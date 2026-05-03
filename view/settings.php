@@ -20,9 +20,13 @@ if (!current_user_can('manage_options')) {
         <div class="notice notice-info">
             <p>
                 <?php
-                printf(
-                    esc_html__('Old configuration data was found at %s.', 'aad-sso-wordpress'),
-                    '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+                echo wp_kses(
+                    sprintf(
+                        /* translators: %s: path to settings file */
+                        __('Old configuration data was found at %s.', 'aad-sso-wordpress'),
+                        '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+                    ),
+                    array('code' => array())
                 );
                 ?>
             </p>
