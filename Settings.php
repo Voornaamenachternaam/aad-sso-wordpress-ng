@@ -160,7 +160,9 @@ class AADSSO_Settings
         }
 
         return match ($key) {
-            'client_id', 'client_secret',
+            'client_id' => sanitize_text_field((string) $value),
+            'client_secret' => (string) $value,
+
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
             'graph_version' => sanitize_text_field((string) $value),
