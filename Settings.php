@@ -2,9 +2,14 @@
 
 declare(strict_types=1);
 
+use Symfony\Component\OptionsResolver\Options;
+use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Cache\Psr16Cache;
+
 class AADSSO_Settings
 {
     private static ?AADSSO_Settings $instance = null;
+    private static ?OptionsResolver $options_resolver = null;
 
     public string $client_id = '';
     public string $client_secret = '';
@@ -58,32 +63,218 @@ class AADSSO_Settings
         return self::$instance;
     }
 
+    public static function get_options_resolver(): OptionsResolver
+    {
+        if (self::$options_resolver === null) {
+            self::$options_resolver = new OptionsResolver();
+
+            $url_fields = array(
+                'redirect_uri',
+                'logout_redirect_uri',
+                'authorization_endpoint',
+                'token_endpoint',
+                'jwks_uri',
+                'end_session_endpoint',
+                'openid_configuration_endpoint',
+                'graph_endpoint',
+            );
+
+            self::$options_resolver->define('client_id')
+                ->required()
+                ->allowedTypes('string')
+                ->sanitize(function (string $value): string {
+                    return sanitize_text_field($value);
+                });
+
+            self::$options_resolver->define('client_secret')
+                ->required()
+                ->allowedTypes('string');
+
+            self::$options_resolver->define('redirect_uri')
+                ->required()
+                ->allowedTypes('string')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('logout_redirect_uri')
+                ->allowedTypes('string')
+                ->default(wp_login_url())
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('org_display_name')
+                ->allowedTypes('string')
+                ->default(get_bloginfo('name'))
+                ->sanitize(function (string $value): string {
+                    return sanitize_text_field($value);
+                });
+
+            self::$options_resolver->define('org_domain_hint')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value): string {
+                    return sanitize_text_field($value);
+                });
+
+            self::$options_resolver->define('field_to_match_to_upn')
+                ->allowedTypes('string')
+                ->default('email')
+                ->allowedValues(array('email', 'login'));
+
+            self::$options_resolver->define('match_on_upn_alias')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('enable_auto_provisioning')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('enable_auto_forward_to_aad')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('enable_aad_group_to_wp_role')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('aad_group_to_wp_role_map')
+                ->allowedTypes('array')
+                ->default(array());
+
+            self::$options_resolver->define('default_wp_role')
+                ->allowedTypes('null', 'string')
+                ->default(null);
+
+            self::$options_resolver->define('enable_full_logout')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('openid_configuration_endpoint')
+                ->allowedTypes('string')
+                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('authorization_endpoint')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value) use ($url_fields): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('token_endpoint')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('jwks_uri')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('end_session_endpoint')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('graph_endpoint')
+                ->allowedTypes('string')
+                ->default('https://graph.microsoft.com')
+                ->sanitize(function (string $value): string {
+                    return esc_url_raw($value);
+                });
+
+            self::$options_resolver->define('graph_version')
+                ->allowedTypes('string')
+                ->default('v1.0')
+                ->sanitize(function (string $value): string {
+                    return sanitize_text_field($value);
+                });
+
+            self::$options_resolver->define('role_map')
+                ->allowedTypes('array')
+                ->default(array())
+                ->after(function (Options $options, $value): array {
+                    if (!is_array($value)) {
+                        return array();
+                    }
+                    return $value;
+                });
+        }
+
+        return self::$options_resolver;
+    }
+
     public static function init(): self
     {
         $instance = self::get_instance();
         $instance->load_settings(get_option('aadsso_settings'));
 
-        $openid_configuration = get_transient('aadsso_openid_configuration');
-        $force_reload = isset($_GET['aadsso_reload_openid_config']);
-
-        if (false === $openid_configuration || $force_reload) {
-            $remote_response = self::get_remote_contents(
-                esc_url_raw($instance->openid_configuration_endpoint)
-            );
-
-            if (!empty($remote_response)) {
-                $openid_configuration = json_decode($remote_response, true);
-                if (is_array($openid_configuration)) {
-                    set_transient('aadsso_openid_configuration', $openid_configuration, 3600);
-                }
-            }
-        }
+        $openid_configuration = self::get_cached_openid_configuration();
 
         if (!empty($openid_configuration) && is_array($openid_configuration)) {
             $instance->load_settings($openid_configuration);
         }
 
         return $instance;
+    }
+
+    private static function get_cached_openid_configuration(): ?array
+    {
+        $force_reload = isset($_GET['aadsso_reload_openid_config']);
+
+        if ($force_reload) {
+            return self::fetch_openid_configuration();
+        }
+
+        $cache = AADSSO_Logger::get_cache();
+
+        try {
+            $cached = $cache->get('aadsso_openid_configuration');
+            if ($cached !== null) {
+                return $cached;
+            }
+        } catch (\Throwable $e) {
+            AADSSO_Logger::log_exception($e, 'Cache read failed for OpenID configuration');
+        }
+
+        $config = self::fetch_openid_configuration();
+
+        if (!empty($config)) {
+            try {
+                $cache->set('aadsso_openid_configuration', $config, 3600);
+            } catch (\Throwable $e) {
+                AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
+            }
+        }
+
+        return $config;
+    }
+
+    private static function fetch_openid_configuration(): ?array
+    {
+        $instance = self::get_instance();
+        $remote_response = self::get_remote_contents(
+            esc_url_raw($instance->openid_configuration_endpoint)
+        );
+
+        if (!empty($remote_response)) {
+            $openid_configuration = json_decode($remote_response, true);
+            if (is_array($openid_configuration)) {
+                return $openid_configuration;
+            }
+        }
+
+        return null;
     }
 
     public static function get_remote_contents(string $url): string
@@ -97,9 +288,8 @@ class AADSSO_Settings
         );
 
         if (is_wp_error($response)) {
-            AADSSO::debug_log(
-                'Failed to fetch remote contents: ' . $response->get_error_message(),
-                100
+            AADSSO_Logger::log_error(
+                'Failed to fetch remote contents: ' . $response->get_error_message()
             );
             return '';
         }
@@ -139,6 +329,7 @@ class AADSSO_Settings
                 $this->{$key} = $this->sanitize_value($key, $value);
             }
         }
+
         return $this;
     }
 

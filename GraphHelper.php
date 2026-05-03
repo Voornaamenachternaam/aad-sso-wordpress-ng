@@ -2,16 +2,48 @@
 
 declare(strict_types=1);
 
+use Http\Client\Common\HttpMethodsClient;
+use Http\Client\Common\Plugin\AddHostPlugin;
+use Http\Discovery\Psr17Discovery;
+use Http\Discovery\Psr18Discovery;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\UriFactoryInterface;
+
 class AADSSO_GraphHelper
 {
     public static ?AADSSO_Settings $settings = null;
     public const GRAPH_VERSION = 'v1.0';
+
+    private static ?HttpMethodsClient $http_client = null;
 
     public static function get_base_url(): string
     {
         $endpoint = self::$settings->graph_endpoint ?? 'https://graph.microsoft.com';
         $version = self::$settings->graph_version ?? self::GRAPH_VERSION;
         return trailingslashit($endpoint) . $version;
+    }
+
+    public static function get_http_client(): HttpMethodsClient
+    {
+        if (self::$http_client === null) {
+            $http_client = Psr18Discovery::findClient();
+            $uri_factory = Psr17Discovery::findUriFactory();
+
+            $base_uri = $uri_factory->createUri(self::get_base_url());
+            $add_host_plugin = new AddHostPlugin($base_uri);
+
+            self::$http_client = new HttpMethodsClient(
+                $http_client,
+                Psr17Discovery::findRequestFactory()
+            );
+        }
+
+        return self::$http_client;
+    }
+
+    public static function set_http_client(HttpMethodsClient $client): void
+    {
+        self::$http_client = $client;
     }
 
     public static function user_check_member_groups(string $user_id, array $group_ids): mixed
@@ -38,7 +70,7 @@ class AADSSO_GraphHelper
             );
         }
 
-        AADSSO::debug_log('GET ' . $url, 50);
+        AADSSO_Logger::log_debug('GET ' . $url, 50);
 
         $response = wp_remote_get(
             esc_url_raw($url),
@@ -58,8 +90,8 @@ class AADSSO_GraphHelper
         $url = $url . '?' . $query_params;
         $payload = wp_json_encode($data);
 
-        AADSSO::debug_log('POST ' . $url, 50);
-        AADSSO::debug_log($payload, 99);
+        AADSSO_Logger::log_debug('POST ' . $url, 50);
+        AADSSO_Logger::log_debug($payload, 99);
 
         $response = wp_remote_post(
             esc_url_raw($url),
@@ -77,7 +109,9 @@ class AADSSO_GraphHelper
     private static function parse_and_log_response(mixed $response): mixed
     {
         if (is_wp_error($response)) {
-            AADSSO::debug_log('Graph API Error: ' . $response->get_error_message(), 100);
+            AADSSO_Logger::log_error(
+                'Graph API Error: ' . $response->get_error_message()
+            );
             return null;
         }
 
@@ -88,8 +122,8 @@ class AADSSO_GraphHelper
         $response_headers = wp_remote_retrieve_headers($response);
         $response_body = wp_remote_retrieve_body($response);
 
-        AADSSO::debug_log('Response headers: ' . wp_json_encode($response_headers), 99);
-        AADSSO::debug_log('Response body: ' . wp_json_encode($response_body), 50);
+        AADSSO_Logger::log_debug('Response headers: ' . wp_json_encode($response_headers), 99);
+        AADSSO_Logger::log_debug('Response body: ' . wp_json_encode($response_body), 50);
 
         return json_decode($response_body);
     }

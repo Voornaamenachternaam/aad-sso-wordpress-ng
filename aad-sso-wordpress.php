@@ -20,6 +20,7 @@ require_once AADSSO_PLUGIN_DIR . '/Settings.php';
 require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
 require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
 require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
+require_once AADSSO_PLUGIN_DIR . '/Logger.php';
 
 class AADSSO
 {
@@ -98,7 +99,7 @@ class AADSSO
         );
 
         if (isset($_GET['aadsso_no_redirect'])) {
-            AADSSO::debug_log('Skipping automatic redirects to Microsoft Entra ID.');
+            AADSSO_Logger::log_info('Skipping automatic redirects to Microsoft Entra ID.');
             $auto_redirect = false;
         }
 
@@ -171,9 +172,10 @@ class AADSSO
                         $antiforgery_id
                     );
 
-                    AADSSO::debug_log("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
-                    AADSSO::debug_log(wp_json_encode($jwt), 50);
+                    AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
+                    AADSSO_Logger::log_debug(wp_json_encode($jwt), 50);
                 } catch (Exception $e) {
+                    AADSSO_Logger::log_exception($e, 'ID token validation failed');
                     return new WP_Error(
                         'invalid_id_token',
                         sprintf(
@@ -194,13 +196,13 @@ class AADSSO
                     );
 
                     if (isset($group_memberships->value)) {
-                        AADSSO::debug_log(sprintf(
+                        AADSSO_Logger::log_debug(sprintf(
                             "Microsoft Entra ID user '%s' is a member of [%s]",
                             $jwt->oid,
                             implode(',', $group_memberships->value)
                         ), 20);
                     } elseif (isset($group_memberships->error)) {
-                        AADSSO::debug_log(
+                        AADSSO_Logger::log_error(
                             'Error when checking group membership: ' . wp_json_encode($group_memberships)
                         );
                         return new WP_Error(
@@ -214,7 +216,7 @@ class AADSSO
                             )
                         );
                     } else {
-                        AADSSO::debug_log(
+                        AADSSO_Logger::log_warning(
                             'Unexpected response to checkMemberGroups: ' . wp_json_encode($group_memberships)
                         );
                         return new WP_Error(
@@ -289,7 +291,7 @@ class AADSSO
         }
 
         if ($user instanceof WP_User) {
-            AADSSO::debug_log(sprintf(
+            AADSSO_Logger::log_debug(sprintf(
                 'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].',
                 $unique_name,
                 (string) $user->ID
@@ -330,7 +332,7 @@ class AADSSO
                     );
                 }
 
-                AADSSO::debug_log("Created new user: '" . $unique_name . "', user id " . $new_user_id . ".");
+                AADSSO_Logger::log_info("Created new user: '" . $unique_name . "', user id " . $new_user_id . ".");
                 $user = new WP_User($new_user_id);
             } else {
                 return new WP_Error(
@@ -364,14 +366,14 @@ class AADSSO
             foreach ($roles_to_set as $role) {
                 $user->add_role($role);
             }
-            AADSSO::debug_log(sprintf(
+            AADSSO_Logger::log_debug(sprintf(
                 'Set roles [%s] for user [%s].',
                 implode(', ', $roles_to_set),
                 (string) $user->ID
             ), 10);
         } elseif (!empty($this->settings->default_wp_role)) {
             $user->set_role((string) $this->settings->default_wp_role);
-            AADSSO::debug_log(sprintf(
+            AADSSO_Logger::log_debug(sprintf(
                 'Set default role [%s] for user [%s].',
                 (string) $this->settings->default_wp_role,
                 (string) $user->ID
@@ -382,7 +384,7 @@ class AADSSO
                     'aad-sso-wordpress'),
                 (string) $user->ID
             );
-            AADSSO::debug_log($error_message, 10);
+            AADSSO_Logger::log_warning($error_message);
             return new WP_Error('user_not_member_of_required_group', $error_message);
         }
 

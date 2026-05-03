@@ -53,7 +53,9 @@ class AADSSO_AuthorizationHelper
         );
 
         if (is_wp_error($response)) {
-            AADSSO::debug_log('Token request error: ' . $response->get_error_message(), 100);
+            AADSSO_Logger::log_error(
+                'Token request error: ' . $response->get_error_message()
+            );
             return new WP_Error(
                 $response->get_error_code(),
                 $response->get_error_message()
