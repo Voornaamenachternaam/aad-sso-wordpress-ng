@@ -1,6 +1,6 @@
 {
-    "name": "psignoret/aad-sso-wordpress",
-    "description": "Single Sign-on with Microsoft Entra ID for WordPress",
+    "name": "Voornaamenachternaam/aad-sso-wordpress-ng",
+    "description": "NG Single Sign-on with Microsoft Entra ID for WordPress",
     "type": "wordpress-plugin",
     "license": "MIT",
     "require": {
