@@ -5,54 +5,60 @@ Plugin Name: Single Sign-on with Microsoft Entra ID
 Plugin URI: http://github.com/psignoret/aad-sso-wordpress
 Description: Allows you to use your organization's Microsoft Entra ID (formerly known as Azure Active Directory) user accounts to log in to WordPress. If your organization is using Office 365, your user accounts are already in Microsoft Entra ID. This plugin uses OAuth 2.0 to authenticate users, and the Microsoft Graph API to get group membership and other details.
 Author: Philippe Signoret
-Version: 0.7.1
+Version: 0.8.0
 Author URI: https://www.psignoret.com/
 Text Domain: aad-sso-wordpress
 Domain Path: /languages/
+Requires PHP: 8.1
+Requires at least: 6.0
+Tested up to: 6.5
 */
 
-defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
+defined( 'ABSPATH' ) || exit;
+
+// Try to load Composer autoloader if available
+$autoloader = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $autoloader ) ) {
+    require_once $autoloader;
+}
 
 define( 'AADSSO', 'aad-sso-wordpress' );
 define( 'AADSSO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'AADSSO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-defined( 'AADSSO_DEBUG' ) or define( 'AADSSO_DEBUG', FALSE );
-defined( 'AADSSO_DEBUG_LEVEL' ) or define( 'AADSSO_DEBUG_LEVEL', 0 );
-
-// Proxy to be used for calls, should be useful for tracing with Fiddler
-// BUGBUG: Doesn't actually work, at least not with WP running on WAMP stack
-//define( 'WP_PROXY_HOST', '127.0.0.1' );
-//define( 'WP_PROXY_PORT', '8888' );
+defined( 'AADSSO_DEBUG' ) || define( 'AADSSO_DEBUG', false );
+defined( 'AADSSO_DEBUG_LEVEL' ) || define( 'AADSSO_DEBUG_LEVEL', 0 );
 
 require_once AADSSO_PLUGIN_DIR . '/Settings.php';
 require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
 require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
 require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
 
-// TODO: Auto-load the ( the exceptions at least )
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/JWT.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/BeforeValidException.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/ExpiredException.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/SignatureInvalidException.php';
-
-//define ('AADSSO_DEBUG', true);
-
+/**
+ * Main plugin class for Single Sign-on with Microsoft Entra ID.
+ */
 class AADSSO {
 
-	static $instance = FALSE;
+	/**
+	 * @var \AADSSO|null Singleton instance
+	 */
+	private static ?AADSSO $instance = null;
 
-	private $settings = null;
+	/**
+	 * @var \AADSSO_Settings|null Plugin settings
+	 */
+	private ?AADSSO_Settings $settings = null;
 
-	public function __construct( $settings ) {
+	/**
+	 * Constructor.
+	 *
+	 * @param \AADSSO_Settings $settings The plugin settings instance.
+	 */
+	public function __construct( AADSSO_Settings $settings ) {
 		$this->settings = $settings;
 
 		// Setup the admin settings page
 		$this->setup_admin_settings();
-
-		// Some debugging locations
-		//add_action( 'admin_notices', array( $this, 'print_debug' ) );
-		//add_action( 'login_footer', array( $this, 'print_debug' ) );
 
 		// Add a link to the Settings page in the list of plugins
 		add_filter(
@@ -61,8 +67,8 @@ class AADSSO {
 		);
 
 		// Register activation and deactivation hooks
-		register_activation_hook( __FILE__, array( 'AADSSO', 'activate' ) );
-		register_deactivation_hook( __FILE__, array( 'AADSSO', 'deactivate' ) );
+		register_activation_hook( __FILE__, array( self::class, 'activate' ) );
+		register_deactivation_hook( __FILE__, array( self::class, 'deactivate' ) );
 
 		// If plugin is not configured, we shouldn't proceed.
 		if ( ! $this->plugin_is_configured() ) {
@@ -80,7 +86,7 @@ class AADSSO {
 		add_action( 'login_enqueue_scripts', array( $this, 'print_login_css' ) );
 
 		// Add the link to the organization's sign-in page
-		add_action( 'login_form', array( $this, 'print_login_link' ) ) ;
+		add_action( 'login_form', array( $this, 'print_login_link' ) );
 
 		// Clear session variables when logging out
 		add_action( 'wp_logout', array( $this, 'logout' ) );
@@ -546,7 +552,7 @@ class AADSSO {
 	 * @return string The authorization URL used to initiate a sign-in to Microsoft Entra ID.
 	 */
 	function get_login_url() {
-		$antiforgery_id = com_create_guid();
+		$antiforgery_id = aad_sso_create_uuid();
 		$_SESSION['aadsso_antiforgery-id'] = $antiforgery_id;
 		return AADSSO_AuthorizationHelper::get_authorization_url( $this->settings, $antiforgery_id );
 	}
@@ -649,14 +655,16 @@ class AADSSO {
 	function print_login_link() {
 		$html = '<p class="aadsso-login-form-text">';
 		$html .= '<a href="%s">';
-		$html .= sprintf( __( 'Sign in with your %s account', 'aad-sso-wordpress' ),
-		                  htmlentities( $this->settings->org_display_name ) );
+		$org_name = ! empty( $this->settings->org_display_name ) 
+			? esc_html( $this->settings->org_display_name ) 
+			: 'Organization';
+		$html .= sprintf( esc_html__( 'Sign in with your %s account', 'aad-sso-wordpress' ), $org_name );
 		$html .= '</a><br /><a class="dim" href="%s">'
-		         . __( 'Sign out', 'aad-sso-wordpress' ) . '</a></p>';
+		         . esc_html__( 'Sign out', 'aad-sso-wordpress' ) . '</a></p>';
 		printf(
 			$html,
-			$this->get_login_url(),
-			$this->get_logout_url()
+			esc_url( $this->get_login_url() ),
+			esc_url( $this->get_logout_url() )
 		);
 	}
 
@@ -720,27 +728,36 @@ class AADSSO {
 
 /*** Utility functions ***/
 
-if ( ! function_exists( 'com_create_guid' ) ) {
+if ( ! function_exists( 'aad_sso_create_uuid' ) ) {
 	/**
-	 * Generates a globally unique identifier ( Guid ).
+	 * Generates a UUID v4 string (Universally Unique Identifier).
 	 *
-	 * @return string A new random globally unique identifier.
+	 * Uses cryptographically secure random bytes when available (PHP 7+).
+	 * Falls back to less secure method for older PHP versions.
+	 *
+	 * @return string A new random UUID v4.
 	 */
-	function com_create_guid() {
-		mt_srand( (int)( (double)microtime() * 10000 ) );
-		$charid = strtoupper( md5( uniqid( rand(), true ) ) );
-		$hyphen = chr( 45 ); // "-"
-		$uuid = chr( 123 ) // "{"
-			.substr( $charid, 0, 8 ) . $hyphen
-			.substr( $charid, 8, 4 ) . $hyphen
-			.substr( $charid, 12, 4 ) . $hyphen
-			.substr( $charid, 16, 4 ) . $hyphen
-			.substr( $charid, 20, 12 )
-			.chr( 125 ); // "}"
-		return $uuid;
+	function aad_sso_create_uuid() {
+		// Generate 16 random bytes
+		if ( function_exists( 'random_bytes' ) ) {
+			$random_bytes = random_bytes( 16 );
+		} else {
+			$random_bytes = '';
+			for ( $i = 0; $i < 16; $i++ ) {
+				$random_bytes .= chr( mt_rand( 0, 255 ) );
+			}
+		}
+
+		// Set version to 0100 (UUID version 4)
+		$random_bytes[6] = chr( ord( $random_bytes[6] ) & 0x0f | 0x40 );
+		// Set bits 6-7 to 10 (UUID variant)
+		$random_bytes[8] = chr( ord( $random_bytes[8] ) & 0x3f | 0x80 );
+
+		// Format as UUID string
+		return vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $random_bytes ), 4 ) );
 	}
 }
 
 // Load settings JSON contents from DB and initialize the plugin
 $aadsso_settings_instance = AADSSO_Settings::init();
-$aadsso = AADSSO::get_instance( $aadsso_settings_instance, com_create_guid() );
+$aadsso = AADSSO::get_instance( $aadsso_settings_instance, aad_sso_create_uuid() );

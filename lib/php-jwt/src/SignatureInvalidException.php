@@ -1,7 +1,13 @@
 <?php
+
 namespace AADSSO\Firebase\JWT;
 
-class SignatureInvalidException extends \UnexpectedValueException
+use UnexpectedValueException;
+
+/**
+ * Exception thrown when the token signature is invalid.
+ */
+class SignatureInvalidException extends UnexpectedValueException
 {
 
 }
