@@ -64,8 +64,8 @@ class AADSSO_AuthorizationHelper
         $result = json_decode($output);
 
         if (isset($result->access_token) && session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION['aadsso_token_type'] = sanitize_text_field($result->token_type ?? 'Bearer');
-            $_SESSION['aadsso_access_token'] = sanitize_text_field($result->access_token);
+            $_SESSION['aadsso_token_type'] = (string) ($result->token_type ?? 'Bearer');
+            $_SESSION['aadsso_access_token'] = (string) $result->access_token;
         }
 
         return $result;
