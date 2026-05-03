@@ -209,3 +209,30 @@ msgstr ""
 
 msgid "Configure advanced settings for Microsoft Entra ID Single Sign-on."
 msgstr ""
+
+msgid "Security Information"
+msgstr ""
+
+msgid "This plugin implements the following security measures:"
+msgstr ""
+
+msgid "CSRF protection via WordPress nonces"
+msgstr ""
+
+msgid "XSS prevention via output escaping"
+msgstr ""
+
+msgid "SQL injection prevention via WordPress prepared statements"
+msgstr ""
+
+msgid "JWT signature verification using RS256"
+msgstr ""
+
+msgid "Nonce verification for state parameter in OAuth flow"
+msgstr ""
+
+msgid "Secure session management"
+msgstr ""
+
+msgid "TLS/SSL verification for all external requests"
+msgstr ""

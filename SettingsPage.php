@@ -300,6 +300,31 @@ class AADSSO_Settings_Page
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
+
+        add_settings_field(
+            'aadsso_settings_security_info',
+            esc_html__('Security Information', 'aad-sso-wordpress'),
+            array($this, 'security_info_callback'),
+            'aadsso_settings_page',
+            'aadsso_settings_advanced'
+        );
+    }
+
+    public function security_info_callback(): void
+    {
+        echo '<p>' . esc_html__(
+            'This plugin implements the following security measures:',
+            'aad-sso-wordpress'
+        ) . '</p>';
+        echo '<ul>';
+        echo '<li>' . esc_html__('CSRF protection via WordPress nonces', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('XSS prevention via output escaping', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('SQL injection prevention via WordPress prepared statements', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('JWT signature verification using RS256', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('Nonce verification for state parameter in OAuth flow', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('Secure session management', 'aad-sso-wordpress') . '</li>';
+        echo '<li>' . esc_html__('TLS/SSL verification for all external requests', 'aad-sso-wordpress') . '</li>';
+        echo '</ul>';
     }
 
     public function sanitize_settings(array $input): array
@@ -387,7 +412,12 @@ class AADSSO_Settings_Page
 
     public function client_secret_callback(): void
     {
-        $this->render_text_field('client_secret');
+        $value = isset($this->settings['client_secret']) ? esc_attr($this->settings['client_secret']) : '';
+        printf(
+            '<input class="regular-text" type="password" autocomplete="new-password" '
+            . 'name="aadsso_settings[client_secret]" id="client_secret" value="%s" />',
+            $value
+        );
         echo '<p class="description">' . esc_html__(
             'A secret key for the Microsoft Entra ID application representing this blog.',
             'aad-sso-wordpress'

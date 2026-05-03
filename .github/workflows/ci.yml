@@ -53,10 +53,10 @@ jobs:
 
       - name: Get WordPress
         run: |
-          curl -sLO https://wordpress.org/wordpress-6.7.tar.gz
-          tar -xzf wordpress-6.7.tar.gz
+          curl -sLO https://wordpress.org/wordpress-6.9.4.tar.gz
+          tar -xzf wordpress-6.9.4.tar.gz
           mv wordpress/* .
-          rm -rf wordpress wordpress-6.7.tar.gz
+          rm -rf wordpress wordpress-6.9.4.tar.gz
 
       - name: Create wp-config.php
         run: |
