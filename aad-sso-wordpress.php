@@ -164,7 +164,7 @@ class AADSSO
             }
 
             $antiforgery_id = (string) $_SESSION['aadsso_antiforgery-id'];
-            $state_param = isset($_GET['state']) ? sanitize_text_field(wp_unslash($_GET['state'])) : '';
+            $state_param = isset($_GET['state']) ? (string) wp_unslash($_GET['state']) : '';
 
             if ('' === $state_param || $state_param !== $antiforgery_id) {
                 return new WP_Error(
@@ -176,7 +176,7 @@ class AADSSO
                 );
             }
 
-            $code = sanitize_text_field(wp_unslash($_GET['code']));
+            $code = (string) wp_unslash($_GET['code']);
             $token = AADSSO_AuthorizationHelper::get_access_token($code, $this->settings);
 
             if (isset($token->access_token)) {
