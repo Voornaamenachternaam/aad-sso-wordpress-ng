@@ -11,10 +11,14 @@ declare(strict_types=1);
 
 /**
  * Microsoft Graph API helper class.
+ *
+ * @package AADSSO
  */
 class AADSSO_GraphHelper
 {
+    /** @var AADSSO_Settings|null Static settings reference */
     public static ?AADSSO_Settings $settings = null;
+
     public const GRAPH_VERSION = 'v1.0';
 
     public static function get_base_url(): string
@@ -38,8 +42,9 @@ class AADSSO_GraphHelper
 
     public static function get_request(string $url, array $query_params = array()): mixed
     {
-        $query_params = http_build_query($query_params);
-        $url = $url . '?' . $query_params;
+        if (!empty($query_params)) {
+            $url = $url . '?' . http_build_query($query_params);
+        }
 
         if (session_status() === PHP_SESSION_ACTIVE) {
             $_SESSION['aadsso_last_request'] = array(
@@ -64,8 +69,9 @@ class AADSSO_GraphHelper
 
     public static function post_request(string $url, array $query_params = array(), array $data = array()): mixed
     {
-        $query_params = http_build_query($query_params);
-        $url = $url . '?' . $query_params;
+        if (!empty($query_params)) {
+            $url = $url . '?' . http_build_query($query_params);
+        }
         $payload = wp_json_encode($data);
 
         AADSSO_Logger::log_debug('POST ' . $url, 50);
@@ -90,11 +96,7 @@ class AADSSO_GraphHelper
             AADSSO_Logger::log_error(
                 'Graph API Error: ' . $response->get_error_message()
             );
-            return null;
-        }
-
-        if (null === $response) {
-            return null;
+            return $response;
         }
 
         $response_headers = wp_remote_retrieve_headers($response);
