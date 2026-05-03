@@ -15,6 +15,17 @@ if (defined('ABSPATH')) {
     define('ABSPATH', is_dir($default_path) ? $default_path : __DIR__ . '/../');
 }
 
+// Bridge environment variables to PHP constants (for PHPUnit test configuration)
+// Note: getenv() returns strings, so we convert to appropriate types
+if (!defined('AADSSO_DEBUG')) {
+    $env_debug = getenv('AADSSO_DEBUG');
+    define('AADSSO_DEBUG', $env_debug !== false && filter_var($env_debug, FILTER_VALIDATE_BOOLEAN));
+}
+if (!defined('AADSSO_DEBUG_LEVEL')) {
+    $env_level = getenv('AADSSO_DEBUG_LEVEL');
+    define('AADSSO_DEBUG_LEVEL', $env_level !== false ? (int) $env_level : 0);
+}
+
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
