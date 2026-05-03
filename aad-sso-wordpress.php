@@ -12,7 +12,7 @@ Author URI: https://www.psignoret.com/
 Text Domain: aad-sso-wordpress
 Domain Path: /languages/
 Requires at least: 6.0
-Tested up to: 6.7
+Tested up to: 6.9.4
 Requires PHP: 8.1
 License: MIT
 License URI: https://github.com/psignoret/aad-sso-wordpress/blob/master/LICENSE.md
