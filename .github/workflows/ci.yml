@@ -27,12 +27,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.3'
+          php-version: latest
           extensions: mbstring, json, openssl, curl, mysql
           coverage: none
 
@@ -79,12 +79,12 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.3'
+          php-version: latest
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -99,12 +99,12 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.3'
+          php-version: latest
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -119,12 +119,12 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.3'
+          php-version: latest
           extensions: mbstring, json, openssl, xdebug
 
       - name: Install Composer dependencies
@@ -143,12 +143,12 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.3'
+          php-version: latest
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist
