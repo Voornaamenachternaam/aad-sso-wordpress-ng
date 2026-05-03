@@ -232,7 +232,7 @@ class AADSSO_Settings
     {
         $force_reload = isset($_GET['aadsso_reload_openid_config']);
 
-        if ($force_reload) {
+        if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
             return self::fetch_openid_configuration();
         }
 
