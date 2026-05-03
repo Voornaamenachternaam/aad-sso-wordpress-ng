@@ -236,7 +236,7 @@ class AADSSO_Settings
 
         try {
             $cached = $cache->get('aadsso_openid_configuration');
-            if ($cached !== null) {
+            if (is_array($cached)) {
                 return $cached;
             }
         } catch (\Throwable $e) {
