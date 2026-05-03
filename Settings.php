@@ -144,11 +144,26 @@ class AADSSO_Settings
 
     private function sanitize_value(string $key, mixed $value): mixed
     {
+        $url_fields = array(
+            'redirect_uri',
+            'logout_redirect_uri',
+            'authorization_endpoint',
+            'token_endpoint',
+            'jwks_uri',
+            'end_session_endpoint',
+            'openid_configuration_endpoint',
+            'graph_endpoint',
+        );
+
+        if (in_array($key, $url_fields, true)) {
+            return esc_url_raw((string) $value);
+        }
+
         return match ($key) {
-            'client_id', 'client_secret', 'redirect_uri', 'logout_redirect_uri',
-            'org_display_name', 'org_domain_hint', 'field_to_match_to_upn', 'default_wp_role',
-            'authorization_endpoint', 'token_endpoint', 'jwks_uri', 'end_session_endpoint',
-            'openid_configuration_endpoint', 'graph_endpoint', 'graph_version' => sanitize_text_field((string) $value),
+            'client_id', 'client_secret',
+            'org_display_name', 'org_domain_hint',
+            'field_to_match_to_upn', 'default_wp_role',
+            'graph_version' => sanitize_text_field((string) $value),
 
             'enable_auto_provisioning', 'enable_auto_forward_to_aad', 'enable_aad_group_to_wp_role',
             'enable_full_logout', 'match_on_upn_alias' => (bool) $value,
