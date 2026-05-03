@@ -218,10 +218,30 @@ class AADSSO_Settings
         $openid_configuration = self::get_cached_openid_configuration();
 
         if (!empty($openid_configuration) && is_array($openid_configuration)) {
-            $instance->load_settings($openid_configuration);
+            // Filter to only known settings to prevent resolve() from throwing on unknown keys
+            $filtered_config = self::filter_to_known_settings($openid_configuration);
+            if (!empty($filtered_config)) {
+                $instance->load_settings($filtered_config);
+            }
         }
 
         return $instance;
+    }
+
+    /**
+     * Filter array to only include keys defined in OptionsResolver.
+     * Prevents resolve() from throwing UndefinedOptionsException on OpenID discovery fields.
+     */
+    private static function filter_to_known_settings(array $settings): array
+    {
+        $resolver = self::get_options_resolver();
+        $defined_options = array_keys($resolver->resolve(array()));
+
+        return array_filter(
+            $settings,
+            fn(string $key): bool => in_array($key, $defined_options, true),
+            ARRAY_FILTER_USE_KEY
+        );
     }
 
     private static function get_cached_openid_configuration(): ?array
