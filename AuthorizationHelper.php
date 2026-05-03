@@ -110,11 +110,9 @@ class AADSSO_AuthorizationHelper
             }
         }
 
-        if (isset($jwt->aud)) {
-            $audiences = is_array($jwt->aud) ? $jwt->aud : [$jwt->aud];
-            if (!in_array($settings->client_id, $audiences, true)) {
-                throw new DomainException('Token audience validation failed');
-            }
+        $audiences = isset($jwt->aud) ? (is_array($jwt->aud) ? $jwt->aud : [$jwt->aud]) : [];
+        if (!in_array($settings->client_id, $audiences, true)) {
+            throw new DomainException('Token audience validation failed');
         }
 
         return $jwt;
