@@ -80,9 +80,9 @@ class AADSSO_Settings_Page
             exit;
         }
 
-        $json_error = json_last_error();
         $legacy_settings = json_decode($json_content, true);
-        if (null === $legacy_settings || JSON_ERROR_NONE !== $json_error) {
+        $json_error = json_last_error();
+        if (null === $legacy_settings && JSON_ERROR_NONE !== $json_error) {
             AADSSO_Logger::log_error('JSON decode error during migration: ' . json_last_error_msg());
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
                 admin_url('options-general.php?page=aadsso_settings')));
