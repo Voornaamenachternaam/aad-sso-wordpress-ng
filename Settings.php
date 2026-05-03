@@ -242,7 +242,19 @@ class AADSSO_Settings
         $force_reload = isset($_GET['aadsso_reload_openid_config']);
 
         if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
-            return self::fetch_openid_configuration();
+            $config = self::fetch_openid_configuration();
+
+            // Update cache with fresh data after forced reload
+            if (!empty($config)) {
+                try {
+                    $cache = AADSSO_Logger::get_cache();
+                    $cache->set('aadsso_openid_configuration', $config, 3600);
+                } catch (\Throwable $e) {
+                    AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
+                }
+            }
+
+            return $config;
         }
 
         $cache = AADSSO_Logger::get_cache();
