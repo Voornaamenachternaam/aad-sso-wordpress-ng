@@ -151,7 +151,6 @@ class AADSSO_Settings
                 $this->{$key} = $value;
             }
         }
-        }
         return $this;
     }
 }
