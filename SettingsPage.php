@@ -31,7 +31,8 @@ class AADSSO_Settings_Page
 
     public function maybe_reset_settings(): void
     {
-        if (!isset($_GET['aadsso_nonce']) || !wp_verify_nonce($_GET['aadsso_nonce'], 'aadsso_reset_settings')) {
+        $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
+        if ('' === $nonce || !wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
             return;
         }
 
@@ -42,8 +43,9 @@ class AADSSO_Settings_Page
 
     public function maybe_migrate_settings(): void
     {
-        if (!isset($_GET['aadsso_nonce'])
-            || !wp_verify_nonce($_GET['aadsso_nonce'], 'aadsso_migrate_from_json')
+        $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
+        if ('' === $nonce
+            || !wp_verify_nonce($nonce, 'aadsso_migrate_from_json')
             || !defined('AADSSO_SETTINGS_PATH')
             || !file_exists(AADSSO_SETTINGS_PATH)
         ) {
