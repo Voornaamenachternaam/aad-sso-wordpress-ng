@@ -158,13 +158,8 @@ class AADSSO_Logger
             'exception_line' => $exception->getLine(),
         );
 
-        if (!empty($message)) {
-            $context['message'] = $message;
-        }
+        $log_message = $message ?: $exception->getMessage();
 
-        self::get_logger()->error(
-            $message ?: $exception->getMessage(),
-            $context
-        );
+        self::get_logger()->error($log_message, $context);
     }
 }
