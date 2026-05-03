@@ -105,7 +105,14 @@ class AADSSO_GraphHelper
         AADSSO_Logger::log_debug('Response headers: ' . wp_json_encode($response_headers), 99);
         AADSSO_Logger::log_debug('Response body: ' . wp_json_encode($response_body), 50);
 
-        return json_decode($response_body);
+        $decoded = json_decode($response_body);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            AADSSO_Logger::log_error('Graph API response JSON decode error: ' . json_last_error_msg());
+            return new WP_Error('invalid_json_response', 'Graph API response could not be decoded');
+        }
+
+        return $decoded;
     }
 
     private static function get_required_headers_and_settings(): array

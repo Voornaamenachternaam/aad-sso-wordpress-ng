@@ -190,7 +190,7 @@ class AADSSO
 
                     AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
                     AADSSO_Logger::log_debug(wp_json_encode($jwt), 50);
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     AADSSO_Logger::log_exception($e, 'ID token validation failed');
                     return new WP_Error(
                         'invalid_id_token',
@@ -524,7 +524,10 @@ class AADSSO
         $debug_enabled = apply_filters('aadsso_debug', AADSSO_DEBUG);
         $debug_level = apply_filters('aadsso_debug_level', AADSSO_DEBUG_LEVEL);
 
-        if (true === $debug_enabled && $debug_level >= $level) {
+        // Handle both boolean and string "true" for compatibility
+        $is_enabled = filter_var($debug_enabled, FILTER_VALIDATE_BOOLEAN);
+
+        if ($is_enabled && $debug_level >= $level) {
             $formatted_message = 'AADSSO: ' . (is_string($message) ? $message : wp_json_encode($message));
             error_log($formatted_message);
         }

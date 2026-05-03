@@ -290,6 +290,12 @@ class AADSSO_Settings
 
         if (!empty($remote_response)) {
             $openid_configuration = json_decode($remote_response, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                AADSSO_Logger::log_error('OpenID configuration JSON decode error: ' . json_last_error_msg());
+                return null;
+            }
+
             if (is_array($openid_configuration)) {
                 return $openid_configuration;
             }

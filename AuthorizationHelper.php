@@ -76,6 +76,11 @@ class AADSSO_AuthorizationHelper
         $output = wp_remote_retrieve_body($response);
         $result = json_decode($output);
 
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            AADSSO_Logger::log_error('Token response JSON decode error: ' . json_last_error_msg());
+            return new WP_Error('invalid_json_response', 'Token response could not be decoded');
+        }
+
         if (isset($result->access_token) && session_status() === PHP_SESSION_ACTIVE) {
             $_SESSION['aadsso_token_type'] = (string) ($result->token_type ?? 'Bearer');
             $_SESSION['aadsso_access_token'] = (string) $result->access_token;
@@ -106,13 +111,17 @@ class AADSSO_AuthorizationHelper
         $jwks_body = wp_remote_retrieve_body($jwks_response);
         $jwks = json_decode($jwks_body, true);
 
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new DomainException('JWKS response JSON decode error: ' . json_last_error_msg());
+        }
+
         if (!is_array($jwks) || empty($jwks['keys']) || !is_array($jwks['keys'])) {
             throw new DomainException('jwks_uri does not contain valid keys');
         }
 
         try {
             $keys = \Firebase\JWT\JWK::parseKeySet($jwks, 'RS256');
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
         }
 
@@ -124,7 +133,7 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Token signature verification failed');
         } catch (\Firebase\JWT\BeforeValidException $e) {
             throw new DomainException('Token is not yet valid');
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Token validation failed: ' . $e->getMessage());
         }
 
