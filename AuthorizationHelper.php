@@ -22,7 +22,7 @@ class AADSSO_AuthorizationHelper
         return $auth_url;
     }
 
-    public static function get_access_token(string $code, AADSSO_Settings $settings)
+    public static function get_access_token(string $code, AADSSO_Settings $settings): mixed
     {
         $authentication_request_body = http_build_query(array(
             'grant_type' => 'authorization_code',
@@ -39,7 +39,7 @@ class AADSSO_AuthorizationHelper
     public static function get_and_process_access_token(
         string $authentication_request_body,
         AADSSO_Settings $settings
-    ) {
+    ): mixed {
         $response = wp_remote_post(
             esc_url_raw($settings->token_endpoint),
             array(
