@@ -134,7 +134,7 @@ class AADSSO
         return 'login' === $action;
     }
 
-    public function authenticate($user, string $username, string $password)
+    public function authenticate($user, string $username, string $password): WP_User|WP_Error|null
     {
         if ($user instanceof WP_User) {
             return $user;
@@ -230,7 +230,11 @@ class AADSSO
                 $user = $this->get_wp_user_from_aad_user($jwt, $group_memberships);
 
                 if ($user instanceof WP_User && true === $this->settings->enable_aad_group_to_wp_role) {
-                    $user = $this->update_wp_user_roles($user, $group_memberships);
+                    $role_result = $this->update_wp_user_roles($user, $group_memberships);
+                    if ($role_result instanceof WP_Error) {
+                        return $role_result;
+                    }
+                    $user = $role_result;
                 }
             } elseif (isset($token->error)) {
                 return new WP_Error(
@@ -263,7 +267,7 @@ class AADSSO
         return $user;
     }
 
-    public function get_wp_user_from_aad_user($jwt, $group_memberships)
+    public function get_wp_user_from_aad_user($jwt, $group_memberships): WP_User|WP_Error
     {
         $upn = isset($jwt->upn) ? (string) $jwt->upn : null;
         $unique_name = isset($jwt->unique_name) ? (string) $jwt->unique_name : null;
@@ -349,7 +353,7 @@ class AADSSO
         return $user;
     }
 
-    public function update_wp_user_roles(WP_User $user, $group_memberships): WP_User
+    public function update_wp_user_roles(WP_User $user, $group_memberships): WP_User|WP_Error
     {
         $roles_to_set = array();
 
