@@ -161,7 +161,10 @@ class AADSSO_Settings
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
                 ->default('')
-                ->sanitize(function (string $value) use ($url_fields): string {
+            self::$options_resolver->define('authorization_endpoint')
+                ->allowedTypes('string')
+                ->default('')
+                ->sanitize(function (string $value): string {
                     return esc_url_raw($value);
                 });
 
