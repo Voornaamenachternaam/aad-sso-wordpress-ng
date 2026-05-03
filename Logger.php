@@ -24,6 +24,8 @@ class AADSSO_Logger
             $log_dir = AADSSO_PLUGIN_DIR . 'logs';
             if (!is_dir($log_dir)) {
                 wp_mkdir_p($log_dir);
+                file_put_contents($log_dir . '/.htaccess', 'Deny from all');
+                file_put_contents($log_dir . '/index.php', '<?php // Silence is golden.');
             }
 
             $handler = new RotatingFileHandler(
