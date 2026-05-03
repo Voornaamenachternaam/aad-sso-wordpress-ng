@@ -179,7 +179,7 @@ class AADSSO
                 );
             }
 
-            $id_token = sanitize_text_field($authorization_result->id_token);
+            $id_token = $authorization_result->id_token;
             $jwt = AADSSO_AuthorizationHelper::validate_id_token(
                 $id_token,
                 $this->settings,
