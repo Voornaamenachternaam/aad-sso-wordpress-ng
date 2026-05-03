@@ -91,8 +91,8 @@ class AADSSO_GraphHelper
 
     private static function get_required_headers_and_settings(): array
     {
-        $token_type = $_SESSION['aadsso_token_type'] ?? 'Bearer';
-        $access_token = $_SESSION['aadsso_access_token'] ?? '';
+        $token_type = (session_status() === PHP_SESSION_ACTIVE) ? ($_SESSION['aadsso_token_type'] ?? 'Bearer') : 'Bearer';
+        $access_token = (session_status() === PHP_SESSION_ACTIVE) ? ($_SESSION['aadsso_access_token'] ?? '') : '';
 
         return [
             'Authorization' => $token_type . ' ' . $access_token,
