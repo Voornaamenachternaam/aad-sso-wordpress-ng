@@ -1,9 +1,10 @@
 <?php
 
-// If uninstall is not called from WordPress, exit
-if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+declare(strict_types=1);
+
+if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit();
 }
 
-// The only uninstall work needed is to remove any stored settings.
-delete_option( 'aadsso_settings' );
+delete_option('aadsso_settings');
+delete_transient('aadsso_openid_configuration');
