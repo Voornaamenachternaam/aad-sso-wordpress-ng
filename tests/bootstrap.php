@@ -2,7 +2,19 @@
 
 declare(strict_types=1);
 
-define('ABSPATH', __DIR__ . '/../../../wordpress/');
+// Allow ABSPATH to be overridden via environment variable (for CI/standalone setups)
+// This is the standard WordPress convention: check env first, then use default
+if (defined('ABSPATH')) {
+    // Already defined (e.g., by WordPress test suite or parent configuration)
+} elseif (getenv('ABSPATH') !== false) {
+    define('ABSPATH', rtrim(getenv('ABSPATH'), '/') . '/');
+} else {
+    // Fallback for plugin installed in standard wp-content/plugins location
+    $default_path = __DIR__ . '/../../../wordpress/';
+    // Only use if it exists, otherwise use plugin dir as safe fallback
+    define('ABSPATH', is_dir($default_path) ? $default_path : __DIR__ . '/../');
+}
+
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
