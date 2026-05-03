@@ -21,11 +21,28 @@ class AADSSO_Logger
     public static function get_logger(): Logger
     {
         if (self::$logger === null) {
-            $log_dir = AADSSO_PLUGIN_DIR . 'logs';
+            // Use WordPress uploads directory for logs (standard writable path)
+            if (function_exists('wp_upload_dir')) {
+                $upload_dir = wp_upload_dir();
+                $log_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-logs';
+            } else {
+                // Fallback to plugin directory if WordPress not fully loaded
+                $log_dir = AADSSO_PLUGIN_DIR . 'logs';
+            }
+
             if (!is_dir($log_dir)) {
-                wp_mkdir_p($log_dir);
-                file_put_contents($log_dir . '/.htaccess', 'Deny from all');
-                file_put_contents($log_dir . '/index.php', '<?php // Silence is golden.');
+                if (function_exists('wp_mkdir_p')) {
+                    wp_mkdir_p($log_dir);
+                } else {
+                    mkdir($log_dir, 0755, true);
+                }
+                // Add security files to protect logs directory
+                if (!file_exists($log_dir . '/.htaccess')) {
+                    file_put_contents($log_dir . '/.htaccess', 'Deny from all');
+                }
+                if (!file_exists($log_dir . '/index.php')) {
+                    file_put_contents($log_dir . '/index.php', '<?php // Silence is golden.');
+                }
             }
 
             $handler = new RotatingFileHandler(
@@ -47,9 +64,21 @@ class AADSSO_Logger
     public static function get_cache(): Psr16Cache
     {
         if (self::$cache === null) {
-            $cache_dir = AADSSO_PLUGIN_DIR . 'cache';
+            // Use WordPress uploads directory for cache (standard writable path)
+            if (function_exists('wp_upload_dir')) {
+                $upload_dir = wp_upload_dir();
+                $cache_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-cache';
+            } else {
+                // Fallback to plugin directory if WordPress not fully loaded
+                $cache_dir = AADSSO_PLUGIN_DIR . 'cache';
+            }
+
             if (!is_dir($cache_dir)) {
-                wp_mkdir_p($cache_dir);
+                if (function_exists('wp_mkdir_p')) {
+                    wp_mkdir_p($cache_dir);
+                } else {
+                    mkdir($cache_dir, 0755, true);
+                }
             }
 
             $filesystem_adapter = new FilesystemAdapter('', 0, $cache_dir);

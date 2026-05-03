@@ -68,17 +68,6 @@ class AADSSO_Settings
         if (self::$options_resolver === null) {
             self::$options_resolver = new OptionsResolver();
 
-            $url_fields = array(
-                'redirect_uri',
-                'logout_redirect_uri',
-                'authorization_endpoint',
-                'token_endpoint',
-                'jwks_uri',
-                'end_session_endpoint',
-                'openid_configuration_endpoint',
-                'graph_endpoint',
-            );
-
             self::$options_resolver->define('client_id')
                 ->required()
                 ->allowedTypes('string')
@@ -158,9 +147,6 @@ class AADSSO_Settings
                     return esc_url_raw($value);
                 });
 
-            self::$options_resolver->define('authorization_endpoint')
-                ->allowedTypes('string')
-                ->default('')
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
                 ->default('')
@@ -307,6 +293,7 @@ class AADSSO_Settings
             return $this;
         }
 
+        // Convert legacy role_map format to aad_group_to_wp_role_map
         if (!empty($settings['role_map']) && is_array($settings['role_map'])) {
             $settings['aad_group_to_wp_role_map'] = array();
             foreach ($settings['role_map'] as $role_slug => $group_ids_list) {
@@ -327,46 +314,18 @@ class AADSSO_Settings
             }
         }
 
-        foreach ($settings as $key => $value) {
-            if (property_exists($this, $key)) {
-                $this->{$key} = $this->sanitize_value($key, $value);
+        // Use OptionsResolver to validate and sanitize settings
+        try {
+            $resolved_settings = self::get_options_resolver()->resolve($settings);
+            foreach ($resolved_settings as $key => $value) {
+                if (property_exists($this, $key)) {
+                    $this->{$key} = $value;
+                }
             }
+        } catch (\Throwable $e) {
+            AADSSO_Logger::log_exception($e, 'Failed to resolve settings with OptionsResolver');
         }
 
         return $this;
-    }
-
-    private function sanitize_value(string $key, mixed $value): mixed
-    {
-        $url_fields = array(
-            'redirect_uri',
-            'logout_redirect_uri',
-            'authorization_endpoint',
-            'token_endpoint',
-            'jwks_uri',
-            'end_session_endpoint',
-            'openid_configuration_endpoint',
-            'graph_endpoint',
-        );
-
-        if (in_array($key, $url_fields, true)) {
-            return esc_url_raw((string) $value);
-        }
-
-        return match ($key) {
-            'client_id' => sanitize_text_field((string) $value),
-            'client_secret' => (string) $value,
-
-            'org_display_name', 'org_domain_hint',
-            'field_to_match_to_upn', 'default_wp_role',
-            'graph_version' => sanitize_text_field((string) $value),
-
-            'enable_auto_provisioning', 'enable_auto_forward_to_aad', 'enable_aad_group_to_wp_role',
-            'enable_full_logout', 'match_on_upn_alias' => (bool) $value,
-
-            'aad_group_to_wp_role_map' => is_array($value) ? $value : array(),
-
-            default => $value,
-        };
     }
 }
