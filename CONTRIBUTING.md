@@ -1,4 +1,4 @@
-# Contributing to Sign Sign-on with Microsoft Entra ID (for WordPress)
+# Contributing to Single Sign-on with Microsoft Entra ID (for WordPress)
 This WordPress plugin is actively maintained by contributors like you.  Contributing is easy.
 
 ## Getting Started

@@ -1,4 +1,4 @@
-# Sign Sign-on with Microsoft Entra ID (for WordPress)
+# Single Sign-on with Microsoft Entra ID (for WordPress)
 
 A WordPress plugin that allows organizations to use their Microsoft Entra ID (formerly known as Azure Active Directory) user accounts to sign in to WordPress. Organizations with Office 365 already have Microsoft Entra ID (Microsoft Entra ID) and can use this plugin for all of their users.
 

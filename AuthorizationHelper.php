@@ -1,155 +1,127 @@
 <?php
 
-/**
- * A helper class used to request authorization and access tokens Microsoft Entra ID.
- */
+declare(strict_types=1);
+
 class AADSSO_AuthorizationHelper
 {
-	/**
-	 * @var string[] List of allowed algorithms. Currently, only RS256 is allowed and expected from AAD.
-	 */
-	private static array $allowed_algorithms = array( 'RS256' );
+    private static array $allowed_algorithms = array('RS256');
 
-	/**
-	 * Gets the authorization URL used to makes the authorization request.
-	 *
-	 * @param \AADSSO_Settings $settings The settings to use.
-	 * @param string $antiforgery_id The value to use as the nonce.
-	 *
-	 * @return string The authorization URL.
-	 */
-	public static function get_authorization_url( $settings, string $antiforgery_id ): string {
-		$auth_url = $settings->authorization_endpoint . '?'
-		 . http_build_query( array(
-				'response_type' => 'code',
-				'scope'         => 'openid',
-				'domain_hint'   => $settings->org_domain_hint,
-				'client_id'     => $settings->client_id,
-				'resource'      => $settings->graph_endpoint,
-				'redirect_uri'  => $settings->redirect_uri,
-				'state'         => $antiforgery_id,
-				'nonce'         => $antiforgery_id,
-			) );
-		return $auth_url;
-	}
+    public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
+    {
+        $auth_url = $settings->authorization_endpoint . '?'
+            . http_build_query(array(
+                'response_type' => 'code',
+                'scope' => 'openid',
+                'domain_hint' => sanitize_text_field($settings->org_domain_hint),
+                'client_id' => sanitize_text_field($settings->client_id),
+                'resource' => esc_url_raw($settings->graph_endpoint),
+                'redirect_uri' => esc_url_raw($settings->redirect_uri),
+                'state' => sanitize_text_field($antiforgery_id),
+                'nonce' => sanitize_text_field($antiforgery_id),
+            ));
+        return $auth_url;
+    }
 
+    public static function get_access_token(string $code, AADSSO_Settings $settings)
+    {
+        $authentication_request_body = http_build_query(array(
+            'grant_type' => 'authorization_code',
+            'code' => sanitize_text_field($code),
+            'redirect_uri' => esc_url_raw($settings->redirect_uri),
+            'resource' => esc_url_raw($settings->graph_endpoint),
+            'client_id' => sanitize_text_field($settings->client_id),
+            'client_secret' => sanitize_text_field($settings->client_secret),
+        ));
 
-	/**
-	 * Exchanges an Authorization Code and obtains an Access Token and an ID Token.
-	 *
-	 * @param string $code The authorization code.
-	 * @param \AADSSO_Settings $settings The settings to use.
-	 *
-	 * @return mixed The decoded authorization result.
-	 */
-	public static function get_access_token( string $code, $settings ) {
+        return self::get_and_process_access_token($authentication_request_body, $settings);
+    }
 
-		// Construct the body for the access token request
-		$authentication_request_body = http_build_query(
-			array(
-				'grant_type'    => 'authorization_code',
-				'code'          => $code,
-				'redirect_uri'  => $settings->redirect_uri,
-				'resource'      => $settings->graph_endpoint,
-				'client_id'     => $settings->client_id,
-				'client_secret' => $settings->client_secret
-			)
-		);
+    public static function get_and_process_access_token(
+        string $authentication_request_body,
+        AADSSO_Settings $settings
+    ) {
+        $response = wp_remote_post(
+            esc_url_raw($settings->token_endpoint),
+            array(
+                'body' => $authentication_request_body,
+                'timeout' => 30,
+                'sslverify' => true,
+                'headers' => array(
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                ),
+            )
+        );
 
-		return self::get_and_process_access_token( $authentication_request_body, $settings );
-	}
+        if (is_wp_error($response)) {
+            AADSSO::debug_log('Token request error: ' . $response->get_error_message(), 100);
+            return new WP_Error(
+                $response->get_error_code(),
+                $response->get_error_message()
+            );
+        }
 
-	/**
-	 * Makes the request for the access token and some does some basic processing of the result.
-	 *
-	 * @param string $authentication_request_body The body to use in the Authentication Request.
-	 * @param \AADSSO_Settings $settings The settings to use.
-	 *
-	 * @return mixed|\WP_Error The decoded authorization result or WP_Error on failure.
-	 */
-	public static function get_and_process_access_token( string $authentication_request_body, $settings ) {
+        $output = wp_remote_retrieve_body($response);
+        $result = json_decode($output);
 
-		// Post the authorization code to the STS and get back the access token
-		$response = wp_remote_post( $settings->token_endpoint, array(
-			'body' => $authentication_request_body
-		) );
-		if( is_wp_error( $response ) ) {
-			return new \WP_Error( $response->get_error_code(), $response->get_error_message() );
-		}
-		$output = wp_remote_retrieve_body( $response );
+        if (isset($result->access_token) && session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['aadsso_token_type'] = sanitize_text_field($result->token_type ?? 'Bearer');
+            $_SESSION['aadsso_access_token'] = sanitize_text_field($result->access_token);
+        }
 
-		// Decode the JSON response from the STS. If all went well, this will contain the access
-		// token and the id_token (a JWT token telling us about the current user)
-		$result = json_decode( $output );
+        return $result;
+    }
 
-		if ( isset( $result->access_token ) ) {
+    public static function validate_id_token(
+        string $id_token,
+        AADSSO_Settings $settings,
+        string $antiforgery_id
+    ): object {
+        $jwks_response = wp_remote_get(
+            esc_url_raw($settings->jwks_uri),
+            array(
+                'timeout' => 15,
+                'sslverify' => true,
+            )
+        );
 
-			// Add the token information to the session so that we can use it later
-			// Note: Sessions should be properly initialized before this point
-			if ( session_status() === PHP_SESSION_ACTIVE ) {
-				$_SESSION['aadsso_token_type'] = $result->token_type;
-				$_SESSION['aadsso_access_token'] = $result->access_token;
-			}
-		}
+        if (is_wp_error($jwks_response)) {
+            throw new DomainException(
+                'Failed to fetch JWKS: ' . $jwks_response->get_error_message()
+            );
+        }
 
-		return $result;
-	}
+        $jwks_body = wp_remote_retrieve_body($jwks_response);
+        $jwks = json_decode($jwks_body, true);
 
-	/**
-	 * Decodes and validates an id_token value returned from Microsoft Entra ID.
-	 *
-	 * @param string $id_token The ID token to validate.
-	 * @param \AADSSO_Settings $settings The settings to use.
-	 * @param string $antiforgery_id The expected nonce value.
-	 *
-	 * @return object The decoded and validated JWT payload.
-	 *
-	 * @throws \DomainException If token validation fails.
-	 * @throws \UnexpectedValueException If the token is invalid.
-	 */
-	public static function validate_id_token( string $id_token, $settings, string $antiforgery_id ): object {
+        if (!is_array($jwks) || empty($jwks['keys']) || !is_array($jwks['keys'])) {
+            throw new DomainException('jwks_uri does not contain valid keys');
+        }
 
-		// Fetch JWKS from Microsoft
-		$jwks_response = wp_remote_get( $settings->jwks_uri, array(
-			'timeout' => 15,
-			'sslverify' => true,
-		) );
-		if ( is_wp_error( $jwks_response ) ) {
-			throw new \DomainException( 'Failed to fetch JWKS: ' . $jwks_response->get_error_message() );
-		}
-		
-		$jwks_body = wp_remote_retrieve_body( $jwks_response );
-		$jwks = json_decode( $jwks_body, true );
+        try {
+            $keys = \Firebase\JWT\JWK::parseKeySet($jwks, 'RS256');
+        } catch (Exception $e) {
+            throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
+        }
 
-		if ( ! is_array( $jwks ) || empty( $jwks['keys'] ) ) {
-			throw new \DomainException( 'jwks_uri does not contain valid keys' );
-		}
+        try {
+            $jwt = \Firebase\JWT\JWT::decode($id_token, $keys, self::$allowed_algorithms);
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            throw new DomainException('Token has expired');
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            throw new DomainException('Token signature verification failed');
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            throw new DomainException('Token is not yet valid');
+        } catch (Exception $e) {
+            throw new DomainException('Token validation failed: ' . $e->getMessage());
+        }
 
-		// Parse the JWKS into keys using firebase/php-jwt v7
-		try {
-			$keys = \Firebase\JWT\JWK::parseKeySet( $jwks, 'RS256' );
-		} catch ( \Exception $e ) {
-			throw new \DomainException( 'Failed to parse JWKS: ' . $e->getMessage() );
-		}
+        $token_nonce = isset($jwt->nonce) ? (string) $jwt->nonce : '';
+        if ($token_nonce !== $antiforgery_id) {
+            throw new DomainException(
+                sprintf('Nonce mismatch. Expecting %s', esc_html($antiforgery_id))
+            );
+        }
 
-		// Decode and validate the token
-		try {
-			$jwt = \Firebase\JWT\JWT::decode( $id_token, $keys, self::$allowed_algorithms );
-		} catch ( \Firebase\JWT\ExpiredException $e ) {
-			throw new \DomainException( 'Token has expired' );
-		} catch ( \Firebase\JWT\SignatureInvalidException $e ) {
-			throw new \DomainException( 'Token signature verification failed' );
-		} catch ( \Firebase\JWT\BeforeValidException $e ) {
-			throw new \DomainException( 'Token is not yet valid' );
-		} catch ( \Exception $e ) {
-			throw new \DomainException( 'Token validation failed: ' . $e->getMessage() );
-		}
-
-		// Validate nonce to prevent replay attacks
-		if ( ! isset( $jwt->nonce ) || $jwt->nonce !== $antiforgery_id ) {
-			throw new \DomainException( sprintf( 'Nonce mismatch. Expecting %s', $antiforgery_id ) );
-		}
-
-		return $jwt;
-	}
+        return $jwt;
+    }
 }

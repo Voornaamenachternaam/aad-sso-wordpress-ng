@@ -1,8 +1,8 @@
-=== Sign Sign-on with Microsoft Entra ID (for WordPress) ===
+=== Single Sign-on with Microsoft Entra ID (for WordPress) ===
 Contributors: psignoret, blobaugh, welcher, jtsternberg, christianhennen, hajekj
 Tags: entra-id, azure-ad, sso, azure-active-directory, office-365, microsoft-entra, entra
 Requires at least: 6.0
-Tested up to: 6.5
+Tested up to: 6.7
 Requires PHP: 8.1
 Stable tag: 0.8.0
 License: MIT

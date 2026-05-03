@@ -17,7 +17,6 @@ parameters:
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     memoryLimit: 512M
-    # WordPress specific
     universalObjectCrates:
         - 'WP_User'
         - 'WP_Error'
