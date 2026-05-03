@@ -1,10 +1,10 @@
-=== Sign Sign-on with Microsoft Entra ID (for WordPress) ===
+=== Single Sign-on with Microsoft Entra ID (for WordPress) ===
 Contributors: psignoret, blobaugh, welcher, jtsternberg, christianhennen, hajekj
 Tags: entra-id, azure-ad, sso, azure-active-directory, office-365, microsoft-entra, entra
-Requires at least: 6.0
-Tested up to: 6.5
-Requires PHP: 8.1
-Stable tag: 0.8.0
+Requires at least: 6.4
+Tested up to: 6.8
+Requires PHP: 8.2
+Stable tag: 0.9.0
 License: MIT
 License URI: https://github.com/psignoret/aad-sso-wordpress/blob/master/LICENSE.md
 
@@ -29,6 +29,23 @@ In the typical flow:
 5. (Optional) Membership to certain groups in Microsoft Entra ID can be mapped to roles in WordPress, and group membership can be used to restrict access.
 
 == Changelog ==
+
+= 0.9.0 =
+* Updated to require PHP 8.2+ for modern features and security
+* Updated all dependencies to latest stable versions (April 2026)
+* Removed annotations from all PHP files for cleaner codebase
+* Enhanced security hardening with:
+  - Proper input sanitization and output escaping throughout
+  - CSRF protection with WordPress nonces
+  - URL validation using wp_validate_redirect
+  - Improved session handling with explicit clearing
+  - Added JWT issuer and audience validation
+* Added strict_types=1 declaration to all PHP files
+* Updated WordPress compatibility to 6.8
+* Improved code quality and type declarations
+* Added proper HTTP timeout and SSL verification settings
+* Removed microsoft-graph SDK dependency (not actively used)
+* Fixed code style to WordPress Coding Standards
 
 = 0.8.0 =
 * Updated to require PHP 8.1+ for modern features and security
