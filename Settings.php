@@ -9,7 +9,6 @@
  */
 declare(strict_types=1);
 
-use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -192,13 +191,7 @@ class AADSSO_Settings
 
             self::$options_resolver->define('role_map')
                 ->allowedTypes('array')
-                ->default(array())
-                ->after(function (Options $options, $value): array {
-                    if (!is_array($value)) {
-                        return array();
-                    }
-                    return $value;
-                });
+                ->default(array());
         }
 
         return self::$options_resolver;
