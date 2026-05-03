@@ -133,7 +133,7 @@ class AADSSO {
 	 *
 	 * @return bool Whether plugin is configured
 	 */
-	public function plugin_is_configured() {
+	public function plugin_is_configured(): bool {
 		return
 			   ! empty( $this->settings->client_id )
 			&& ! empty( $this->settings->client_secret )
@@ -146,7 +146,7 @@ class AADSSO {
 	 *
 	 * @return \AADSSO The (only) instance of the class.
 	 */
-	public static function get_instance( $settings ) {
+	public static function get_instance( AADSSO_Settings $settings ): self {
 		if ( ! self::$instance ) {
 			self::$instance = new self( $settings );
 		}
@@ -209,7 +209,7 @@ class AADSSO {
 	 * @return string
 	 */
 	public function redirect_after_login( $redirect_to, $requested_redirect_to, $user ) {
-		if ( is_a( $user, 'WP_User' ) && isset( $_SESSION['aadsso_redirect_to'] ) ) {
+		if ( $user instanceof WP_User && isset( $_SESSION['aadsso_redirect_to'] ) ) {
 			$redirect_to = $_SESSION['aadsso_redirect_to'];
 		}
 
@@ -227,13 +227,13 @@ class AADSSO {
 	*
 	* @return boolean Whether or not the user is trying to log in to wp-login.
 	*/
-	private function wants_to_login() {
+	private function wants_to_login(): bool {
 		$wants_to_login = false;
 		// Cover default WordPress behavior
 		$action = isset( $_REQUEST['action'] ) ? $_REQUEST['action'] : 'login';
 		// And now the exceptions
 		$action = isset( $_GET['loggedout'] ) ? 'loggedout' : $action;
-		if( 'login' == $action ) {
+		if ( 'login' === $action ) {
 			$wants_to_login = true;
 		}
 		return $wants_to_login;
@@ -253,10 +253,10 @@ class AADSSO {
 	 *
 	 * @return WP_User|WP_Error The authenticated WP_User, or a WP_Error if there were errors.
 	 */
-	function authenticate( $user, $username, $password ) {
+	function authenticate( $user, string $username, string $password ) {
 
 		// Don't re-authenticate if already authenticated
-		if ( is_a( $user, 'WP_User' ) ) { return $user; }
+		if ( $user instanceof WP_User ) { return $user; }
 
 		/* If 'code' is present, this is the Authorization Response from Microsoft Entra ID, and 'code' has
 		 * the Authorization Code, which will be exchanged for an ID Token and an Access Token.
@@ -350,7 +350,7 @@ class AADSSO {
 				// group membership details in case they're needed to decide whether or not to create the user.
 				$user = $this->get_wp_user_from_aad_user( $jwt, $group_memberships );
 
-				if ( is_a( $user, 'WP_User' ) ) {
+				if ( $user instanceof WP_User ) {
 
 					// At this point, we have an authorization code, an access token and the user
 					// exists in WordPress (either because it already existed, or we created it
@@ -388,7 +388,7 @@ class AADSSO {
 			);
 		}
 
-		if ( is_a( $user, 'WP_User' ) ) {
+		if ( $user instanceof WP_User ) {
 			$_SESSION['aadsso_signed_in_with_azuread'] = true;
 		}
 
@@ -411,13 +411,13 @@ class AADSSO {
 		$user = get_user_by( $this->settings->field_to_match_to_upn, $unique_name );
 
 		if ( true === $this->settings->match_on_upn_alias ) {
-			if ( ! is_a( $user, 'WP_User' ) ) {
+			if ( ! $user instanceof WP_User ) {
 				$username = explode( sprintf( '@%s', $this->settings->org_domain_hint ), $unique_name );
 				$user = get_user_by( $this->settings->field_to_match_to_upn, $username[0] );
 			}
 		}
 
-		if ( is_a( $user, 'WP_User' ) ) {
+		if ( $user instanceof WP_User ) {
 			AADSSO::debug_log( sprintf(
 				'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].', $unique_name, $user->ID ), 10 );
 		} else {
@@ -496,7 +496,7 @@ class AADSSO {
 		*
 		* @return WP_User|WP_Error Return the WP_User with updated roles, or WP_Error if failed.
 		*/
-	function update_wp_user_roles( $user, $group_memberships ) {
+	function update_wp_user_roles( WP_User $user, $group_memberships ): WP_User {
 
 		// Determine which WordPress role the AAD group corresponds to.
 		$roles_to_set = array();
@@ -504,7 +504,7 @@ class AADSSO {
 		if ( ! empty( $group_memberships->value ) ) {
 			foreach ( $this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role ) {
 				if ( in_array( $aad_group, $group_memberships->value ) ) {
-					array_push( $roles_to_set, $wp_role );
+					$roles_to_set[] = $wp_role;
 				}
 			}
 		}
@@ -523,7 +523,7 @@ class AADSSO {
 		} else {
 			$error_message = sprintf(
 				__( 'ERROR: Microsoft Entra ID user %s is not a member of any group granting a role.', 'aad-sso-wordpress' ),
-				$aad_user_id
+				$user->ID
 			);
 			AADSSO::debug_log( $error_message, 10 );
 			return new WP_Error( 'user_not_member_of_required_group', $error_message );
@@ -549,7 +549,7 @@ class AADSSO {
 	 *
 	 * @return string The authorization URL used to initiate a sign-in to Microsoft Entra ID.
 	 */
-	function get_login_url() {
+	function get_login_url(): string {
 		$antiforgery_id = aad_sso_create_uuid();
 		$_SESSION['aadsso_antiforgery-id'] = $antiforgery_id;
 		return AADSSO_AuthorizationHelper::get_authorization_url( $this->settings, $antiforgery_id );
@@ -558,7 +558,7 @@ class AADSSO {
 	/**
 	 * Generates the URL for logging out of Microsoft Entra ID. (Does not log out of WordPress.)
 	 */
-	function get_logout_url() {
+	function get_logout_url(): string {
 
 		// logout_redirect_uri is not a required setting, use default value if none is set
 		$logout_redirect_uri = $this->settings->logout_redirect_uri;
@@ -576,7 +576,7 @@ class AADSSO {
 	/**
 	 * Starts a new session.
 	 */
-	function register_session() {
+	function register_session(): void {
 		if ( ! session_id() ) {
 			session_start();
 		}
@@ -585,7 +585,7 @@ class AADSSO {
 	/**
 	 * Clears the current the session (e.g. as part of logout).
 	 */
-	function clear_session() {
+	function clear_session(): void {
 		if ( session_id() ) {
 			session_destroy();
 		}
@@ -594,7 +594,7 @@ class AADSSO {
 	/**
 	 * Clears the current the session, and triggers a full Microsoft Entra ID logout if needed.
 	 */
-	function logout() {
+	function logout(): void {
 
 		$signed_in_with_azuread = isset( $_SESSION['aadsso_signed_in_with_azuread'] ) 
 									&& true === $_SESSION['aadsso_signed_in_with_azuread'];

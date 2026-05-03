@@ -65,6 +65,7 @@ class AADSSO_Settings_Page {
 		if ( $should_reset_settings ) {
 			delete_option( 'aadsso_settings' );
 			wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_reset=success' ) );
+exit;
 		}
 	}
 
@@ -90,6 +91,7 @@ class AADSSO_Settings_Page {
 
 			if ( null === $legacy_settings ) {
 				wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_migrate_from_json_status=invalid_json') );
+exit;
 			}
 
 			// If aad_group_to_wp_role_map is set in the legacy settings, build the inverted role_map array,
@@ -114,6 +116,7 @@ class AADSSO_Settings_Page {
 			} else {
 				wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_migrate_from_json_status=manual' ) );
 			}
+exit;
 		}
 	}
 
