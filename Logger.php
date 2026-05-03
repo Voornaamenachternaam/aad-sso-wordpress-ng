@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * Logger class for Microsoft Entra ID SSO plugin.
+ *
+ * Provides centralized logging using Monolog and caching using Symfony Cache.
+ * Log and cache directories are stored in WordPress uploads directory.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
 use Monolog\Handler\RotatingFileHandler;
@@ -18,6 +26,9 @@ if (!defined('AADSSO_PLUGIN_DIR')) {
     define('AADSSO_PLUGIN_DIR', dirname(__FILE__) . '/');
 }
 
+/**
+ * Logger class for centralized logging and caching.
+ */
 class AADSSO_Logger
 {
     private static ?Logger $logger = null;

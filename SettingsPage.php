@@ -1,7 +1,17 @@
 <?php
 
+/**
+ * Settings page class for Microsoft Entra ID SSO plugin.
+ *
+ * Handles the WordPress admin settings page rendering and validation.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
+/**
+ * Settings page class.
+ */
 class AADSSO_Settings_Page
 {
     private $settings;

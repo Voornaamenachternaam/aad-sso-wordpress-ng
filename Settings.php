@@ -1,13 +1,48 @@
 <?php
 
+/**
+ * Plugin settings management class.
+ *
+ * Handles loading, validating, and resolving plugin settings using Symfony OptionsResolver.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+/**
+ * Plugin settings management class.
+ *
+ * @property string $client_id
+ * @property string $client_secret
+ * @property string $redirect_uri
+ * @property string $logout_redirect_uri
+ * @property string $org_display_name
+ * @property string $org_domain_hint
+ * @property string $field_to_match_to_upn
+ * @property bool $match_on_upn_alias
+ * @property bool $enable_auto_provisioning
+ * @property bool $enable_auto_forward_to_aad
+ * @property bool $enable_aad_group_to_wp_role
+ * @property array $aad_group_to_wp_role_map
+ * @property string|null $default_wp_role
+ * @property bool $enable_full_logout
+ * @property string $openid_configuration_endpoint
+ * @property string $authorization_endpoint
+ * @property string $token_endpoint
+ * @property string $jwks_uri
+ * @property string $end_session_endpoint
+ * @property string $graph_endpoint
+ * @property string $graph_version
+ */
 class AADSSO_Settings
 {
+    /** @var self|null Singleton instance */
     private static ?AADSSO_Settings $instance = null;
+
+    /** @var OptionsResolver|null Options resolver instance */
     private static ?OptionsResolver $options_resolver = null;
 
     public string $client_id = '';

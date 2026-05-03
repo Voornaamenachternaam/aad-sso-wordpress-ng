@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * Main plugin class for Microsoft Entra ID Single Sign-On.
+ *
+ * Handles authentication, authorization, user provisioning, and role mapping
+ * with Microsoft Entra ID (formerly Azure Active Directory).
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
 defined('ABSPATH') || exit;
@@ -24,9 +32,17 @@ require_once AADSSO_PLUGIN_DIR . '/Logger.php';
 
 class AADSSO
 {
+    /** @var self|null Singleton instance */
     private static ?AADSSO $instance = null;
+
+    /** @var AADSSO_Settings|null Plugin settings */
     private ?AADSSO_Settings $settings = null;
 
+    /**
+     * Constructor.
+     *
+     * @param AADSSO_Settings $settings Plugin settings instance.
+     */
     public function __construct(AADSSO_Settings $settings)
     {
         $this->settings = $settings;

@@ -1,7 +1,18 @@
 <?php
 
+/**
+ * Authorization helper class for Microsoft Entra ID SSO.
+ *
+ * Handles authorization URL generation, access token retrieval,
+ * and JWT/ID token validation.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
+/**
+ * Authorization helper class.
+ */
 class AADSSO_AuthorizationHelper
 {
     private static array $allowed_algorithms = array('RS256');

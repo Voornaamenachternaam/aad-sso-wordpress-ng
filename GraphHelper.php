@@ -1,7 +1,17 @@
 <?php
 
+/**
+ * Microsoft Graph API helper class.
+ *
+ * Provides methods for interacting with Microsoft Graph API endpoints.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
+/**
+ * Microsoft Graph API helper class.
+ */
 class AADSSO_GraphHelper
 {
     public static ?AADSSO_Settings $settings = null;
