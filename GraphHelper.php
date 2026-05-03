@@ -74,7 +74,7 @@ class AADSSO_GraphHelper
         return self::parse_and_log_response($response);
     }
 
-    private static function parse_and_log_response($response): mixed
+    private static function parse_and_log_response(mixed $response): mixed
     {
         if (is_wp_error($response)) {
             AADSSO::debug_log('Graph API Error: ' . $response->get_error_message(), 100);
