@@ -10,6 +10,7 @@ class SettingsTest extends TestCase
 {
     protected function setUp(): void
     {
+        parent::setUp();
         // Reset the singleton instance before each test
         $reflection = new \ReflectionClass(\AADSSO_Settings::class);
         $property = $reflection->getProperty('instance');
@@ -150,5 +151,37 @@ class SettingsTest extends TestCase
         $this->assertFalse($resolved['enable_auto_provisioning']);
         $this->assertEquals('v1.0', $resolved['graph_version']);
         $this->assertEquals('https://graph.microsoft.com', $resolved['graph_endpoint']);
+    }
+
+    public function test_options_resolver_allows_only_email_or_login_for_field_to_match(): void
+    {
+        $resolver = \AADSSO_Settings::get_options_resolver();
+
+        // Test that 'login' is allowed
+        $resolved = $resolver->resolve(array(
+            'client_id' => 'test',
+            'client_secret' => 'test',
+            'redirect_uri' => 'https://example.com',
+            'field_to_match_to_upn' => 'login',
+        ));
+        $this->assertEquals('login', $resolved['field_to_match_to_upn']);
+    }
+
+    public function test_settings_properties_have_correct_defaults(): void
+    {
+        $settings = \AADSSO_Settings::get_instance();
+
+        // Default values should be empty or false
+        $this->assertEquals('', $settings->client_id);
+        $this->assertEquals('', $settings->client_secret);
+        $this->assertEquals('', $settings->redirect_uri);
+        $this->assertEquals('', $settings->authorization_endpoint);
+        $this->assertEquals('', $settings->token_endpoint);
+        $this->assertEquals('', $settings->jwks_uri);
+        $this->assertEquals('', $settings->end_session_endpoint);
+        $this->assertFalse($settings->enable_auto_provisioning);
+        $this->assertFalse($settings->enable_auto_forward_to_aad);
+        $this->assertFalse($settings->enable_aad_group_to_wp_role);
+        $this->assertEquals(array(), $settings->aad_group_to_wp_role_map);
     }
 }

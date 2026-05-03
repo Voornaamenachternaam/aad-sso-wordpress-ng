@@ -13,6 +13,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Define plugin directory if not already defined
+if (!defined('AADSSO_PLUGIN_DIR')) {
+    define('AADSSO_PLUGIN_DIR', dirname(__FILE__) . '/');
+}
+
 class AADSSO_Logger
 {
     private static ?Logger $logger = null;

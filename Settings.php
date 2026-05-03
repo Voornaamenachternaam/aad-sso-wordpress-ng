@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Cache\Psr16Cache;
 
 class AADSSO_Settings
 {
@@ -68,44 +67,31 @@ class AADSSO_Settings
         if (self::$options_resolver === null) {
             self::$options_resolver = new OptionsResolver();
 
+            // Required fields - but we make them optional with defaults to handle OpenID config loading
+            // The init() method ensures required fields are validated before use
             self::$options_resolver->define('client_id')
-                ->required()
                 ->allowedTypes('string')
-                ->sanitize(function (string $value): string {
-                    return sanitize_text_field($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('client_secret')
-                ->required()
-                ->allowedTypes('string');
+                ->allowedTypes('string')
+                ->default('');
 
             self::$options_resolver->define('redirect_uri')
-                ->required()
                 ->allowedTypes('string')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('logout_redirect_uri')
                 ->allowedTypes('string')
-                ->default(wp_login_url())
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default(wp_login_url());
 
             self::$options_resolver->define('org_display_name')
                 ->allowedTypes('string')
-                ->default(get_bloginfo('name'))
-                ->sanitize(function (string $value): string {
-                    return sanitize_text_field($value);
-                });
+                ->default(get_bloginfo('name'));
 
             self::$options_resolver->define('org_domain_hint')
                 ->allowedTypes('string')
-                ->default('')
-                ->sanitize(function (string $value): string {
-                    return sanitize_text_field($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('field_to_match_to_upn')
                 ->allowedTypes('string')
@@ -142,52 +128,31 @@ class AADSSO_Settings
 
             self::$options_resolver->define('openid_configuration_endpoint')
                 ->allowedTypes('string')
-                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration');
 
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
-                ->default('')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('token_endpoint')
                 ->allowedTypes('string')
-                ->default('')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('jwks_uri')
                 ->allowedTypes('string')
-                ->default('')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('end_session_endpoint')
                 ->allowedTypes('string')
-                ->default('')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('');
 
             self::$options_resolver->define('graph_endpoint')
                 ->allowedTypes('string')
-                ->default('https://graph.microsoft.com')
-                ->sanitize(function (string $value): string {
-                    return esc_url_raw($value);
-                });
+                ->default('https://graph.microsoft.com');
 
             self::$options_resolver->define('graph_version')
                 ->allowedTypes('string')
-                ->default('v1.0')
-                ->sanitize(function (string $value): string {
-                    return sanitize_text_field($value);
-                });
+                ->default('v1.0');
 
             self::$options_resolver->define('role_map')
                 ->allowedTypes('array')
@@ -206,8 +171,14 @@ class AADSSO_Settings
     public static function init(): self
     {
         $instance = self::get_instance();
-        $instance->load_settings(get_option('aadsso_settings'));
 
+        // Load plugin settings from WordPress options
+        $plugin_settings = get_option('aadsso_settings');
+        if (is_array($plugin_settings)) {
+            $instance->load_settings($plugin_settings);
+        }
+
+        // Load OpenID configuration from Microsoft
         $openid_configuration = self::get_cached_openid_configuration();
 
         if (!empty($openid_configuration) && is_array($openid_configuration)) {
@@ -287,6 +258,42 @@ class AADSSO_Settings
         return is_string($file_contents) ? $file_contents : '';
     }
 
+    /**
+     * Sanitize a setting value based on the option key.
+     */
+    private static function sanitize_setting(string $key, mixed $value): mixed
+    {
+        $url_fields = array(
+            'redirect_uri',
+            'logout_redirect_uri',
+            'authorization_endpoint',
+            'token_endpoint',
+            'jwks_uri',
+            'end_session_endpoint',
+            'openid_configuration_endpoint',
+            'graph_endpoint',
+        );
+
+        if (in_array($key, $url_fields, true)) {
+            return esc_url_raw((string) $value);
+        }
+
+        return match ($key) {
+            'client_id' => sanitize_text_field((string) $value),
+            'client_secret' => (string) $value,
+            'org_display_name', 'org_domain_hint',
+            'field_to_match_to_upn', 'default_wp_role',
+            'graph_version' => sanitize_text_field((string) $value),
+            'match_on_upn_alias',
+            'enable_auto_provisioning',
+            'enable_auto_forward_to_aad',
+            'enable_aad_group_to_wp_role',
+            'enable_full_logout' => (bool) $value,
+            'aad_group_to_wp_role_map' => is_array($value) ? $value : array(),
+            default => $value,
+        };
+    }
+
     public function load_settings(?array $settings): self
     {
         if (!is_array($settings) || empty($settings)) {
@@ -314,12 +321,13 @@ class AADSSO_Settings
             }
         }
 
-        // Use OptionsResolver to validate and sanitize settings
+        // Use OptionsResolver to validate and get defaults for settings
         try {
             $resolved_settings = self::get_options_resolver()->resolve($settings);
             foreach ($resolved_settings as $key => $value) {
                 if (property_exists($this, $key)) {
-                    $this->{$key} = $value;
+                    // Apply sanitization after resolution
+                    $this->{$key} = self::sanitize_setting($key, $value);
                 }
             }
         } catch (\Throwable $e) {

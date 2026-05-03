@@ -6,10 +6,17 @@ define('ABSPATH', __DIR__ . '/../../../wordpress/');
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
+define('AADSSO_PLUGIN_DIR', __DIR__ . '/../');
 
 if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', dirname(ABSPATH) . '/wp-content');
 }
+
+// Load the Logger class for tests
+require_once AADSSO_PLUGIN_DIR . 'Logger.php';
+
+// Load the Settings class for tests
+require_once AADSSO_PLUGIN_DIR . 'Settings.php';
 
 if (!function_exists('get_bloginfo')) {
     function get_bloginfo($show = '', $filter = 'raw')
@@ -383,6 +390,21 @@ if (!function_exists('trailingslashit')) {
     function trailingslashit($string)
     {
         return rtrim($string, '/') . '/';
+    }
+}
+
+if (!function_exists('wp_upload_dir')) {
+    function wp_upload_dir($time = null, $dir = null, $single = false)
+    {
+        $base = '/tmp/wordpress-test-uploads';
+        return array(
+            'path' => $base,
+            'url' => 'https://example.com/wp-content/uploads',
+            'subdir' => '',
+            'basedir' => $base,
+            'baseurl' => 'https://example.com/wp-content/uploads',
+            'error' => false,
+        );
     }
 }
 
