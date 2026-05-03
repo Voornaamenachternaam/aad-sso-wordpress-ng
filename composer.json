@@ -1,5 +1,5 @@
 {
-    "name": "Voornaamenachternaam/aad-sso-wordpress-ng",
+    "name": "voornaamenachternaam/aad-sso-wordpress-ng",
     "description": "NG Single Sign-on with Microsoft Entra ID for WordPress",
     "type": "wordpress-plugin",
     "license": "MIT",
