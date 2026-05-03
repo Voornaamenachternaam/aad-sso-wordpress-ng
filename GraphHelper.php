@@ -100,8 +100,8 @@ class AADSSO_GraphHelper
         $access_token = '';
 
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $token_type = sanitize_text_field($_SESSION['aadsso_token_type'] ?? 'Bearer');
-            $access_token = sanitize_text_field($_SESSION['aadsso_access_token'] ?? '');
+            $token_type = (string) ($_SESSION['aadsso_token_type'] ?? 'Bearer');
+            $access_token = (string) ($_SESSION['aadsso_access_token'] ?? '');
         }
 
         return array(
@@ -127,8 +127,8 @@ class AADSSO_GraphHelper
         $access_token = '';
 
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $token_type = sanitize_text_field($_SESSION['aadsso_token_type'] ?? 'Bearer');
-            $access_token = sanitize_text_field($_SESSION['aadsso_access_token'] ?? '');
+            $token_type = (string) ($_SESSION['aadsso_token_type'] ?? 'Bearer');
+            $access_token = (string) ($_SESSION['aadsso_access_token'] ?? '');
         }
 
         $graph = new \Microsoft\Graph\Graph();
