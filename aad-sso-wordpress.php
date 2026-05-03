@@ -5,54 +5,60 @@ Plugin Name: Single Sign-on with Microsoft Entra ID
 Plugin URI: http://github.com/psignoret/aad-sso-wordpress
 Description: Allows you to use your organization's Microsoft Entra ID (formerly known as Azure Active Directory) user accounts to log in to WordPress. If your organization is using Office 365, your user accounts are already in Microsoft Entra ID. This plugin uses OAuth 2.0 to authenticate users, and the Microsoft Graph API to get group membership and other details.
 Author: Philippe Signoret
-Version: 0.7.1
+Version: 0.8.0
 Author URI: https://www.psignoret.com/
 Text Domain: aad-sso-wordpress
 Domain Path: /languages/
+Requires PHP: 8.1
+Requires at least: 6.0
+Tested up to: 6.5
 */
 
-defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
+defined( 'ABSPATH' ) || exit;
+
+// Try to load Composer autoloader if available
+$autoloader = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $autoloader ) ) {
+    require_once $autoloader;
+}
 
 define( 'AADSSO', 'aad-sso-wordpress' );
 define( 'AADSSO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'AADSSO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-defined( 'AADSSO_DEBUG' ) or define( 'AADSSO_DEBUG', FALSE );
-defined( 'AADSSO_DEBUG_LEVEL' ) or define( 'AADSSO_DEBUG_LEVEL', 0 );
-
-// Proxy to be used for calls, should be useful for tracing with Fiddler
-// BUGBUG: Doesn't actually work, at least not with WP running on WAMP stack
-//define( 'WP_PROXY_HOST', '127.0.0.1' );
-//define( 'WP_PROXY_PORT', '8888' );
+defined( 'AADSSO_DEBUG' ) || define( 'AADSSO_DEBUG', false );
+defined( 'AADSSO_DEBUG_LEVEL' ) || define( 'AADSSO_DEBUG_LEVEL', 0 );
 
 require_once AADSSO_PLUGIN_DIR . '/Settings.php';
 require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
 require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
 require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
 
-// TODO: Auto-load the ( the exceptions at least )
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/JWT.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/BeforeValidException.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/ExpiredException.php';
-require_once AADSSO_PLUGIN_DIR . '/lib/php-jwt/src/SignatureInvalidException.php';
-
-//define ('AADSSO_DEBUG', true);
-
+/**
+ * Main plugin class for Single Sign-on with Microsoft Entra ID.
+ */
 class AADSSO {
 
-	static $instance = FALSE;
+	/**
+	 * @var \AADSSO|null Singleton instance
+	 */
+	private static ?AADSSO $instance = null;
 
-	private $settings = null;
+	/**
+	 * @var \AADSSO_Settings|null Plugin settings
+	 */
+	private ?AADSSO_Settings $settings = null;
 
-	public function __construct( $settings ) {
+	/**
+	 * Constructor.
+	 *
+	 * @param \AADSSO_Settings $settings The plugin settings instance.
+	 */
+	public function __construct( AADSSO_Settings $settings ) {
 		$this->settings = $settings;
 
 		// Setup the admin settings page
 		$this->setup_admin_settings();
-
-		// Some debugging locations
-		//add_action( 'admin_notices', array( $this, 'print_debug' ) );
-		//add_action( 'login_footer', array( $this, 'print_debug' ) );
 
 		// Add a link to the Settings page in the list of plugins
 		add_filter(
@@ -61,8 +67,8 @@ class AADSSO {
 		);
 
 		// Register activation and deactivation hooks
-		register_activation_hook( __FILE__, array( 'AADSSO', 'activate' ) );
-		register_deactivation_hook( __FILE__, array( 'AADSSO', 'deactivate' ) );
+		register_activation_hook( __FILE__, array( self::class, 'activate' ) );
+		register_deactivation_hook( __FILE__, array( self::class, 'deactivate' ) );
 
 		// If plugin is not configured, we shouldn't proceed.
 		if ( ! $this->plugin_is_configured() ) {
@@ -80,7 +86,7 @@ class AADSSO {
 		add_action( 'login_enqueue_scripts', array( $this, 'print_login_css' ) );
 
 		// Add the link to the organization's sign-in page
-		add_action( 'login_form', array( $this, 'print_login_link' ) ) ;
+		add_action( 'login_form', array( $this, 'print_login_link' ) );
 
 		// Clear session variables when logging out
 		add_action( 'wp_logout', array( $this, 'logout' ) );
@@ -127,7 +133,7 @@ class AADSSO {
 	 *
 	 * @return bool Whether plugin is configured
 	 */
-	public function plugin_is_configured() {
+	public function plugin_is_configured(): bool {
 		return
 			   ! empty( $this->settings->client_id )
 			&& ! empty( $this->settings->client_secret )
@@ -140,7 +146,7 @@ class AADSSO {
 	 *
 	 * @return \AADSSO The (only) instance of the class.
 	 */
-	public static function get_instance( $settings ) {
+	public static function get_instance( AADSSO_Settings $settings ): self {
 		if ( ! self::$instance ) {
 			self::$instance = new self( $settings );
 		}
@@ -165,7 +171,7 @@ class AADSSO {
 		 */ 
 		if ( isset( $_GET['aadsso_no_redirect'] ) ) {
 			AADSSO::debug_log( 'Skipping automatic redirects to Microsoft Entra ID.' );
-			$auto_redirect = FALSE;
+			$auto_redirect = false;
 		}
 
 		/*
@@ -203,7 +209,7 @@ class AADSSO {
 	 * @return string
 	 */
 	public function redirect_after_login( $redirect_to, $requested_redirect_to, $user ) {
-		if ( is_a( $user, 'WP_User' ) && isset( $_SESSION['aadsso_redirect_to'] ) ) {
+		if ( $user instanceof WP_User && isset( $_SESSION['aadsso_redirect_to'] ) ) {
 			$redirect_to = $_SESSION['aadsso_redirect_to'];
 		}
 
@@ -221,13 +227,13 @@ class AADSSO {
 	*
 	* @return boolean Whether or not the user is trying to log in to wp-login.
 	*/
-	private function wants_to_login() {
+	private function wants_to_login(): bool {
 		$wants_to_login = false;
 		// Cover default WordPress behavior
 		$action = isset( $_REQUEST['action'] ) ? $_REQUEST['action'] : 'login';
 		// And now the exceptions
 		$action = isset( $_GET['loggedout'] ) ? 'loggedout' : $action;
-		if( 'login' == $action ) {
+		if ( 'login' === $action ) {
 			$wants_to_login = true;
 		}
 		return $wants_to_login;
@@ -247,10 +253,10 @@ class AADSSO {
 	 *
 	 * @return WP_User|WP_Error The authenticated WP_User, or a WP_Error if there were errors.
 	 */
-	function authenticate( $user, $username, $password ) {
+	function authenticate( $user, string $username, string $password ) {
 
 		// Don't re-authenticate if already authenticated
-		if ( is_a( $user, 'WP_User' ) ) { return $user; }
+		if ( $user instanceof WP_User ) { return $user; }
 
 		/* If 'code' is present, this is the Authorization Response from Microsoft Entra ID, and 'code' has
 		 * the Authorization Code, which will be exchanged for an ID Token and an Access Token.
@@ -344,7 +350,7 @@ class AADSSO {
 				// group membership details in case they're needed to decide whether or not to create the user.
 				$user = $this->get_wp_user_from_aad_user( $jwt, $group_memberships );
 
-				if ( is_a( $user, 'WP_User' ) ) {
+				if ( $user instanceof WP_User ) {
 
 					// At this point, we have an authorization code, an access token and the user
 					// exists in WordPress (either because it already existed, or we created it
@@ -382,7 +388,7 @@ class AADSSO {
 			);
 		}
 
-		if ( is_a( $user, 'WP_User' ) ) {
+		if ( $user instanceof WP_User ) {
 			$_SESSION['aadsso_signed_in_with_azuread'] = true;
 		}
 
@@ -405,13 +411,13 @@ class AADSSO {
 		$user = get_user_by( $this->settings->field_to_match_to_upn, $unique_name );
 
 		if ( true === $this->settings->match_on_upn_alias ) {
-			if ( ! is_a( $user, 'WP_User' ) ) {
+			if ( ! $user instanceof WP_User ) {
 				$username = explode( sprintf( '@%s', $this->settings->org_domain_hint ), $unique_name );
 				$user = get_user_by( $this->settings->field_to_match_to_upn, $username[0] );
 			}
 		}
 
-		if ( is_a( $user, 'WP_User' ) ) {
+		if ( $user instanceof WP_User ) {
 			AADSSO::debug_log( sprintf(
 				'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].', $unique_name, $user->ID ), 10 );
 		} else {
@@ -490,7 +496,7 @@ class AADSSO {
 		*
 		* @return WP_User|WP_Error Return the WP_User with updated roles, or WP_Error if failed.
 		*/
-	function update_wp_user_roles( $user, $group_memberships ) {
+	function update_wp_user_roles( WP_User $user, $group_memberships ): WP_User {
 
 		// Determine which WordPress role the AAD group corresponds to.
 		$roles_to_set = array();
@@ -498,7 +504,7 @@ class AADSSO {
 		if ( ! empty( $group_memberships->value ) ) {
 			foreach ( $this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role ) {
 				if ( in_array( $aad_group, $group_memberships->value ) ) {
-					array_push( $roles_to_set, $wp_role );
+					$roles_to_set[] = $wp_role;
 				}
 			}
 		}
@@ -517,7 +523,7 @@ class AADSSO {
 		} else {
 			$error_message = sprintf(
 				__( 'ERROR: Microsoft Entra ID user %s is not a member of any group granting a role.', 'aad-sso-wordpress' ),
-				$aad_user_id
+				$user->ID
 			);
 			AADSSO::debug_log( $error_message, 10 );
 			return new WP_Error( 'user_not_member_of_required_group', $error_message );
@@ -533,10 +539,8 @@ class AADSSO {
 	 *
 	 * @return array The new list of links to display
 	 */
-	function add_settings_link( $links ) {
-		$link_to_settings =
-			'<a href="' . admin_url( 'options-general.php?page=aadsso_settings' ) . '">Settings</a>';
-		array_push( $links, $link_to_settings );
+	function add_settings_link( array $links ): array {
+		$links[] = '<a href="' . esc_url( admin_url( 'options-general.php?page=aadsso_settings' ) ) . '">Settings</a>';
 		return $links;
 	}
 
@@ -545,8 +549,8 @@ class AADSSO {
 	 *
 	 * @return string The authorization URL used to initiate a sign-in to Microsoft Entra ID.
 	 */
-	function get_login_url() {
-		$antiforgery_id = com_create_guid();
+	function get_login_url(): string {
+		$antiforgery_id = aad_sso_create_uuid();
 		$_SESSION['aadsso_antiforgery-id'] = $antiforgery_id;
 		return AADSSO_AuthorizationHelper::get_authorization_url( $this->settings, $antiforgery_id );
 	}
@@ -554,7 +558,7 @@ class AADSSO {
 	/**
 	 * Generates the URL for logging out of Microsoft Entra ID. (Does not log out of WordPress.)
 	 */
-	function get_logout_url() {
+	function get_logout_url(): string {
 
 		// logout_redirect_uri is not a required setting, use default value if none is set
 		$logout_redirect_uri = $this->settings->logout_redirect_uri;
@@ -572,7 +576,7 @@ class AADSSO {
 	/**
 	 * Starts a new session.
 	 */
-	function register_session() {
+	function register_session(): void {
 		if ( ! session_id() ) {
 			session_start();
 		}
@@ -581,7 +585,7 @@ class AADSSO {
 	/**
 	 * Clears the current the session (e.g. as part of logout).
 	 */
-	function clear_session() {
+	function clear_session(): void {
 		if ( session_id() ) {
 			session_destroy();
 		}
@@ -590,7 +594,7 @@ class AADSSO {
 	/**
 	 * Clears the current the session, and triggers a full Microsoft Entra ID logout if needed.
 	 */
-	function logout() {
+	function logout(): void {
 
 		$signed_in_with_azuread = isset( $_SESSION['aadsso_signed_in_with_azuread'] ) 
 									&& true === $_SESSION['aadsso_signed_in_with_azuread'];
@@ -607,9 +611,9 @@ class AADSSO {
 	/**
 	 * Add filters and actions for admin settings.
 	 */
-	public function setup_admin_settings() {
+	public function setup_admin_settings(): void {
 		if ( is_admin() ) {
-			$azure_active_directory_settings = new AADSSO_Settings_Page();
+			new AADSSO_Settings_Page();
 		}
 	}
 
@@ -649,14 +653,16 @@ class AADSSO {
 	function print_login_link() {
 		$html = '<p class="aadsso-login-form-text">';
 		$html .= '<a href="%s">';
-		$html .= sprintf( __( 'Sign in with your %s account', 'aad-sso-wordpress' ),
-		                  htmlentities( $this->settings->org_display_name ) );
+		$org_name = ! empty( $this->settings->org_display_name ) 
+			? esc_html( $this->settings->org_display_name ) 
+			: 'Organization';
+		$html .= sprintf( esc_html__( 'Sign in with your %s account', 'aad-sso-wordpress' ), $org_name );
 		$html .= '</a><br /><a class="dim" href="%s">'
-		         . __( 'Sign out', 'aad-sso-wordpress' ) . '</a></p>';
+		         . esc_html__( 'Sign out', 'aad-sso-wordpress' ) . '</a></p>';
 		printf(
 			$html,
-			$this->get_login_url(),
-			$this->get_logout_url()
+			esc_url( $this->get_login_url() ),
+			esc_url( $this->get_logout_url() )
 		);
 	}
 
@@ -720,27 +726,36 @@ class AADSSO {
 
 /*** Utility functions ***/
 
-if ( ! function_exists( 'com_create_guid' ) ) {
+if ( ! function_exists( 'aad_sso_create_uuid' ) ) {
 	/**
-	 * Generates a globally unique identifier ( Guid ).
+	 * Generates a UUID v4 string (Universally Unique Identifier).
 	 *
-	 * @return string A new random globally unique identifier.
+	 * Uses cryptographically secure random bytes when available (PHP 7+).
+	 * Falls back to less secure method for older PHP versions.
+	 *
+	 * @return string A new random UUID v4.
 	 */
-	function com_create_guid() {
-		mt_srand( (int)( (double)microtime() * 10000 ) );
-		$charid = strtoupper( md5( uniqid( rand(), true ) ) );
-		$hyphen = chr( 45 ); // "-"
-		$uuid = chr( 123 ) // "{"
-			.substr( $charid, 0, 8 ) . $hyphen
-			.substr( $charid, 8, 4 ) . $hyphen
-			.substr( $charid, 12, 4 ) . $hyphen
-			.substr( $charid, 16, 4 ) . $hyphen
-			.substr( $charid, 20, 12 )
-			.chr( 125 ); // "}"
-		return $uuid;
+	function aad_sso_create_uuid() {
+		// Generate 16 random bytes
+		if ( function_exists( 'random_bytes' ) ) {
+			$random_bytes = random_bytes( 16 );
+		} else {
+			$random_bytes = '';
+			for ( $i = 0; $i < 16; $i++ ) {
+				$random_bytes .= chr( mt_rand( 0, 255 ) );
+			}
+		}
+
+		// Set version to 0100 (UUID version 4)
+		$random_bytes[6] = chr( ord( $random_bytes[6] ) & 0x0f | 0x40 );
+		// Set bits 6-7 to 10 (UUID variant)
+		$random_bytes[8] = chr( ord( $random_bytes[8] ) & 0x3f | 0x80 );
+
+		// Format as UUID string
+		return vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $random_bytes ), 4 ) );
 	}
 }
 
 // Load settings JSON contents from DB and initialize the plugin
 $aadsso_settings_instance = AADSSO_Settings::init();
-$aadsso = AADSSO::get_instance( $aadsso_settings_instance, com_create_guid() );
+$aadsso = AADSSO::get_instance( $aadsso_settings_instance );

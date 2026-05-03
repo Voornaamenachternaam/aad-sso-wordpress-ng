@@ -65,6 +65,7 @@ class AADSSO_Settings_Page {
 		if ( $should_reset_settings ) {
 			delete_option( 'aadsso_settings' );
 			wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_reset=success' ) );
+exit;
 		}
 	}
 
@@ -90,13 +91,14 @@ class AADSSO_Settings_Page {
 
 			if ( null === $legacy_settings ) {
 				wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_migrate_from_json_status=invalid_json') );
+exit;
 			}
 
 			// If aad_group_to_wp_role_map is set in the legacy settings, build the inverted role_map array,
 			// which is what is ultimately saved in the database.
 			if ( isset( $legacy_settings['aad_group_to_wp_role_map'] ) ) {
 				$legacy_settings['role_map'] = array();
-				foreach ($aad_group_to_wp_role_map as $group_id => $role_slug ) {
+				foreach ( $legacy_settings['aad_group_to_wp_role_map' ] as $group_id => $role_slug ) {
 					if ( ! isset( $legacy_settings['role_map'][$role_slug] ) ) {
 						$legacy_settings['role_map'][$role_slug] = $group_id;
 					} else {
@@ -114,6 +116,7 @@ class AADSSO_Settings_Page {
 			} else {
 				wp_redirect( admin_url( 'options-general.php?page=aadsso_settings&aadsso_migrate_from_json_status=manual' ) );
 			}
+exit;
 		}
 	}
 
@@ -432,23 +435,23 @@ class AADSSO_Settings_Page {
 	 */
 	function role_map_callback() {
 		printf( '<p>%s</p>',
-			__( 'Map WordPress roles to Microsoft Entra ID groups.', 'aad-sso-wordpress' )
+			esc_html__( 'Map WordPress roles to Microsoft Entra ID groups.', 'aad-sso-wordpress' )
 		);
 		echo '<table>';
 		printf(
 			'<thead><tr><th>%s</th><th>%s</th></tr></thead>',
-			__( 'WordPress Role', 'aad-sso-wordpress' ),
-			__( 'Microsoft Entra ID Group Object ID', 'aad-sso-wordpress' )
+			esc_html__( 'WordPress Role', 'aad-sso-wordpress' ),
+			esc_html__( 'Microsoft Entra ID Group Object ID', 'aad-sso-wordpress' )
 		);
 		echo '<tbody>';
 		foreach( $this->get_editable_roles( ) as $role_slug => $role ) {
 			echo '<tr>';
-				echo '<td>' . htmlentities( $role['name'] ) . '</td>';
+				echo '<td>' . esc_html( $role['name'] ) . '</td>';
 				echo '<td>';
 					printf(
 						'<input type="text" class="regular-text" name="aadsso_settings[role_map][%1$s]" '
 						 . 'id="role_map_%1$s" value="%2$s" />',
-						$role_slug,
+						esc_attr( $role_slug ),
 						isset( $this->settings['role_map'][ $role_slug ] )
 							? esc_attr( $this->settings['role_map'][ $role_slug ] )
 							: ''
@@ -587,18 +590,18 @@ class AADSSO_Settings_Page {
 		}
 
 		echo '<select name="aadsso_settings[default_wp_role]" id="default_wp_role">';
-		printf( '<option value="%s">%s</option>', '', '(None, deny access)' );
+		printf( '<option value="%s">%s</option>', '', esc_html__( '(None, deny access)', 'aad-sso-wordpress' ) );
 		foreach( $this->get_editable_roles() as $role_slug => $role ) {
 			$selected = $this->settings['default_wp_role'] === $role_slug ? ' selected="selected"' : '';
 			printf(
 				'<option value="%s"%s>%s</option>',
-				esc_attr( $role_slug ), $selected, htmlentities( $role['name'] )
+				esc_attr( $role_slug ), $selected, esc_html( $role['name'] )
 			);
 		}
 		echo '</select>';
 		printf(
 			'<p class="description">%s</p>',
-			__('This is the default role that users will be assigned to if matching Microsoft Entra ID group to '
+			esc_html__( 'This is the default role that users will be assigned to if matching Microsoft Entra ID group to '
 			 . 'WordPress roles is enabled, but the signed in user isn\'t a member of any of the '
 			 . 'configured Microsoft Entra ID groups.', 'aad-sso-wordpress')
 		);
