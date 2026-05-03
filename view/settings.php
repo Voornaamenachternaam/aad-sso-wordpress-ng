@@ -74,25 +74,24 @@ if (!defined('ABSPATH')) {
         <?php if (is_writable(AADSSO_SETTINGS_PATH) && is_writable(dirname(AADSSO_SETTINGS_PATH))): ?>
             <p>
                 <?php
-                printf(
-                    esc_html__(
-                        'If migration is successful, migration will delete this configuration file, %s.',
-                        'aad-sso-wordpress'
-                    ),
-                    '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+                echo esc_html__(
+                    'If migration is successful, migration will delete this configuration file, ',
+                    'aad-sso-wordpress'
                 );
+                echo '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>.';
                 ?>
             </p>
         <?php else: ?>
             <p>
                 <?php
-                printf(
-                    esc_html__(
-                        'If migration is successful, migration will be unable to delete the configuration file at %s. '
-                        . 'It is recommended to delete the file after migration.',
-                        'aad-sso-wordpress'
-                    ),
-                    '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+                echo esc_html__(
+                    'If migration is successful, migration will be unable to delete the configuration file at ',
+                    'aad-sso-wordpress'
+                );
+                echo '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>. ';
+                echo esc_html__(
+                    'It is recommended to delete the file after migration.',
+                    'aad-sso-wordpress'
                 );
                 ?>
             </p>
