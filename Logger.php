@@ -119,8 +119,8 @@ class AADSSO_Logger
 
     public static function log_debug(string $message, int $level = 0): void
     {
-        $debug_enabled = apply_filters('aadso_debug', AADSSO_DEBUG);
-        $debug_level = apply_filters('aadso_debug_level', AADSSO_DEBUG_LEVEL);
+        $debug_enabled = apply_filters('aadsso_debug', AADSSO_DEBUG);
+        $debug_level = apply_filters('aadsso_debug_level', AADSSO_DEBUG_LEVEL);
 
         // Handle both boolean and string "true" for compatibility
         $is_enabled = filter_var($debug_enabled, FILTER_VALIDATE_BOOLEAN);
