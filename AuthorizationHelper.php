@@ -109,55 +109,40 @@ class AADSSO_AuthorizationHelper
 	 */
 	public static function validate_id_token( string $id_token, $settings, string $antiforgery_id ): object {
 
-		$jwt = null;
-		$last_exception = null;
-
 		// Fetch JWKS from Microsoft
-		$jwks_response = wp_remote_get( $settings->jwks_uri );
+		$jwks_response = wp_remote_get( $settings->jwks_uri, array(
+			'timeout' => 15,
+			'sslverify' => true,
+		) );
 		if ( is_wp_error( $jwks_response ) ) {
 			throw new \DomainException( 'Failed to fetch JWKS: ' . $jwks_response->get_error_message() );
 		}
 		
-		$jwks = wp_remote_retrieve_body( $jwks_response );
-		$discovery = json_decode( $jwks );
+		$jwks_body = wp_remote_retrieve_body( $jwks_response );
+		$jwks = json_decode( $jwks_body, true );
 
-		if ( null === $discovery || ! isset( $discovery->keys ) ) {
-			throw new \DomainException( 'jwks_uri does not contain the keys attribute' );
+		if ( ! is_array( $jwks ) || empty( $jwks['keys'] ) ) {
+			throw new \DomainException( 'jwks_uri does not contain valid keys' );
 		}
 
-		foreach ( $discovery->keys as $key ) {
-			try {
-				if ( ! isset( $key->x5c ) || empty( $key->x5c ) ) {
-					throw new \DomainException( 'key does not contain the x5c attribute' );
-				}
-
-				$key_der = $key->x5c[0];
-
-				/* Per section 4.7 of the current JWK draft, the 'x5c' property will be the
-				 * DER-encoded value of the X.509 certificate. PHP's openssl functions all require
-				 * a PEM-encoded value.
-				 */
-				$key_pem = "-----BEGIN CERTIFICATE-----\n"
-				            . chunk_split( $key_der, 64, "\n" )
-				            . "-----END CERTIFICATE-----\n";
-
-				// Use firebase/php-jwt v7 for token validation
-				$jwt = \Firebase\JWT\JWT::decode(
-					$id_token,
-					\Firebase\JWT\JWK::parseKeySet( 
-						array( 'keys' => array( $key ) ),
-						'RS256'
-					),
-					self::$allowed_algorithms
-				);
-				break;
-			} catch ( \Exception $e ) {
-				$last_exception = $e;
-			}
+		// Parse the JWKS into keys using firebase/php-jwt v7
+		try {
+			$keys = \Firebase\JWT\JWK::parseKeySet( $jwks, 'RS256' );
+		} catch ( \Exception $e ) {
+			throw new \DomainException( 'Failed to parse JWKS: ' . $e->getMessage() );
 		}
 
-		if ( null === $jwt ) {
-			throw $last_exception ?? new \DomainException( 'No valid key found for token validation' );
+		// Decode and validate the token
+		try {
+			$jwt = \Firebase\JWT\JWT::decode( $id_token, $keys, self::$allowed_algorithms );
+		} catch ( \Firebase\JWT\ExpiredException $e ) {
+			throw new \DomainException( 'Token has expired' );
+		} catch ( \Firebase\JWT\SignatureInvalidException $e ) {
+			throw new \DomainException( 'Token signature verification failed' );
+		} catch ( \Firebase\JWT\BeforeValidException $e ) {
+			throw new \DomainException( 'Token is not yet valid' );
+		} catch ( \Exception $e ) {
+			throw new \DomainException( 'Token validation failed: ' . $e->getMessage() );
 		}
 
 		// Validate nonce to prevent replay attacks

@@ -96,7 +96,7 @@ class AADSSO_Settings_Page {
 			// which is what is ultimately saved in the database.
 			if ( isset( $legacy_settings['aad_group_to_wp_role_map'] ) ) {
 				$legacy_settings['role_map'] = array();
-				foreach ($aad_group_to_wp_role_map as $group_id => $role_slug ) {
+				foreach ( $legacy_settings['aad_group_to_wp_role_map' ] as $group_id => $role_slug ) {
 					if ( ! isset( $legacy_settings['role_map'][$role_slug] ) ) {
 						$legacy_settings['role_map'][$role_slug] = $group_id;
 					} else {

@@ -171,7 +171,7 @@ class AADSSO {
 		 */ 
 		if ( isset( $_GET['aadsso_no_redirect'] ) ) {
 			AADSSO::debug_log( 'Skipping automatic redirects to Microsoft Entra ID.' );
-			$auto_redirect = FALSE;
+			$auto_redirect = false;
 		}
 
 		/*
@@ -539,10 +539,8 @@ class AADSSO {
 	 *
 	 * @return array The new list of links to display
 	 */
-	function add_settings_link( $links ) {
-		$link_to_settings =
-			'<a href="' . admin_url( 'options-general.php?page=aadsso_settings' ) . '">Settings</a>';
-		array_push( $links, $link_to_settings );
+	function add_settings_link( array $links ): array {
+		$links[] = '<a href="' . esc_url( admin_url( 'options-general.php?page=aadsso_settings' ) ) . '">Settings</a>';
 		return $links;
 	}
 
@@ -613,9 +611,9 @@ class AADSSO {
 	/**
 	 * Add filters and actions for admin settings.
 	 */
-	public function setup_admin_settings() {
+	public function setup_admin_settings(): void {
 		if ( is_admin() ) {
-			$azure_active_directory_settings = new AADSSO_Settings_Page();
+			new AADSSO_Settings_Page();
 		}
 	}
 
@@ -760,4 +758,4 @@ if ( ! function_exists( 'aad_sso_create_uuid' ) ) {
 
 // Load settings JSON contents from DB and initialize the plugin
 $aadsso_settings_instance = AADSSO_Settings::init();
-$aadsso = AADSSO::get_instance( $aadsso_settings_instance, aad_sso_create_uuid() );
+$aadsso = AADSSO::get_instance( $aadsso_settings_instance );
