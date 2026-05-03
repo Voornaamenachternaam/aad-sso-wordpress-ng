@@ -102,10 +102,12 @@ class AADSSO_AuthorizationHelper
         }
 
         if (isset($jwt->iss)) {
-            $expected_iss = $settings->authorization_endpoint;
-            $parsed_url = parse_url($expected_iss);
+            $parsed_url = parse_url($settings->authorization_endpoint);
+            if (!is_array($parsed_url) || empty($parsed_url['scheme']) || empty($parsed_url['host'])) {
+                throw new DomainException('Invalid authorization endpoint URL');
+            }
             $expected_iss_base = $parsed_url['scheme'] . '://' . $parsed_url['host'];
-            if (strpos($jwt->iss, $expected_iss_base) !== 0) {
+            if ($jwt->iss !== $expected_iss_base && strpos($jwt->iss, $expected_iss_base . '/') !== 0) {
                 throw new DomainException('Token issuer validation failed');
             }
         }
