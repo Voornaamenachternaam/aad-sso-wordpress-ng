@@ -52,10 +52,11 @@ if (!defined('ABSPATH')) {
         <h2><?php echo esc_html__('Migrate Legacy Settings', 'aad-sso-wordpress'); ?></h2>
         <p>
             <?php
-            printf(
-                esc_html__('Old configuration data was found at %s.', 'aad-sso-wordpress'),
-                '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+            echo esc_html__(
+                'Old configuration data was found at ',
+                'aad-sso-wordpress'
             );
+            echo '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>.';
             ?>
             <?php echo esc_html__(
                 'This configuration data can be migrated automatically.',
@@ -64,9 +65,14 @@ if (!defined('ABSPATH')) {
         </p>
         <p>
             <?php
-            printf(
-                esc_html__('Delete the file at %s to hide this migration utility.', 'aad-sso-wordpress'),
-                '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+            echo esc_html__(
+                'Delete the file at ',
+                'aad-sso-wordpress'
+            );
+            echo '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>';
+            echo esc_html__(
+                ' to hide this migration utility.',
+                'aad-sso-wordpress'
             );
             ?>
         </p>
