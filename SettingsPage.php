@@ -31,6 +31,10 @@ class AADSSO_Settings_Page
 
     public function maybe_reset_settings(): void
     {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
         $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
         if ('' === $nonce || !wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
             return;
@@ -43,6 +47,10 @@ class AADSSO_Settings_Page
 
     public function maybe_migrate_settings(): void
     {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
         $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
         if ('' === $nonce
             || !wp_verify_nonce($nonce, 'aadsso_migrate_from_json')
@@ -59,8 +67,10 @@ class AADSSO_Settings_Page
             exit;
         }
 
+        $json_error = json_last_error();
         $legacy_settings = json_decode($json_content, true);
-        if (null === $legacy_settings) {
+        if (null === $legacy_settings || JSON_ERROR_NONE !== $json_error) {
+            AADSSO::debug_log('JSON decode error during migration: ' . json_last_error_msg(), 100);
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
                 admin_url('options-general.php?page=aadsso_settings')));
             exit;
@@ -312,7 +322,9 @@ class AADSSO_Settings_Page
         $sanitized['enable_auto_forward_to_aad'] = !empty($input['enable_auto_forward_to_aad']);
         $sanitized['enable_aad_group_to_wp_role'] = !empty($input['enable_aad_group_to_wp_role']);
 
-        $sanitized['default_wp_role'] = sanitize_text_field($input['default_wp_role'] ?? '');
+        $default_wp_role = sanitize_text_field($input['default_wp_role'] ?? '');
+        $valid_roles = array_keys($this->get_editable_roles());
+        $sanitized['default_wp_role'] = in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
         $sanitized['openid_configuration_endpoint'] = esc_url_raw(
             $input['openid_configuration_endpoint'] ??
@@ -321,10 +333,11 @@ class AADSSO_Settings_Page
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
             $sanitized['role_map'] = array();
+            $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
                 $role = sanitize_text_field($role);
                 $groups = sanitize_text_field($groups);
-                if (!empty($role)) {
+                if (!empty($role) && in_array($role, $valid_roles, true)) {
                     $sanitized['role_map'][$role] = $groups;
                 }
             }
