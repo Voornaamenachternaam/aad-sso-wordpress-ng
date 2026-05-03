@@ -432,11 +432,12 @@ class AADSSO_Settings_Page
     {
         $this->render_checkbox_field(
             'match_on_upn_alias',
-            esc_html__(
-                'Match WordPress users based on the alias of their Microsoft Entra ID '
-                . 'UserPrincipalName. For example, Microsoft Entra ID username <code>bob@example.com</code> '
-                . 'will match WordPress user <code>bob</code>.',
-                'aad-sso-wordpress'
+            wp_kses_post(
+                __('Match WordPress users based on the alias of their Microsoft Entra ID '
+                    . 'UserPrincipalName. For example, Microsoft Entra ID username <code>bob@example.com</code> '
+                    . 'will match WordPress user <code>bob</code>.',
+                    'aad-sso-wordpress'
+                )
             )
         );
     }
@@ -546,13 +547,14 @@ class AADSSO_Settings_Page
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
             . esc_url(AADSSO_Settings::get_defaults('openid_configuration_endpoint'))
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';
-        echo '<p class="description">' . esc_html__(
-            'The OpenID Connect configuration endpoint to use. To support Microsoft '
-            . 'Accounts and external users (users invited in from other Microsoft Entra ID '
-            . 'directories, known sometimes as "B2B users") you must use: '
-            . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
-            . 'where <code>{tenant-id}</code> is the tenant ID or a verified domain name of your directory.',
-            'aad-sso-wordpress'
+        echo '<p class="description">' . wp_kses_post(
+            __('The OpenID Connect configuration endpoint to use. To support Microsoft '
+                . 'Accounts and external users (users invited in from other Microsoft Entra ID '
+                . 'directories, known sometimes as "B2B users") you must use: '
+                . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
+                . 'where <code>{tenant-id}</code> is the tenant ID or a verified domain name of your directory.',
+                'aad-sso-wordpress'
+            )
         ) . '</p>';
     }
 
