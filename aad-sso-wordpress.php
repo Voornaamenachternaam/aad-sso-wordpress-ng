@@ -154,6 +154,18 @@ class AADSSO
 
     public function authenticate($user, string $username, string $password)
     {
+    public function authenticate($user, string $username, string $password)
+    {
+        if (isset($_GET['error'])) {
+            return new WP_Error(
+                sanitize_key(wp_unslash($_GET['error'])),
+                sprintf(
+                    __('ERROR: Access denied to Microsoft Entra ID. %s', 'aad-sso-wordpress'),
+                    sanitize_text_field(wp_unslash($_GET['error_description'] ?? ''))
+                )
+            );
+        }
+
         if (!isset($_GET['code'])) {
             return $user;
         }
