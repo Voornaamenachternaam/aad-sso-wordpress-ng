@@ -143,7 +143,7 @@ class AADSSO
 
     private function wants_to_login(): bool
     {
-        $action = isset($_REQUEST['action']) ? (string) $_REQUEST['action'] : 'login';
+        $action = isset($_REQUEST['action']) ? sanitize_text_field(wp_unslash($_REQUEST['action'])) : 'login';
         if (isset($_GET['loggedout'])) {
             $action = 'loggedout';
         }

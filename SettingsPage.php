@@ -123,7 +123,7 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $status = sanitize_text_field($_GET['aadsso_migrate_from_json_status']);
+        $status = sanitize_text_field(wp_unslash($_GET['aadsso_migrate_from_json_status']));
 
         if ('success' === $status) {
             echo '<div id="message" class="notice notice-success"><p>'
