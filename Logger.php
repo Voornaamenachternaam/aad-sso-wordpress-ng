@@ -38,11 +38,16 @@ class AADSSO_Logger
     {
         if (self::$logger === null) {
             // Use WordPress uploads directory for logs (standard writable path)
+            $log_dir = null;
             if (function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
-                $log_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-logs';
-            } else {
-                // Fallback to plugin directory if WordPress not fully loaded
+                if (empty($upload_dir['error']) && !empty($upload_dir['basedir'])) {
+                    $log_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-logs';
+                }
+            }
+
+            if ($log_dir === null) {
+                // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $log_dir = AADSSO_PLUGIN_DIR . 'logs';
             }
 
@@ -81,11 +86,16 @@ class AADSSO_Logger
     {
         if (self::$cache === null) {
             // Use WordPress uploads directory for cache (standard writable path)
+            $cache_dir = null;
             if (function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
-                $cache_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-cache';
-            } else {
-                // Fallback to plugin directory if WordPress not fully loaded
+                if (empty($upload_dir['error']) && !empty($upload_dir['basedir'])) {
+                    $cache_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-cache';
+                }
+            }
+
+            if ($cache_dir === null) {
+                // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $cache_dir = AADSSO_PLUGIN_DIR . 'cache';
             }
 
