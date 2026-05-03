@@ -408,6 +408,94 @@ if (!function_exists('wp_upload_dir')) {
     }
 }
 
+if (!function_exists('add_query_arg')) {
+    function add_query_arg(...$args)
+    {
+        if (is_array($args[0])) {
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $query = $args[0];
+        } else {
+            $uri = $args[0];
+            $query = $args[1] ?? array();
+        }
+        $uri = strtok($uri, '?');
+        if (count($query) > 0) {
+            $uri .= '?' . http_build_query($query);
+        }
+        return $uri;
+    }
+}
+
+if (!function_exists('remove_query_arg')) {
+    function remove_query_arg($key, $query = '')
+    {
+        if (is_array($key)) {
+            foreach ($key as $k) {
+                $query = preg_replace('/[?&]' . preg_quote($k, '/') . '=[^&]*&?/', '', $query);
+            }
+        } else {
+            $query = preg_replace('/[?&]' . preg_quote($key, '/') . '=[^&]*&?/', '', $query);
+        }
+        return $query;
+    }
+}
+
+if (!function_exists('wp_die')) {
+    function wp_die($message = '', $title = '', $args = array())
+    {
+        throw new \Exception($message);
+    }
+}
+
+if (!function_exists('checked')) {
+    function checked($checked, $current = true, $display = true)
+    {
+        return $checked === $current ? ($display ? ' checked="checked"' : ' checked') : '';
+    }
+}
+
+if (!function_exists('selected')) {
+    function selected($selected, $current = true, $display = true)
+    {
+        return $selected === $current ? ($display ? ' selected="selected"' : ' selected') : '';
+    }
+}
+
+if (!function_exists('wp_kses_post')) {
+    function wp_kses_post($string)
+    {
+        return $string;
+    }
+}
+
+if (!function_exists('get_current_screen')) {
+    function get_current_screen()
+    {
+        return null;
+    }
+}
+
+if (!function_exists('wp_verify_nonce')) {
+    function wp_verify_nonce($nonce, $action = -1)
+    {
+        return 1;
+    }
+}
+
+if (!function_exists('check_admin_referer')) {
+    function check_admin_referer($action = -1, $query_arg = '_wpnonce')
+    {
+        return true;
+    }
+}
+
+if (!function_exists('sanitize_url')) {
+    function sanitize_url($url, $protocols = null)
+    {
+        return filter_var($url, FILTER_SANITIZE_URL);
+    }
+}
+
 if (!function_exists('current_user_can')) {
     function current_user_can($capability, ...$args)
     {

@@ -2,53 +2,16 @@
 
 declare(strict_types=1);
 
-use Http\Client\Common\HttpMethodsClient;
-use Http\Client\Common\Plugin\AddHostPlugin;
-use Http\Discovery\Psr17Discovery;
-use Http\Discovery\Psr18Discovery;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\UriFactoryInterface;
-
 class AADSSO_GraphHelper
 {
     public static ?AADSSO_Settings $settings = null;
     public const GRAPH_VERSION = 'v1.0';
-
-    private static ?HttpMethodsClient $http_client = null;
 
     public static function get_base_url(): string
     {
         $endpoint = self::$settings->graph_endpoint ?? 'https://graph.microsoft.com';
         $version = self::$settings->graph_version ?? self::GRAPH_VERSION;
         return trailingslashit($endpoint) . $version;
-    }
-
-    public static function get_http_client(): HttpMethodsClient
-    {
-        if (self::$http_client === null) {
-            $http_client = Psr18Discovery::findClient();
-            $uri_factory = Psr17Discovery::findUriFactory();
-
-            $base_uri = $uri_factory->createUri(self::get_base_url());
-            $add_host_plugin = new AddHostPlugin($base_uri);
-
-            $plugin_client = new \Http\Client\Common\PluginClient(
-                $http_client,
-                [$add_host_plugin]
-            );
-
-            self::$http_client = new HttpMethodsClient(
-                $plugin_client,
-                Psr17Discovery::findRequestFactory()
-            );
-        }
-
-        return self::$http_client;
-    }
-
-    public static function set_http_client(HttpMethodsClient $client): void
-    {
-        self::$http_client = $client;
     }
 
     public static function user_check_member_groups(string $user_id, array $group_ids): mixed
@@ -149,30 +112,5 @@ class AADSSO_GraphHelper
             'Content-Type' => 'application/json',
             'Prefer' => 'return-content',
         );
-    }
-
-    public static function is_sdk_available(): bool
-    {
-        return class_exists('\Microsoft\Graph\Graph');
-    }
-
-    public static function create_graph_client(): ?\Microsoft\Graph\Graph
-    {
-        if (!self::is_sdk_available()) {
-            return null;
-        }
-
-        $token_type = 'Bearer';
-        $access_token = '';
-
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $token_type = (string) ($_SESSION['aadsso_token_type'] ?? 'Bearer');
-            $access_token = (string) ($_SESSION['aadsso_access_token'] ?? '');
-        }
-
-        $graph = new \Microsoft\Graph\Graph();
-        $graph->setAccessToken($token_type . ' ' . $access_token);
-
-        return $graph;
     }
 }

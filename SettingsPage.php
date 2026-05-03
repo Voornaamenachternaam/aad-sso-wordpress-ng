@@ -356,6 +356,16 @@ class AADSSO_Settings_Page
             'https://login.microsoftonline.com/common/.well-known/openid-configuration'
         );
 
+        // OpenID configuration endpoints (loaded from OpenID config, may be set manually)
+        $sanitized['authorization_endpoint'] = esc_url_raw($input['authorization_endpoint'] ?? '');
+        $sanitized['token_endpoint'] = esc_url_raw($input['token_endpoint'] ?? '');
+        $sanitized['jwks_uri'] = esc_url_raw($input['jwks_uri'] ?? '');
+        $sanitized['end_session_endpoint'] = esc_url_raw($input['end_session_endpoint'] ?? '');
+
+        // Graph API settings
+        $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
+        $sanitized['graph_version'] = sanitize_text_field($input['graph_version'] ?? 'v1.0');
+
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
             $sanitized['role_map'] = array();
             $valid_roles = array_keys($this->get_editable_roles());
