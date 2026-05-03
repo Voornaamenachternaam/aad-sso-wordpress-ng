@@ -1,12 +1,35 @@
+/**
+ * Single Sign-on with Microsoft Entra ID
+ * Login page stylesheet
+ * 
+ * @package AADSSO
+ */
+
 .aadsso-login-form-text {
-	text-align: center;
-	padding: 20px 0px 30px 0px;
+    text-align: center;
+    padding: 20px 0 30px 0;
+    margin: 0;
 }
 
-.aadsso-login-form-text a.dim, 
-.aadsso-login-form-text a.dim:visited, 
-.aadsso-login-form-text a.dim:active, 
-.aadsso-login-form-text a.dim:link {
-	text-decoration: none;
-	color: #aaa;
+.aadsso-login-form-text a,
+.aadsso-login-form-text a:visited,
+.aadsso-login-form-text a:active,
+.aadsso-login-form-text a:link {
+    text-decoration: none;
+    color: #2271b1;
+    transition: color 0.2s ease;
+}
+
+.aadsso-login-form-text a:hover {
+    color: #135e96;
+    text-decoration: underline;
+}
+
+.aadsso-login-form-text a.dim {
+    color: #72777c;
+    font-size: 0.9em;
+}
+
+.aadsso-login-form-text a.dim:hover {
+    color: #50575e;
 }
