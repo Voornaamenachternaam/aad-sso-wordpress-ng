@@ -120,10 +120,37 @@ class AADSSO_Settings
             }
         }
 
+        $property_types = [
+            'client_id' => 'string', 'client_secret' => 'string',
+            'redirect_uri' => 'string', 'logout_redirect_uri' => 'string',
+            'org_display_name' => 'string', 'org_domain_hint' => 'string',
+            'field_to_match_to_upn' => 'string', 'authorization_endpoint' => 'string',
+            'token_endpoint' => 'string', 'jwks_uri' => 'string',
+            'end_session_endpoint' => 'string', 'graph_endpoint' => 'string',
+            'graph_version' => 'string', 'openid_configuration_endpoint' => 'string',
+            'match_on_upn_alias' => 'bool', 'enable_auto_provisioning' => 'bool',
+            'enable_auto_forward_to_aad' => 'bool', 'enable_aad_group_to_wp_role' => 'bool',
+            'enable_full_logout' => 'bool',
+            'aad_group_to_wp_role_map' => 'array',
+            'default_wp_role' => 'nullable_string',
+        ];
         foreach ($settings as $key => $value) {
-            if (property_exists($this, $key)) {
+            if (!property_exists($this, $key)) {
+                continue;
+            }
+            $type = $property_types[$key] ?? null;
+            if ($type === 'bool') {
+                $this->{$key} = (bool) $value;
+            } elseif ($type === 'string') {
+                $this->{$key} = (string) $value;
+            } elseif ($type === 'array') {
+                $this->{$key} = is_array($value) ? $value : [];
+            } elseif ($type === 'nullable_string') {
+                $this->{$key} = null === $value ? null : (string) $value;
+            } else {
                 $this->{$key} = $value;
             }
+        }
         }
         return $this;
     }
