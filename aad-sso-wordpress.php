@@ -124,7 +124,7 @@ class AADSSO
             }
 
             if ($auto_redirect && !isset($_GET['code']) && !isset($_POST['log'])) {
-                wp_redirect($this->get_login_url());
+                wp_safe_redirect($this->get_login_url());
                 exit;
             }
         }
@@ -451,7 +451,7 @@ class AADSSO
         $this->clear_session();
 
         if ($signed_in_with_azuread && $this->settings->enable_full_logout) {
-            wp_redirect($this->get_logout_url());
+            wp_safe_redirect($this->get_logout_url());
             exit;
         }
     }
