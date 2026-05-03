@@ -32,8 +32,13 @@ class AADSSO_GraphHelper
             $base_uri = $uri_factory->createUri(self::get_base_url());
             $add_host_plugin = new AddHostPlugin($base_uri);
 
-            self::$http_client = new HttpMethodsClient(
+            $plugin_client = new \Http\Client\Common\PluginClient(
                 $http_client,
+                [$add_host_plugin]
+            );
+
+            self::$http_client = new HttpMethodsClient(
+                $plugin_client,
                 Psr17Discovery::findRequestFactory()
             );
         }
