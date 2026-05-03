@@ -91,8 +91,7 @@ class AADSSO_GraphHelper
         AADSSO::debug_log('Response headers: ' . wp_json_encode($response_headers), 99);
         AADSSO::debug_log('Response body: ' . wp_json_encode($response_body), 50);
 
-        $decoded = json_decode($response_body);
-        return is_array($decoded) ? (object) $decoded : $decoded;
+        return json_decode($response_body);
     }
 
     private static function get_required_headers_and_settings(): array
