@@ -409,17 +409,29 @@ if (!function_exists('wp_upload_dir')) {
 }
 
 if (!function_exists('add_query_arg')) {
+    /**
+     * Stub for WordPress add_query_arg().
+     * Supports: add_query_arg($key, $value), add_query_arg($key, $value, $uri), add_query_arg($array), add_query_arg($array, $uri)
+     */
     function add_query_arg(...$args)
     {
-        if (is_array($args[0])) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
-            $query = $args[0];
-        } else {
-            $uri = $args[0];
-            $query = $args[1] ?? array();
+        if (empty($args)) {
+            return '';
         }
-        $uri = strtok($uri, '?');
-        if (count($query) > 0) {
+
+        // Determine if first arg is an array (key=>value pairs) or a key name
+        if (is_array($args[0])) {
+            $query = $args[0];
+            $uri = $args[1] ?? ($_SERVER['REQUEST_URI'] ?? '');
+        } else {
+            $key = $args[0];
+            $value = $args[1] ?? '';
+            $uri = $args[2] ?? ($_SERVER['REQUEST_URI'] ?? '');
+            $query = array($key => $value);
+        }
+
+        $uri = strtok((string) $uri, '?');
+        if (!empty($query)) {
             $uri .= '?' . http_build_query($query);
         }
         return $uri;
@@ -427,16 +439,28 @@ if (!function_exists('add_query_arg')) {
 }
 
 if (!function_exists('remove_query_arg')) {
-    function remove_query_arg($key, $query = '')
+    /**
+     * Stub for WordPress remove_query_arg().
+     * Supports: remove_query_arg($key), remove_query_arg($key, $url)
+     */
+    function remove_query_arg($key, $url = '')
     {
+        $url = $url ?: ($_SERVER['REQUEST_URI'] ?? '');
+        $url = strtok((string) $url, '?');
+
         if (is_array($key)) {
             foreach ($key as $k) {
-                $query = preg_replace('/[?&]' . preg_quote($k, '/') . '=[^&]*&?/', '', $query);
+                $url = preg_replace('/([?&])' . preg_quote((string) $k, '/') . '=[^&]*&?/', '$1', $url);
             }
         } else {
-            $query = preg_replace('/[?&]' . preg_quote($key, '/') . '=[^&]*&?/', '', $query);
+            $url = preg_replace('/([?&])' . preg_quote((string) $key, '/') . '=[^&]*&?/', '$1', $url);
         }
-        return $query;
+
+        // Clean up trailing ? or & that may remain
+        $url = rtrim($url, '?');
+        $url = rtrim($url, '&');
+
+        return $url;
     }
 }
 
