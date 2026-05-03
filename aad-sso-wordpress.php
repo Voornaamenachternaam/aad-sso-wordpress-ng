@@ -164,7 +164,7 @@ class AADSSO
             }
 
             $antiforgery_id = (string) $_SESSION['aadsso_antiforgery-id'];
-            $state_param = isset($_GET['state']) ? (string) $_GET['state'] : '';
+            $state_param = isset($_GET['state']) ? sanitize_text_field(wp_unslash($_GET['state'])) : '';
 
             if ('' === $state_param || $state_param !== $antiforgery_id) {
                 return new WP_Error(
