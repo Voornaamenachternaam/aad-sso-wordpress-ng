@@ -15,10 +15,10 @@ declare(strict_types=1);
 class AADSSO_Settings_Page
 {
     /** @var array<string, mixed> Plugin settings */
-    private array $settings;
+    private array $settings = array();
 
-    /** @var string|int|false Options page ID */
-    private $options_page_id;
+    /** @var int|false Options page ID */
+    private int|false $options_page_id = false;
 
     public function __construct()
     {

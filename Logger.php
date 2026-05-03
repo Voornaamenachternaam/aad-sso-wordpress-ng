@@ -31,7 +31,10 @@ if (!defined('AADSSO_PLUGIN_DIR')) {
  */
 class AADSSO_Logger
 {
+    /** @var Logger|null */
     private static ?Logger $logger = null;
+
+    /** @var Psr16Cache|null */
     private static ?Psr16Cache $cache = null;
 
     public static function get_logger(): Logger
