@@ -26,11 +26,11 @@ class AADSSO_AuthorizationHelper
     {
         $authentication_request_body = http_build_query(array(
             'grant_type' => 'authorization_code',
-            'code' => $code,
-            'redirect_uri' => $settings->redirect_uri,
-            'resource' => $settings->graph_endpoint,
-            'client_id' => $settings->client_id,
-            'client_secret' => $settings->client_secret,
+            'code' => (string) $code,
+            'redirect_uri' => (string) $settings->redirect_uri,
+            'resource' => (string) $settings->graph_endpoint,
+            'client_id' => (string) $settings->client_id,
+            'client_secret' => (string) $settings->client_secret,
         ));
 
         return self::get_and_process_access_token($authentication_request_body, $settings);

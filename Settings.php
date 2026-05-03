@@ -152,7 +152,8 @@ class AADSSO_Settings
 
             self::$options_resolver->define('graph_version')
                 ->allowedTypes('string')
-                ->default('v1.0');
+                ->default('v1.0')
+                ->allowedValues(array('v1.0', 'beta'));
 
             self::$options_resolver->define('role_map')
                 ->allowedTypes('array')
@@ -301,20 +302,32 @@ class AADSSO_Settings
         }
 
         // Convert legacy role_map format to aad_group_to_wp_role_map
+        // Legacy format: role_map[role_slug] = "group1,group2" or array("group1", "group2")
+        // New format: aad_group_to_wp_role_map[group_id] = role_slug
         if (!empty($settings['role_map']) && is_array($settings['role_map'])) {
             $settings['aad_group_to_wp_role_map'] = array();
             foreach ($settings['role_map'] as $role_slug => $group_ids_list) {
                 if (empty($group_ids_list)) {
                     continue;
                 }
-                $group_ids = explode(',', $group_ids_list);
-                if (!empty($group_ids)) {
-                    foreach ($group_ids as $group_id) {
-                        $group_id = trim(sanitize_text_field($group_id));
-                        if (!empty($group_id)
-                            && !isset($settings['aad_group_to_wp_role_map'][$group_id])
-                        ) {
-                            $settings['aad_group_to_wp_role_map'][$group_id] = sanitize_text_field($role_slug);
+                // Handle array format (newer) or string format (legacy)
+                if (is_array($group_ids_list)) {
+                    foreach ($group_ids_list as $group_id) {
+                        $group_id = trim(sanitize_text_field((string) $group_id));
+                        if (!empty($group_id) && !isset($settings['aad_group_to_wp_role_map'][$group_id])) {
+                            $settings['aad_group_to_wp_role_map'][$group_id] = sanitize_text_field((string) $role_slug);
+                        }
+                    }
+                } else {
+                    $group_ids = explode(',', (string) $group_ids_list);
+                    if (!empty($group_ids)) {
+                        foreach ($group_ids as $group_id) {
+                            $group_id = trim(sanitize_text_field($group_id));
+                            if (!empty($group_id)
+                                && !isset($settings['aad_group_to_wp_role_map'][$group_id])
+                            ) {
+                                $settings['aad_group_to_wp_role_map'][$group_id] = sanitize_text_field((string) $role_slug);
+                            }
                         }
                     }
                 }

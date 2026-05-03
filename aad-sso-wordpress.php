@@ -412,7 +412,12 @@ class AADSSO
             $logout_redirect_uri = AADSSO_Settings::get_defaults('logout_redirect_uri');
         }
 
-        return $this->settings->end_session_endpoint
+        $end_session = $this->settings->end_session_endpoint;
+        if (empty($end_session)) {
+            return $logout_redirect_uri;
+        }
+
+        return $end_session
             . '?' . http_build_query(array('post_logout_redirect_uri' => $logout_redirect_uri));
     }
 

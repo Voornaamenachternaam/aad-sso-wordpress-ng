@@ -79,6 +79,11 @@ class AADSSO_Settings_Page
         if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
             $legacy_settings['role_map'] = array();
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
+                $role_slug = sanitize_text_field($role_slug);
+                $group_id = sanitize_text_field($group_id);
+                if (empty($role_slug) || empty($group_id)) {
+                    continue;
+                }
                 if (!isset($legacy_settings['role_map'][$role_slug])) {
                     $legacy_settings['role_map'][$role_slug] = $group_id;
                 } else {
@@ -364,7 +369,9 @@ class AADSSO_Settings_Page
 
         // Graph API settings
         $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
-        $sanitized['graph_version'] = sanitize_text_field($input['graph_version'] ?? 'v1.0');
+        $sanitized['graph_version'] = in_array($input['graph_version'] ?? '', array('v1.0', 'beta'), true)
+            ? $input['graph_version']
+            : 'v1.0';
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
             $sanitized['role_map'] = array();

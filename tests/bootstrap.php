@@ -510,13 +510,6 @@ if (!function_exists('wp_create_nonce')) {
     }
 }
 
-if (!function_exists('wp_verify_nonce')) {
-    function wp_verify_nonce($nonce, $action = -1)
-    {
-        return 1;
-    }
-}
-
 if (!function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field($str)
     {
