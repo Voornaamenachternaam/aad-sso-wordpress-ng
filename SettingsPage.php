@@ -22,13 +22,13 @@ class AADSSO_Settings_Page
 
     public function __construct()
     {
-        add_action('admin_enqueue_scripts', [$this, 'maybe_include_jquery'));
-        add_action('admin_menu', [$this, 'add_options_page'));
-        add_action('admin_init', [$this, 'register_settings'));
-        add_action('admin_init', [$this, 'maybe_reset_settings'));
-        add_action('admin_init', [$this, 'maybe_migrate_settings'));
-        add_action('all_admin_notices', [$this, 'notify_if_reset_successful'));
-        add_action('all_admin_notices', [$this, 'notify_json_migrate_status'));
+        add_action('admin_enqueue_scripts', [$this, 'maybe_include_jquery')];
+        add_action('admin_menu', [$this, 'add_options_page')];
+        add_action('admin_init', [$this, 'register_settings')];
+        add_action('admin_init', [$this, 'maybe_reset_settings')];
+        add_action('admin_init', [$this, 'maybe_migrate_settings')];
+        add_action('all_admin_notices', [$this, 'notify_if_reset_successful')];
+        add_action('all_admin_notices', [$this, 'notify_json_migrate_status')];
 
         $default_settings = AADSSO_Settings::get_defaults();
         $this->settings = get_option('aadsso_settings', $default_settings);
