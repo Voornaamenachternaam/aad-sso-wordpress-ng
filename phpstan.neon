@@ -17,11 +17,6 @@ parameters:
         - tests/
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
-    memoryLimit: 512M
-    universalObjectCrates:
-        - 'WP_User'
-        - 'WP_Error'
-        - 'WP_REST_Response'
     ignoreErrors:
         - '#^Function .+ not found#'
         - '#^Class .+ not found#'
