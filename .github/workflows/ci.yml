@@ -127,7 +127,7 @@ jobs:
           composer install --no-interaction --prefer-dist
 
       - name: Run PHP-CS-Fixer
-        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+        run: vendor/bin/php-cs-fixer fix --diff
 
   code-quality:
     name: Code Quality Check
