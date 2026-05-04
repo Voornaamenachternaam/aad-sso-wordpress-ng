@@ -110,7 +110,7 @@ class AADSSO
     public function save_redirect_and_maybe_bypass_login(): void
     {
         $auto_redirect = apply_filters(
-            'aad_auto_forward_login',
+            'aadsso_auto_forward_login',
             $this->settings->enable_auto_forward_to_aad
         );
 
