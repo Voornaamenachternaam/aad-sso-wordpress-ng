@@ -93,7 +93,7 @@ class AADSSO_Settings_Page
         }
 
         if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
-            // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for sanitize_settings
+            // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for UI compatibility
             $legacy_settings['role_map'] = array();
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
                 $role_slug = sanitize_text_field($role_slug);
@@ -101,7 +101,7 @@ class AADSSO_Settings_Page
                 if (empty($role_slug) || empty($group_id)) {
                     continue;
                 }
-                // Store as role_slug => array of group_ids (what sanitize_settings expects)
+                // Store as role_slug => array of group_ids (matching UI format)
                 if (!isset($legacy_settings['role_map'][$role_slug])) {
                     $legacy_settings['role_map'][$role_slug] = array($group_id);
                 } else {
@@ -404,17 +404,21 @@ class AADSSO_Settings_Page
             : 'v1.0';
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
-            $sanitized['aad_group_to_wp_role_map'] = array();
+            $sanitized['role_map'] = array();
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
                 $role = sanitize_text_field($role);
                 $groups = is_array($groups) ? $groups : explode(',', $groups);
                 if (!empty($role) && in_array($role, $valid_roles, true)) {
+                    $group_ids = array();
                     foreach ($groups as $group_id) {
                         $group_id = sanitize_text_field(trim((string) $group_id));
                         if (!empty($group_id)) {
-                            $sanitized['aad_group_to_wp_role_map'][$group_id] = $role;
+                            $group_ids[] = $group_id;
                         }
+                    }
+                    if (!empty($group_ids)) {
+                        $sanitized['role_map'][$role] = $group_ids;
                     }
                 }
             }
