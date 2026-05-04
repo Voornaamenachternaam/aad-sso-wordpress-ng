@@ -12,20 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.1', '8.2', '8.3', '8.4']
+        php-version: ['8.5']
         include:
-          - php-version: '8.4'
+          - php-version: '8.5'
             coverage: true
-          - php-version: '8.1'
-            coverage: false
-          - php-version: '8.2'
-            coverage: false
-          - php-version: '8.3'
-            coverage: false
     
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:9.7
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_test
@@ -90,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.1', '8.4']
+        php-version: ['8.5']
     
     steps:
       - name: Checkout
@@ -119,7 +113,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -139,7 +133,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           extensions: mbstring, json, openssl, xdebug
 
       - name: Install Composer dependencies
@@ -163,7 +157,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: '8.4'
+          php-version: '8.5'
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist

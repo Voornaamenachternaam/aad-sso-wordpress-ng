@@ -18,6 +18,7 @@ $config
         '@PHP82Migration' => true,
         '@PHP83Migration' => true,
         '@PHP84Migration' => true,
+        '@PHP8x5Migration' => true,
         '@Symfony' => true,
         '@Symfony:risky' => true,
         'align_multiline_comment' => true,
