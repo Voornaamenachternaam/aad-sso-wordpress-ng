@@ -40,7 +40,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           extensions: mbstring, json, openssl, curl, mysql
-          coverage: ${{ matrix.coverage ? 'xdebug' : 'none' }}
+          coverage: "${{ matrix.coverage ? 'xdebug' : 'none' }}"
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist
