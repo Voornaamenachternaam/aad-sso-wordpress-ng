@@ -181,91 +181,107 @@ class AADSSO
             $code = (string) wp_unslash($_GET['code']);
             $token = AADSSO_AuthorizationHelper::get_access_token($code, $this->settings);
 
-            if (isset($token->access_token)) {
-                try {
-                    $jwt = AADSSO_AuthorizationHelper::validate_id_token(
-                        (string) $token->id_token,
-                        $this->settings,
-                        $antiforgery_id
-                    );
+            if (is_wp_error($token)) {
+                AADSSO_Logger::log_error('Token request failed: ' . $token->get_error_message());
+                return new WP_Error(
+                    'token_request_failed',
+                    sprintf(
+                        __('ERROR: Could not get an access token to Microsoft Graph. %s', 'aad-sso-wordpress'),
+                        esc_html($token->get_error_message())
+                    )
+                );
+            }
 
-                    AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
-                    AADSSO_Logger::log_debug(wp_json_encode($jwt), 50);
-                } catch (\Throwable $e) {
-                    AADSSO_Logger::log_exception($e, 'ID token validation failed');
+            if (!isset($token->access_token)) {
+                AADSSO_Logger::log_error('Token response missing access_token');
+                return new WP_Error(
+                    'invalid_token_response',
+                    __('ERROR: Invalid token response from Microsoft Entra ID.', 'aad-sso-wordpress')
+                );
+            }
+
+            try {
+                $jwt = AADSSO_AuthorizationHelper::validate_id_token(
+                    (string) $token->id_token,
+                    $this->settings,
+                    $antiforgery_id
+                );
+
+                AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
+                AADSSO_Logger::log_debug(wp_json_encode($jwt), 50);
+            } catch (\Throwable $e) {
+                AADSSO_Logger::log_exception($e, 'ID token validation failed');
+                return new WP_Error(
+                    'invalid_id_token',
+                    sprintf(
+                        __('ERROR: Invalid id_token. %s', 'aad-sso-wordpress'),
+                        esc_html($e->getMessage())
+                    )
+                );
+            }
+
+            $group_memberships = false;
+            if (true === $this->settings->enable_aad_group_to_wp_role) {
+                AADSSO_GraphHelper::$settings = $this->settings;
+
+                $group_ids = array_keys($this->settings->aad_group_to_wp_role_map);
+                $group_memberships = AADSSO_GraphHelper::user_check_member_groups(
+                    (string) $jwt->oid,
+                    $group_ids
+                );
+
+                // Check for WP_Error from Graph API call
+                if (is_wp_error($group_memberships)) {
+                    AADSSO_Logger::log_error('Graph API error: ' . $group_memberships->get_error_message());
                     return new WP_Error(
-                        'invalid_id_token',
+                        'graph_api_error',
                         sprintf(
-                            __('ERROR: Invalid id_token. %s', 'aad-sso-wordpress'),
-                            esc_html($e->getMessage())
+                            __('ERROR: Unable to check group membership with Microsoft Graph: %s', 'aad-sso-wordpress'),
+                            esc_html($group_memberships->get_error_message())
                         )
                     );
                 }
 
-                $group_memberships = false;
-                if (true === $this->settings->enable_aad_group_to_wp_role) {
-                    AADSSO_GraphHelper::$settings = $this->settings;
-
-                    $group_ids = array_keys($this->settings->aad_group_to_wp_role_map);
-                    $group_memberships = AADSSO_GraphHelper::user_check_member_groups(
-                        (string) $jwt->oid,
-                        $group_ids
+                if (isset($group_memberships->value)) {
+                    AADSSO_Logger::log_debug(sprintf(
+                        "Microsoft Entra ID user '%s' is a member of [%s]",
+                        $jwt->oid,
+                        implode(',', $group_memberships->value)
+                    ), 20);
+                } elseif (isset($group_memberships->error)) {
+                    AADSSO_Logger::log_error(
+                        'Error when checking group membership: ' . wp_json_encode($group_memberships)
                     );
-
-                    if (isset($group_memberships->value)) {
-                        AADSSO_Logger::log_debug(sprintf(
-                            "Microsoft Entra ID user '%s' is a member of [%s]",
-                            $jwt->oid,
-                            implode(',', $group_memberships->value)
-                        ), 20);
-                    } elseif (isset($group_memberships->error)) {
-                        AADSSO_Logger::log_error(
-                            'Error when checking group membership: ' . wp_json_encode($group_memberships)
-                        );
-                        return new WP_Error(
-                            'error_checking_group_membership',
-                            sprintf(
-                                __('ERROR: Unable to check group membership with Microsoft Graph: '
-                                    . '<b>%s</b> %s<br />%s', 'aad-sso-wordpress'),
-                                esc_html((string) ($group_memberships->error->code ?? '')),
-                                esc_html((string) ($group_memberships->error->message ?? '')),
-                                esc_html(wp_json_encode($group_memberships->error->innerError ?? null))
-                            )
-                        );
-                    } else {
-                        AADSSO_Logger::log_warning(
-                            'Unexpected response to checkMemberGroups: ' . wp_json_encode($group_memberships)
-                        );
-                        return new WP_Error(
-                            'unexpected_response_to_checkMemberGroups',
-                            __('ERROR: Unexpected response when checking group membership with Microsoft Graph.',
-                                'aad-sso-wordpress')
-                        );
-                    }
+                    return new WP_Error(
+                        'error_checking_group_membership',
+                        sprintf(
+                            __('ERROR: Unable to check group membership with Microsoft Graph: '
+                                . '<b>%s</b> %s<br />%s', 'aad-sso-wordpress'),
+                            esc_html((string) ($group_memberships->error->code ?? '')),
+                            esc_html((string) ($group_memberships->error->message ?? '')),
+                            esc_html(wp_json_encode($group_memberships->error->innerError ?? null))
+                        )
+                    );
+                } else {
+                    AADSSO_Logger::log_warning(
+                        'Unexpected response to checkMemberGroups: ' . wp_json_encode($group_memberships)
+                    );
+                    return new WP_Error(
+                        'unexpected_response_to_checkMemberGroups',
+                        __('ERROR: Unexpected response when checking group membership with Microsoft Graph.',
+                            'aad-sso-wordpress')
+                    );
                 }
+            }
 
-                $user = $this->get_wp_user_from_aad_user($jwt, $group_memberships);
+            $user = $this->get_wp_user_from_aad_user($jwt, $group_memberships);
 
-                if ($user instanceof WP_User && true === $this->settings->enable_aad_group_to_wp_role) {
-                    $role_result = $this->update_wp_user_roles($user, $group_memberships);
-                    if ($role_result instanceof WP_Error) {
-                        return $role_result;
-                    }
-                    $user = $role_result;
+            if ($user instanceof WP_User && true === $this->settings->enable_aad_group_to_wp_role) {
+                $role_result = $this->update_wp_user_roles($user, $group_memberships);
+                if ($role_result instanceof WP_Error) {
+                    return $role_result;
                 }
-            } elseif (isset($token->error)) {
-                return new WP_Error(
-                    'token_error',
-                    sprintf(
-                        __('ERROR: Could not get an access token to Microsoft Graph. %s', 'aad-sso-wordpress'),
-                        esc_html((string) ($token->error_description ?? $token->error))
-                    )
-                );
-            } else {
-                return new WP_Error(
-                    'unknown',
-                    __('ERROR: An unknown error occurred.', 'aad-sso-wordpress')
-                );
+                $user = $role_result;
             }
         } elseif (isset($_GET['error']) && is_string($_GET['error'])) {
             return new WP_Error(
