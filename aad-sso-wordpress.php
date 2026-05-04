@@ -29,6 +29,7 @@ require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
 require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
 require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
 require_once AADSSO_PLUGIN_DIR . '/Logger.php';
+require_once AADSSO_PLUGIN_DIR . '/HttpClient.php';
 
 class AADSSO
 {

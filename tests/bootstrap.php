@@ -573,4 +573,221 @@ if (!function_exists('wp_strip_all_tags')) {
     }
 }
 
+// Mock PSR-18 HTTP client classes for testing
+if (!class_exists('Psr\Http\Client\ClientInterface')) {
+    interface ClientInterface
+    {
+        public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface;
+    }
+}
+
+if (!class_exists('Psr\Http\Message\RequestInterface')) {
+    interface RequestInterface extends \Psr\Http\Message\MessageInterface
+    {
+        public function getRequestTarget(): string;
+        public function withRequestTarget(string $requestTarget): self;
+        public function getMethod(): string;
+        public function withMethod(string $method): self;
+        public function getUri(): \Psr\Http\Message\UriInterface;
+        public function withUri(\Psr\Http\Message\UriInterface $uri, bool $preserveHost = false): self;
+    }
+}
+
+if (!class_exists('Psr\Http\Message\ResponseInterface')) {
+    interface ResponseInterface extends \Psr\Http\Message\MessageInterface
+    {
+        public function getStatusCode(): int;
+        public function withStatus(int $code, string $reasonPhrase = ''): self;
+        public function getReasonPhrase(): string;
+    }
+}
+
+if (!class_exists('Psr\Http\Message\MessageInterface')) {
+    interface MessageInterface
+    {
+        public function getProtocolVersion(): string;
+        public function withProtocolVersion(string $version): self;
+        public function getHeaders(): array;
+        public function hasHeader(string $name): bool;
+        public function getHeader(string $name): array;
+        public function getHeaderLine(string $name): string;
+        public function withHeader(string $name, $value): self;
+        public function withAddedHeader(string $name, $value): self;
+        public function withoutHeader(string $name): self;
+        public function getBody(): \Psr\Http\Message\StreamInterface;
+        public function withBody(\Psr\Http\Message\StreamInterface $body): self;
+    }
+}
+
+if (!class_exists('Psr\Http\Message\UriInterface')) {
+    interface UriInterface
+    {
+        public function getScheme(): string;
+        public function withScheme(string $scheme): self;
+        public function getAuthority(): string;
+        public function getUserInfo(): string;
+        public function withUserInfo(string $user, ?string $password = null): self;
+        public function getHost(): string;
+        public function withHost(string $host): self;
+        public function getPort(): ?int;
+        public function withPort(?int $port): self;
+        public function getPath(): string;
+        public function withPath(string $path): self;
+        public function getQuery(): string;
+        public function withQuery(string $query): self;
+        public function getFragment(): string;
+        public function withFragment(string $fragment): self;
+        public function __toString(): string;
+    }
+}
+
+if (!class_exists('Psr\Http\Message\StreamInterface')) {
+    interface StreamInterface
+    {
+        public function __toString(): string;
+        public function close(): void;
+        public function detach();
+        public function getSize(): ?int;
+        public function tell(): int;
+        public function eof(): bool;
+        public function isSeekable(): bool;
+        public function seek(int $offset, int $whence = SEEK_SET): void;
+        public function rewind(): void;
+        public function isWritable(): bool;
+        public function write(string $string): int;
+        public function isReadable(): bool;
+        public function read(int $length): string;
+        public function getContents(): string;
+        public function getMetadata(?string $key = null);
+    }
+}
+
+// Mock AADSSO_HttpClient for tests
+if (!class_exists('AADSSO_HttpClient')) {
+    class AADSSO_HttpClient implements \Psr\Http\Client\ClientInterface
+    {
+        private static $instance = null;
+
+        public static function get_instance(): self
+        {
+            if (self::$instance === null) {
+                self::$instance = new self();
+            }
+            return self::$instance;
+        }
+
+        public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface
+        {
+            return $this->createMockResponse();
+        }
+
+        public function get(string $url, array $options = array()): \Psr\Http\Message\ResponseInterface
+        {
+            return $this->createMockResponse();
+        }
+
+        public function post(string $url, array $options = array()): \Psr\Http\Message\ResponseInterface
+        {
+            return $this->createMockResponse();
+        }
+
+        private function createMockResponse(): \Psr\Http\Message\ResponseInterface
+        {
+            return new class implements \Psr\Http\Message\ResponseInterface {
+                private $statusCode = 200;
+                private $headers = array('Content-Type' => array('application/json'));
+                private $body;
+
+                public function __construct()
+                {
+                    $this->body = new class {
+                        public function getContents(): string
+                        {
+                            return '{"access_token":"test","token_type":"Bearer"}';
+                        }
+                    };
+                }
+
+                public function getStatusCode(): int
+                {
+                    return $this->statusCode;
+                }
+
+                public function withStatus(int $code, string $reasonPhrase = ''): self
+                {
+                    $clone = clone $this;
+                    $clone->statusCode = $code;
+                    return $clone;
+                }
+
+                public function getReasonPhrase(): string
+                {
+                    return 'OK';
+                }
+
+                public function getProtocolVersion(): string
+                {
+                    return '1.1';
+                }
+
+                public function withProtocolVersion(string $version): self
+                {
+                    return clone $this;
+                }
+
+                public function getHeaders(): array
+                {
+                    return $this->headers;
+                }
+
+                public function hasHeader(string $name): bool
+                {
+                    return isset($this->headers[$name]);
+                }
+
+                public function getHeader(string $name): array
+                {
+                    return $this->headers[$name] ?? array();
+                }
+
+                public function getHeaderLine(string $name): string
+                {
+                    return implode(', ', $this->getHeader($name));
+                }
+
+                public function withHeader(string $name, $value): self
+                {
+                    $clone = clone $this;
+                    $clone->headers[$name] = (array) $value;
+                    return $clone;
+                }
+
+                public function withAddedHeader(string $name, $value): self
+                {
+                    return $this->withHeader($name, $value);
+                }
+
+                public function withoutHeader(string $name): self
+                {
+                    $clone = clone $this;
+                    unset($clone->headers[$name]);
+                    return $clone;
+                }
+
+                public function getBody(): \Psr\Http\Message\StreamInterface
+                {
+                    return $this->body;
+                }
+
+                public function withBody(\Psr\Http\Message\StreamInterface $body): self
+                {
+                    $clone = clone $this;
+                    $clone->body = $body;
+                    return $clone;
+                }
+            };
+        }
+    }
+}
+
 $_SESSION = array();

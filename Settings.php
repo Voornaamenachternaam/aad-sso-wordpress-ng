@@ -306,23 +306,30 @@ class AADSSO_Settings
 
     public static function get_remote_contents(string $url): string
     {
-        $response = wp_remote_get(
-            esc_url_raw($url),
-            array(
-                'timeout' => 15,
-                'sslverify' => true,
-            )
-        );
+        try {
+            $response = AADSSO_HttpClient::get_instance()->get($url, array(
+                'headers' => array(
+                    'Accept' => 'application/json',
+                ),
+            ));
 
-        if (is_wp_error($response)) {
+            $status_code = $response->getStatusCode();
+
+            if ($status_code >= 400) {
+                AADSSO_Logger::log_error(
+                    'Failed to fetch remote contents: HTTP ' . $status_code
+                );
+                return '';
+            }
+
+            $body = $response->getBody()->getContents();
+            return is_string($body) ? $body : '';
+        } catch (\Throwable $e) {
             AADSSO_Logger::log_error(
-                'Failed to fetch remote contents: ' . $response->get_error_message()
+                'Failed to fetch remote contents: ' . $e->getMessage()
             );
             return '';
         }
-
-        $file_contents = wp_remote_retrieve_body($response);
-        return is_string($file_contents) ? $file_contents : '';
     }
 
     /**

@@ -3,7 +3,8 @@
 /**
  * Microsoft Graph API helper class.
  *
- * Provides methods for interacting with Microsoft Graph API endpoints.
+ * Provides methods for interacting with Microsoft Graph API endpoints
+ * using PSR-18 HTTP client for standardized HTTP communication.
  *
  * @package AADSSO
  */
@@ -19,7 +20,23 @@ class AADSSO_GraphHelper
     /** @var AADSSO_Settings|null Static settings reference */
     public static ?AADSSO_Settings $settings = null;
 
+    /** @var AADSSO_HttpClient|null HTTP client instance */
+    private static ?AADSSO_HttpClient $http_client = null;
+
     public const GRAPH_VERSION = 'v1.0';
+
+    /**
+     * Get the HTTP client instance.
+     *
+     * @return AADSSO_HttpClient The HTTP client.
+     */
+    private static function get_http_client(): AADSSO_HttpClient
+    {
+        if (self::$http_client === null) {
+            self::$http_client = AADSSO_HttpClient::get_instance();
+        }
+        return self::$http_client;
+    }
 
     public static function get_base_url(): string
     {
@@ -55,16 +72,17 @@ class AADSSO_GraphHelper
 
         AADSSO_Logger::log_debug('GET ' . $url, 50);
 
-        $response = wp_remote_get(
-            esc_url_raw($url),
-            array(
-                'headers' => self::get_required_headers_and_settings(),
-                'timeout' => 30,
-                'sslverify' => true,
-            )
+        $options = array(
+            'headers' => self::get_required_headers_and_settings(),
         );
 
-        return self::parse_and_log_response($response);
+        try {
+            $response = self::get_http_client()->get($url, $options);
+            return self::parse_and_log_response($response);
+        } catch (\Throwable $e) {
+            AADSSO_Logger::log_error('Graph API GET request failed: ' . $e->getMessage());
+            return new WP_Error('http_request_failed', $e->getMessage());
+        }
     }
 
     public static function post_request(string $url, array $query_params = array(), array $data = array()): mixed
@@ -77,42 +95,54 @@ class AADSSO_GraphHelper
         AADSSO_Logger::log_debug('POST ' . $url, 50);
         AADSSO_Logger::log_debug($payload, 99);
 
-        $response = wp_remote_post(
-            esc_url_raw($url),
-            array(
-                'body' => $payload,
-                'headers' => self::get_required_headers_and_settings(),
-                'timeout' => 30,
-                'sslverify' => true,
-            )
+        $options = array(
+            'body' => $payload,
+            'headers' => self::get_required_headers_and_settings(),
         );
 
-        return self::parse_and_log_response($response);
+        try {
+            $response = self::get_http_client()->post($url, $options);
+            return self::parse_and_log_response($response);
+        } catch (\Throwable $e) {
+            AADSSO_Logger::log_error('Graph API POST request failed: ' . $e->getMessage());
+            return new WP_Error('http_request_failed', $e->getMessage());
+        }
     }
 
-    private static function parse_and_log_response(mixed $response): mixed
+    /**
+     * Parse and log a PSR-7 response.
+     *
+     * @param \Psr\Http\Message\ResponseInterface $response The PSR-7 response.
+     * @return mixed The decoded response body or WP_Error on failure.
+     */
+    private static function parse_and_log_response(\Psr\Http\Message\ResponseInterface $response): mixed
     {
-        if (is_wp_error($response)) {
-            AADSSO_Logger::log_error(
-                'Graph API Error: ' . $response->get_error_message()
-            );
-            return $response;
+        $status_code = $response->getStatusCode();
+        $response_headers = array();
+        foreach ($response->getHeaders() as $name => $values) {
+            $response_headers[$name] = implode(', ', $values);
         }
-
-        $response_headers = wp_remote_retrieve_headers($response);
-        $response_body = wp_remote_retrieve_body($response);
+        $response_body = $response->getBody()->getContents();
 
         AADSSO_Logger::log_debug('Response headers: ' . wp_json_encode($response_headers), 99);
         AADSSO_Logger::log_debug('Response body: ' . wp_json_encode($response_body), 50);
 
-        $decoded = json_decode($response_body);
+        if ($status_code >= 400) {
+            AADSSO_Logger::log_error('Graph API Error: HTTP ' . $status_code . ' - ' . $response_body);
+            return new WP_Error(
+                'http_error',
+                'Graph API request failed with HTTP ' . $status_code
+            );
+        }
+
+        $decoded = json_decode($response_body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             AADSSO_Logger::log_error('Graph API response JSON decode error: ' . json_last_error_msg());
             return new WP_Error('invalid_json_response', 'Graph API response could not be decoded');
         }
 
-        return $decoded;
+        return (object) $decoded;
     }
 
     private static function get_required_headers_and_settings(): array

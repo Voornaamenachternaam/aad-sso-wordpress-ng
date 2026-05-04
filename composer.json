@@ -9,6 +9,10 @@
         "symfony/options-resolver": "^8.0",
         "monolog/monolog": "^3.10",
         "symfony/cache": "^8.0",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "symfony/http-client": "^8.0",
+        "nyholm/psr7": "^1.8",
         "ext-json": "*",
         "ext-openssl": "*",
         "ext-mbstring": "*"
