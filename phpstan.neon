@@ -13,7 +13,6 @@ parameters:
         - uninstall.php
         - view/
     excludePaths:
-        - lib/php-jwt/tests/
         - vendor/
         - tests/
     reportUnmatchedIgnoredErrors: false
