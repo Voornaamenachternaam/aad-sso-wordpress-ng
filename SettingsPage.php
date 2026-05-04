@@ -1,11 +1,24 @@
 <?php
 
+/**
+ * Settings page class for Microsoft Entra ID SSO plugin.
+ *
+ * Handles the WordPress admin settings page rendering and validation.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
+/**
+ * Settings page class.
+ */
 class AADSSO_Settings_Page
 {
-    private $settings;
-    private $options_page_id;
+    /** @var array<string, mixed> Plugin settings */
+    private array $settings = array();
+
+    /** @var int|false Options page ID */
+    private int|false $options_page_id = false;
 
     public function __construct()
     {
@@ -67,10 +80,10 @@ class AADSSO_Settings_Page
             exit;
         }
 
-        $json_error = json_last_error();
         $legacy_settings = json_decode($json_content, true);
-        if (null === $legacy_settings || JSON_ERROR_NONE !== $json_error) {
-            AADSSO::debug_log('JSON decode error during migration: ' . json_last_error_msg(), 100);
+        $json_error = json_last_error();
+        if (null === $legacy_settings && JSON_ERROR_NONE !== $json_error) {
+            AADSSO_Logger::log_error('JSON decode error during migration: ' . json_last_error_msg());
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
                 admin_url('options-general.php?page=aadsso_settings')));
             exit;
@@ -79,6 +92,11 @@ class AADSSO_Settings_Page
         if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
             $legacy_settings['role_map'] = array();
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
+                $role_slug = sanitize_text_field($role_slug);
+                $group_id = sanitize_text_field($group_id);
+                if (empty($role_slug) || empty($group_id)) {
+                    continue;
+                }
                 if (!isset($legacy_settings['role_map'][$role_slug])) {
                     $legacy_settings['role_map'][$role_slug] = $group_id;
                 } else {
@@ -108,7 +126,7 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $status = sanitize_text_field($_GET['aadsso_migrate_from_json_status']);
+        $status = sanitize_text_field(wp_unslash($_GET['aadsso_migrate_from_json_status']));
 
         if ('success' === $status) {
             echo '<div id="message" class="notice notice-success"><p>'
@@ -355,6 +373,18 @@ class AADSSO_Settings_Page
             $input['openid_configuration_endpoint'] ??
             'https://login.microsoftonline.com/common/.well-known/openid-configuration'
         );
+
+        // OpenID configuration endpoints (loaded from OpenID config, may be set manually)
+        $sanitized['authorization_endpoint'] = esc_url_raw($input['authorization_endpoint'] ?? '');
+        $sanitized['token_endpoint'] = esc_url_raw($input['token_endpoint'] ?? '');
+        $sanitized['jwks_uri'] = esc_url_raw($input['jwks_uri'] ?? '');
+        $sanitized['end_session_endpoint'] = esc_url_raw($input['end_session_endpoint'] ?? '');
+
+        // Graph API settings
+        $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
+        $sanitized['graph_version'] = in_array($input['graph_version'] ?? '', array('v1.0', 'beta'), true)
+            ? $input['graph_version']
+            : 'v1.0';
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
             $sanitized['role_map'] = array();

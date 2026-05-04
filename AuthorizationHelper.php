@@ -1,10 +1,37 @@
 <?php
 
+/**
+ * Authorization helper class for Microsoft Entra ID SSO.
+ *
+ * Handles authorization URL generation, access token retrieval,
+ * and JWT/ID token validation using PSR-18 HTTP client.
+ *
+ * @package AADSSO
+ */
 declare(strict_types=1);
 
+/**
+ * Authorization helper class.
+ */
 class AADSSO_AuthorizationHelper
 {
+    /** @var AADSSO_HttpClient|null HTTP client instance */
+    private static ?AADSSO_HttpClient $http_client = null;
+
     private static array $allowed_algorithms = array('RS256');
+
+    /**
+     * Get the HTTP client instance.
+     *
+     * @return AADSSO_HttpClient The HTTP client.
+     */
+    private static function get_http_client(): AADSSO_HttpClient
+    {
+        if (self::$http_client === null) {
+            self::$http_client = AADSSO_HttpClient::get_instance();
+        }
+        return self::$http_client;
+    }
 
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
     {
@@ -26,11 +53,11 @@ class AADSSO_AuthorizationHelper
     {
         $authentication_request_body = http_build_query(array(
             'grant_type' => 'authorization_code',
-            'code' => $code,
-            'redirect_uri' => $settings->redirect_uri,
-            'resource' => $settings->graph_endpoint,
-            'client_id' => $settings->client_id,
-            'client_secret' => $settings->client_secret,
+            'code' => (string) $code,
+            'redirect_uri' => (string) $settings->redirect_uri,
+            'resource' => (string) $settings->graph_endpoint,
+            'client_id' => (string) $settings->client_id,
+            'client_secret' => (string) $settings->client_secret,
         ));
 
         return self::get_and_process_access_token($authentication_request_body, $settings);
@@ -40,35 +67,59 @@ class AADSSO_AuthorizationHelper
         string $authentication_request_body,
         AADSSO_Settings $settings
     ): mixed {
-        $response = wp_remote_post(
-            esc_url_raw($settings->token_endpoint),
-            array(
-                'body' => $authentication_request_body,
-                'timeout' => 30,
-                'sslverify' => true,
-                'headers' => array(
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                ),
-            )
+        $options = array(
+            'body' => $authentication_request_body,
+            'headers' => array(
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ),
         );
 
-        if (is_wp_error($response)) {
-            AADSSO::debug_log('Token request error: ' . $response->get_error_message(), 100);
+        try {
+            $response = self::get_http_client()->post($settings->token_endpoint, $options);
+            return self::process_token_response($response);
+        } catch (\Throwable $e) {
+            AADSSO_Logger::log_error(
+                'Token request error: ' . $e->getMessage()
+            );
             return new WP_Error(
-                $response->get_error_code(),
-                $response->get_error_message()
+                'http_request_failed',
+                'Token request failed: ' . $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Process the token response.
+     *
+     * @param \Psr\Http\Message\ResponseInterface $response The PSR-7 response.
+     * @return mixed The decoded response or WP_Error on failure.
+     */
+    private static function process_token_response(\Psr\Http\Message\ResponseInterface $response): mixed
+    {
+        $status_code = $response->getStatusCode();
+        $response_body = $response->getBody()->getContents();
+
+        if ($status_code >= 400) {
+            AADSSO_Logger::log_error('Token request failed with HTTP ' . $status_code . ': ' . $response_body);
+            return new WP_Error(
+                'token_request_failed',
+                'Token request failed with HTTP ' . $status_code
             );
         }
 
-        $output = wp_remote_retrieve_body($response);
-        $result = json_decode($output);
+        $result = json_decode($response_body, true);
 
-        if (isset($result->access_token) && session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION['aadsso_token_type'] = (string) ($result->token_type ?? 'Bearer');
-            $_SESSION['aadsso_access_token'] = (string) $result->access_token;
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            AADSSO_Logger::log_error('Token response JSON decode error: ' . json_last_error_msg());
+            return new WP_Error('invalid_json_response', 'Token response could not be decoded');
         }
 
-        return $result;
+        if (isset($result['access_token']) && session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['aadsso_token_type'] = (string) ($result['token_type'] ?? 'Bearer');
+            $_SESSION['aadsso_access_token'] = (string) $result['access_token'];
+        }
+
+        return (object) $result;
     }
 
     public static function validate_id_token(
@@ -76,22 +127,42 @@ class AADSSO_AuthorizationHelper
         AADSSO_Settings $settings,
         string $antiforgery_id
     ): object {
-        $jwks_response = wp_remote_get(
-            esc_url_raw($settings->jwks_uri),
-            array(
-                'timeout' => 15,
-                'sslverify' => true,
-            )
-        );
-
-        if (is_wp_error($jwks_response)) {
+        try {
+            $response = self::get_http_client()->get($settings->jwks_uri);
+            return self::process_jwks_response($response, $id_token, $antiforgery_id);
+        } catch (\Throwable $e) {
             throw new DomainException(
-                'Failed to fetch JWKS: ' . $jwks_response->get_error_message()
+                'Failed to fetch JWKS: ' . $e->getMessage()
             );
         }
+    }
 
-        $jwks_body = wp_remote_retrieve_body($jwks_response);
+    /**
+     * Process JWKS response and validate ID token.
+     *
+     * @param \Psr\Http\Message\ResponseInterface $response The PSR-7 response.
+     * @param string $id_token The ID token to validate.
+     * @param string $antiforgery_id The expected nonce value.
+     * @return object The decoded and validated JWT.
+     * @throws DomainException If validation fails.
+     */
+    private static function process_jwks_response(
+        \Psr\Http\Message\ResponseInterface $response,
+        string $id_token,
+        string $antiforgery_id
+    ): object {
+        $status_code = $response->getStatusCode();
+
+        if ($status_code >= 400) {
+            throw new DomainException('Failed to fetch JWKS: HTTP ' . $status_code);
+        }
+
+        $jwks_body = $response->getBody()->getContents();
         $jwks = json_decode($jwks_body, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new DomainException('JWKS response JSON decode error: ' . json_last_error_msg());
+        }
 
         if (!is_array($jwks) || empty($jwks['keys']) || !is_array($jwks['keys'])) {
             throw new DomainException('jwks_uri does not contain valid keys');
@@ -99,7 +170,7 @@ class AADSSO_AuthorizationHelper
 
         try {
             $keys = \Firebase\JWT\JWK::parseKeySet($jwks, 'RS256');
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
         }
 
@@ -111,7 +182,7 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Token signature verification failed');
         } catch (\Firebase\JWT\BeforeValidException $e) {
             throw new DomainException('Token is not yet valid');
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Token validation failed: ' . $e->getMessage());
         }
 

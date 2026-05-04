@@ -9,11 +9,13 @@ parameters:
         - GraphHelper.php
         - Settings.php
         - SettingsPage.php
+        - Logger.php
         - uninstall.php
         - view/
     excludePaths:
         - lib/php-jwt/tests/
         - vendor/
+        - tests/
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     memoryLimit: 512M
