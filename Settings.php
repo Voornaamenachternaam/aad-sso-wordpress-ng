@@ -247,6 +247,9 @@ class AADSSO_Settings
     /**
      * Filter array to only include keys defined in OptionsResolver.
      * Prevents resolve() from throwing UndefinedOptionsException on OpenID discovery fields.
+     *
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
      */
     private static function filter_to_known_settings(array $settings): array
     {
@@ -304,6 +307,9 @@ class AADSSO_Settings
         return $config ?? null;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private static function fetch_openid_configuration(): ?array
     {
         $instance = self::get_instance();
@@ -330,6 +336,7 @@ class AADSSO_Settings
     public static function get_remote_contents(string $url): string
     {
         try {
+            /** @var Psr\Http\Message\ResponseInterface $response */
             $response = AADSSO_HttpClient::get_instance()->get($url, [
                 'headers' => [
                     'Accept' => 'application/json',
@@ -393,6 +400,9 @@ class AADSSO_Settings
         };
     }
 
+    /**
+     * @param array<string, mixed>|null $settings
+     */
     public function load_settings(?array $settings): self
     {
         if (!\is_array($settings) || empty($settings)) {

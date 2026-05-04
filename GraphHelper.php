@@ -105,8 +105,6 @@ class AADSSO_GraphHelper
 
     /**
      * Get the HTTP client instance.
-     *
-     * @return AADSSO_HttpClient The HTTP client.
      */
     private static function get_http_client(): AADSSO_HttpClient
     {

@@ -181,8 +181,6 @@ class AADSSO_HttpClient implements ClientInterface
 
     /**
      * Get the underlying Symfony HTTP client.
-     *
-     * @return HttpClientInterface The HTTP client instance.
      */
     public function get_http_client(): HttpClientInterface
     {
