@@ -374,7 +374,7 @@ class AADSSO_Settings_Page
         $sanitized['logout_redirect_uri'] = esc_url_raw($input['logout_redirect_uri'] ?? '');
 
         $sanitized['enable_full_logout'] = !empty($input['enable_full_logout']);
-        $sanitized['field_to_match_to_upn'] = \in_array($input['field_to_match_to_upn'] ?? '', ['''login''', ''email''], true)
+        $sanitized['field_to_match_to_upn'] = \in_array($input['field_to_match_to_upn'] ?? '', ['login', 'email'], true)
             ? $input['field_to_match_to_upn']
             : 'email';
         $sanitized['match_on_upn_alias'] = !empty($input['match_on_upn_alias']);
@@ -399,7 +399,7 @@ class AADSSO_Settings_Page
 
         // Graph API settings
         $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
-        $sanitized['graph_version'] = \in_array($input['graph_version'] ?? '', ['''v1.0''', ''beta''], true)
+        $sanitized['graph_version'] = \in_array($input['graph_version'] ?? '', ['v1.0', 'beta'], true)
             ? $input['graph_version']
             : 'v1.0';
 

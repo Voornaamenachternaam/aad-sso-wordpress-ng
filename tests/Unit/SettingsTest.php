@@ -35,7 +35,7 @@ class SettingsTest extends TestCase
         $this->assertSame($instance1, $instance2);
     }
 
-    public function test_get_defaults_returns_[]: void
+    public function test_get_defaults_returns_array(): void
     {
         $defaults = \AADSSO_Settings::get_defaults();
         $this->assertIsArray($defaults);
