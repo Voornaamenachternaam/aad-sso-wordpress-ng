@@ -90,7 +90,7 @@ class AADSSO_GraphHelper
         if (!empty($query_params)) {
             $url = $url . '?' . http_build_query($query_params);
         }
-        $payload = json_encode($data);
+        $payload = wp_json_encode($data);
 
         AADSSO_Logger::log_debug('POST ' . $url, 50);
         AADSSO_Logger::log_debug($payload, 99);
@@ -124,8 +124,8 @@ class AADSSO_GraphHelper
         }
         $response_body = $response->getBody()->getContents();
 
-        AADSSO_Logger::log_debug('Response headers: ' . json_encode($response_headers), 99);
-        AADSSO_Logger::log_debug('Response body: ' . json_encode($response_body), 50);
+        AADSSO_Logger::log_debug('Response headers: ' . wp_json_encode($response_headers), 99);
+        AADSSO_Logger::log_debug('Response body: ' . wp_json_encode($response_body), 50);
 
         if ($status_code >= 400) {
             AADSSO_Logger::log_error('Graph API Error: HTTP ' . $status_code . ' - ' . $response_body);
