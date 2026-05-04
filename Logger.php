@@ -108,6 +108,13 @@ class AADSSO_Logger
                 } else {
                     mkdir($cache_dir, 0755, true);
                 }
+                // Add security files to protect cache directory from direct HTTP access
+                if (!file_exists($cache_dir . '/.htaccess')) {
+                    file_put_contents($cache_dir . '/.htaccess', 'Deny from all');
+                }
+                if (!file_exists($cache_dir . '/index.php')) {
+                    file_put_contents($cache_dir . '/index.php', '<?php // Silence is golden.');
+                }
             }
 
             $filesystem_adapter = new FilesystemAdapter('', 0, $cache_dir);
