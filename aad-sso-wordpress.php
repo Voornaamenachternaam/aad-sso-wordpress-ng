@@ -151,7 +151,7 @@ class AADSSO
         return 'login' === $action;
     }
 
-    public function authenticate($user, string $username, string $password): WP_User|WP_Error|null
+    public function authenticate($user, ?string $username, ?string $password): WP_User|WP_Error|null
     {
         if ($user instanceof WP_User) {
             return $user;

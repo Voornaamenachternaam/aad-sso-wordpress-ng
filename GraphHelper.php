@@ -45,19 +45,19 @@ class AADSSO_GraphHelper
         return trailingslashit($endpoint) . $version;
     }
 
-    public static function user_check_member_groups(string $user_id, array $group_ids): mixed
+    public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id) . '/checkMemberGroups';
         return self::post_request($url, array(), array('groupIds' => $group_ids));
     }
 
-    public static function get_user(string $user_id): mixed
+    public static function get_user(string $user_id): object|WP_Error
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id);
         return self::get_request($url);
     }
 
-    public static function get_request(string $url, array $query_params = array()): mixed
+    public static function get_request(string $url, array $query_params = array()): object|WP_Error
     {
         if (!empty($query_params)) {
             $url = $url . '?' . http_build_query($query_params);
@@ -85,7 +85,7 @@ class AADSSO_GraphHelper
         }
     }
 
-    public static function post_request(string $url, array $query_params = array(), array $data = array()): mixed
+    public static function post_request(string $url, array $query_params = array(), array $data = array()): object|WP_Error
     {
         if (!empty($query_params)) {
             $url = $url . '?' . http_build_query($query_params);
@@ -113,9 +113,9 @@ class AADSSO_GraphHelper
      * Parse and log a PSR-7 response.
      *
      * @param \Psr\Http\Message\ResponseInterface $response The PSR-7 response.
-     * @return mixed The decoded response body or WP_Error on failure.
+     * @return object|WP_Error The decoded response body or WP_Error on failure.
      */
-    private static function parse_and_log_response(\Psr\Http\Message\ResponseInterface $response): mixed
+    private static function parse_and_log_response(\Psr\Http\Message\ResponseInterface $response): object|WP_Error
     {
         $status_code = $response->getStatusCode();
         $response_headers = array();
