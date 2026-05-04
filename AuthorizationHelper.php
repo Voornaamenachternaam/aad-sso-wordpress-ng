@@ -39,12 +39,12 @@ class AADSSO_AuthorizationHelper
             . http_build_query(array(
                 'response_type' => 'code',
                 'scope' => 'openid',
-                'domain_hint' => sanitize_text_field($settings->org_domain_hint),
-                'client_id' => sanitize_text_field($settings->client_id),
-                'resource' => esc_url_raw($settings->graph_endpoint),
-                'redirect_uri' => esc_url_raw($settings->redirect_uri),
-                'state' => sanitize_text_field($antiforgery_id),
-                'nonce' => sanitize_text_field($antiforgery_id),
+                'domain_hint' => $settings->org_domain_hint,
+                'client_id' => $settings->client_id,
+                'resource' => $settings->graph_endpoint,
+                'redirect_uri' => $settings->redirect_uri,
+                'state' => $antiforgery_id,
+                'nonce' => $antiforgery_id,
             ));
         return $auth_url;
     }
@@ -189,7 +189,7 @@ class AADSSO_AuthorizationHelper
         $token_nonce = isset($jwt->nonce) ? (string) $jwt->nonce : '';
         if ($token_nonce !== $antiforgery_id) {
             throw new DomainException(
-                sprintf('Nonce mismatch. Expecting %s', esc_html($antiforgery_id))
+                sprintf('Nonce mismatch. Expecting %s', $antiforgery_id)
             );
         }
 

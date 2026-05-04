@@ -132,7 +132,7 @@ class AADSSO
         }
     }
 
-    public function redirect_after_login(string $redirect_to, string $requested_redirect_to, $user): string
+    public function redirect_after_login(string $redirect_to, string $requested_redirect_to, ?WP_User $user): string
     {
         if ($user instanceof WP_User && isset($_SESSION['aadsso_redirect_to'])) {
             $redirect_to = sanitize_url((string) $_SESSION['aadsso_redirect_to']);
@@ -151,7 +151,7 @@ class AADSSO
         return 'login' === $action;
     }
 
-    public function authenticate($user, string $username, string $password): WP_User|WP_Error|null
+    public function authenticate($user, ?string $username, ?string $password): WP_User|WP_Error|null
     {
         if ($user instanceof WP_User) {
             return $user;

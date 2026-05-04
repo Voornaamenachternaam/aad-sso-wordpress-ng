@@ -28,11 +28,11 @@ if (!defined('ABSPATH')) {
  */
 class AADSSO_HttpClient implements ClientInterface
 {
-    /** @var HttpClientInterface|Symfony\Contracts\HttpClient\HttpClientInterface */
-    private $http_client;
+    /** @var HttpClientInterface */
+    private HttpClientInterface $http_client;
 
     /** @var Psr18Client */
-    private $psr18_client;
+    private Psr18Client $psr18_client;
 
     /** @var self|null Singleton instance */
     private static ?self $instance = null;
@@ -42,7 +42,7 @@ class AADSSO_HttpClient implements ClientInterface
      *
      * @param HttpClientInterface|null $http_client Optional custom HTTP client.
      */
-    public function __construct($http_client = null)
+    public function __construct(?HttpClientInterface $http_client = null)
     {
         if ($http_client !== null) {
             $this->http_client = $http_client;

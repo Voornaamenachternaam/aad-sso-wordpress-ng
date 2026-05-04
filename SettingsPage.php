@@ -30,9 +30,6 @@ class AADSSO_Settings_Page
         add_action('all_admin_notices', array($this, 'notify_if_reset_successful'));
         add_action('all_admin_notices', array($this, 'notify_json_migrate_status'));
 
-        $_SERVER['REQUEST_URI'] = remove_query_arg('aadsso_reset', $_SERVER['REQUEST_URI']);
-        $_SERVER['REQUEST_URI'] = remove_query_arg('aadsso_migrate_from_json_status', $_SERVER['REQUEST_URI']);
-
         $default_settings = AADSSO_Settings::get_defaults();
         $this->settings = get_option('aadsso_settings', $default_settings);
         foreach ($default_settings as $key => $default_value) {
@@ -48,9 +45,15 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
-        if ('' === $nonce || !wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
+        if (!isset($_GET['aadsso_nonce'])) {
             return;
+        }
+
+        $nonce = sanitize_text_field(wp_unslash($_GET['aadsso_nonce']));
+
+        if (!wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
+            wp_safe_redirect(add_query_arg('aadsso_reset', 'failed', admin_url('options-general.php?page=aadsso_settings')));
+            exit;
         }
 
         delete_option('aadsso_settings');
@@ -90,6 +93,7 @@ class AADSSO_Settings_Page
         }
 
         if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
+            // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for sanitize_settings
             $legacy_settings['role_map'] = array();
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
                 $role_slug = sanitize_text_field($role_slug);
@@ -97,10 +101,11 @@ class AADSSO_Settings_Page
                 if (empty($role_slug) || empty($group_id)) {
                     continue;
                 }
+                // Store as role_slug => array of group_ids (what sanitize_settings expects)
                 if (!isset($legacy_settings['role_map'][$role_slug])) {
-                    $legacy_settings['role_map'][$role_slug] = $group_id;
+                    $legacy_settings['role_map'][$role_slug] = array($group_id);
                 } else {
-                    $legacy_settings['role_map'][$role_slug] .= ',' . $group_id;
+                    $legacy_settings['role_map'][$role_slug][] = $group_id;
                 }
             }
         }
@@ -152,10 +157,22 @@ class AADSSO_Settings_Page
 
     public function notify_if_reset_successful(): void
     {
-        if (isset($_GET['aadsso_reset']) && 'success' === $_GET['aadsso_reset']) {
+        if (!isset($_GET['aadsso_reset'])) {
+            return;
+        }
+
+        $status = sanitize_text_field(wp_unslash($_GET['aadsso_reset']));
+
+        if ('success' === $status) {
             echo '<div id="message" class="notice notice-warning"><p>'
                 . esc_html__(
                     'Single Sign-on with Microsoft Entra ID settings have been reset to default.',
+                    'aad-sso-wordpress'
+                ) . '</p></div>';
+        } elseif ('failed' === $status) {
+            echo '<div id="message" class="notice notice-error"><p>'
+                . esc_html__(
+                    'Single Sign-on with Microsoft Entra ID settings reset failed. Invalid nonce.',
                     'aad-sso-wordpress'
                 ) . '</p></div>';
         }
@@ -387,13 +404,18 @@ class AADSSO_Settings_Page
             : 'v1.0';
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
-            $sanitized['role_map'] = array();
+            $sanitized['aad_group_to_wp_role_map'] = array();
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
                 $role = sanitize_text_field($role);
-                $groups = sanitize_text_field($groups);
+                $groups = is_array($groups) ? $groups : explode(',', $groups);
                 if (!empty($role) && in_array($role, $valid_roles, true)) {
-                    $sanitized['role_map'][$role] = $groups;
+                    foreach ($groups as $group_id) {
+                        $group_id = sanitize_text_field(trim((string) $group_id));
+                        if (!empty($group_id)) {
+                            $sanitized['aad_group_to_wp_role_map'][$group_id] = $role;
+                        }
+                    }
                 }
             }
         }

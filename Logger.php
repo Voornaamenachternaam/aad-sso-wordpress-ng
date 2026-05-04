@@ -136,12 +136,7 @@ class AADSSO_Logger
             return;
         }
 
-        $context = array(
-            'level' => $level,
-            'source' => 'AADSSO',
-        );
-
-        self::get_logger()->debug($message, $context);
+        self::get_logger()->debug($message);
     }
 
     public static function log_info(string $message, array $context = array()): void

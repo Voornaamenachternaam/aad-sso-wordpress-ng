@@ -278,7 +278,7 @@ class AADSSO_Settings
             }
         }
 
-        return $config;
+        return $config ?? null;
     }
 
     private static function fetch_openid_configuration(): ?array
