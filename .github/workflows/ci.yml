@@ -1,6 +1,6 @@
 name: CI
 
-on:
+"on":
   push:
     branches: [ main, master, develop ]
   pull_request:
@@ -19,12 +19,12 @@ jobs:
     
     services:
       mysql:
-        image: mysql:9.7
+        image: "mysql:9.7"
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_test
         ports:
-          - 3306:3306
+          - "3306:3306"
         options: >-
           --health-cmd="mysqladmin ping"
           --health-interval=10s
@@ -38,9 +38,9 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: "${{ matrix.php-version }}"
           extensions: mbstring, json, openssl, curl, mysql
-          coverage: "${{ matrix.coverage ? 'xdebug' : 'none' }}"
+          coverage: "${{ matrix.coverage && 'xdebug' || 'none' }}"
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist
@@ -93,7 +93,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2.37.0
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: "${{ matrix.php-version }}"
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
