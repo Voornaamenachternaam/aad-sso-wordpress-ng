@@ -13,7 +13,7 @@
     "psr/http-client": "^1.0.3",
     "psr/http-factory": "^1.1.0",
     "symfony/http-client": "^8.0.9",
-    "nyholm/psr7": "^1.8.2",
+    "guzzlehttp/psr7": "^2.9.0",
     "ext-json": "*",
     "ext-openssl": "*",
     "ext-mbstring": "*"
