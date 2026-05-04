@@ -5,8 +5,6 @@
  *
  * Provides a consistent HTTP client interface for making requests
  * to Microsoft Entra ID and Graph API endpoints.
- *
- * @package AADSSO
  */
 declare(strict_types=1);
 
@@ -16,7 +14,7 @@ use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpClient\Psr18Client;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-if (!defined('ABSPATH')) {
+if (!\defined('ABSPATH')) {
     exit;
 }
 
@@ -28,13 +26,19 @@ if (!defined('ABSPATH')) {
  */
 class AADSSO_HttpClient implements ClientInterface
 {
-    /** @var HttpClientInterface */
+    /**
+     * @var HttpClientInterface
+     */
     private HttpClientInterface $http_client;
 
-    /** @var Psr18Client */
+    /**
+     * @var Psr18Client
+     */
     private Psr18Client $psr18_client;
 
-    /** @var self|null Singleton instance */
+    /**
+     * @var null|self Singleton instance
+     */
     private static ?self $instance = null;
 
     /**
@@ -44,15 +48,15 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function __construct(?HttpClientInterface $http_client = null)
     {
-        if ($http_client !== null) {
+        if (null !== $http_client) {
             $this->http_client = $http_client;
         } else {
             // Create default HTTP client with sensible defaults
-            $this->http_client = \Symfony\Component\HttpClient\HttpClient::create(array(
+            $this->http_client = \Symfony\Component\HttpClient\HttpClient::create([
                 'timeout' => 30,
                 'verify_peer' => true,
                 'verify_host' => true,
-            ));
+            ]);
         }
 
         $this->psr18_client = new Psr18Client($this->http_client);
@@ -63,9 +67,10 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public static function get_instance(): self
     {
-        if (self::$instance === null) {
+        if (null === self::$instance) {
             self::$instance = new self();
         }
+
         return self::$instance;
     }
 
@@ -73,7 +78,9 @@ class AADSSO_HttpClient implements ClientInterface
      * Send a PSR-7 request.
      *
      * @param RequestInterface $request The PSR-7 request to send.
+     *
      * @return ResponseInterface The PSR-7 response.
+     *
      * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
      */
     public function sendRequest(RequestInterface $request): ResponseInterface
@@ -86,12 +93,15 @@ class AADSSO_HttpClient implements ClientInterface
      *
      * @param string $url The URL to request.
      * @param array<string, mixed> $options Request options (headers, query params, etc.).
+     *
      * @return ResponseInterface The PSR-7 response.
+     *
      * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
      */
-    public function get(string $url, array $options = array()): ResponseInterface
+    public function get(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('GET', $url, $options);
+
         return $this->sendRequest($request);
     }
 
@@ -100,12 +110,15 @@ class AADSSO_HttpClient implements ClientInterface
      *
      * @param string $url The URL to request.
      * @param array<string, mixed> $options Request options (headers, body, etc.).
+     *
      * @return ResponseInterface The PSR-7 response.
+     *
      * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
      */
-    public function post(string $url, array $options = array()): ResponseInterface
+    public function post(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('POST', $url, $options);
+
         return $this->sendRequest($request);
     }
 
@@ -118,9 +131,10 @@ class AADSSO_HttpClient implements ClientInterface
      *   - headers: array<string, string|string[]>
      *   - body: string|array|resource
      *   - query: array<string, mixed> (appended to URL as query params)
+     *
      * @return RequestInterface The PSR-7 request.
      */
-    public function createRequest(string $method, string $url, array $options = array()): RequestInterface
+    public function createRequest(string $method, string $url, array $options = []): RequestInterface
     {
         // Handle query parameters
         if (!empty($options['query'])) {
@@ -131,15 +145,15 @@ class AADSSO_HttpClient implements ClientInterface
 
         // Get PSR-7 factory from the Psr18Client
         $requestFactory = $this->psr18_client->getRequestFactory();
-        if ($requestFactory === null) {
-            throw new \RuntimeException('Request factory not available');
+        if (null === $requestFactory) {
+            throw new RuntimeException('Request factory not available');
         }
 
-        $headers = $options['headers'] ?? array();
+        $headers = $options['headers'] ?? [];
         $body = $options['body'] ?? '';
 
         // Handle array body (form data)
-        if (is_array($body)) {
+        if (\is_array($body)) {
             $body = http_build_query($body);
             if (!isset($headers['Content-Type'])) {
                 $headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -156,7 +170,7 @@ class AADSSO_HttpClient implements ClientInterface
         $request = $request->withUri($uri);
 
         // Add body if applicable
-        if (!empty($body) && in_array($method, array('POST', 'PUT', 'PATCH'), true)) {
+        if (!empty($body) && \in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
             $request = $request->withBody(
                 $this->psr18_client->getStreamFactory()->createStream($body)
             );
@@ -181,13 +195,14 @@ class AADSSO_HttpClient implements ClientInterface
      * Useful for testing and mocking.
      *
      * @param array<string, mixed> $data Response data (body, status, headers).
+     *
      * @return ResponseInterface A PSR-7 response.
      */
     public static function create_response(array $data): ResponseInterface
     {
         $factory = new \Nyholm\Psr7\Factory\Psr17Factory();
         $status = $data['status'] ?? 200;
-        $headers = $data['headers'] ?? array();
+        $headers = $data['headers'] ?? [];
         $body = is_string($data['body'] ?? null) ? $data['body'] : json_encode($data['body'] ?? '');
 
         return $factory->createResponse($status, '', $headers)

@@ -4,8 +4,6 @@
  * Plugin settings management class.
  *
  * Handles loading, validating, and resolving plugin settings using Symfony OptionsResolver.
- *
- * @package AADSSO
  */
 declare(strict_types=1);
 
@@ -14,61 +12,85 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 /**
  * Plugin settings management class.
  *
- * @property string $client_id
- * @property string $client_secret
- * @property string $redirect_uri
- * @property string $logout_redirect_uri
- * @property string $org_display_name
- * @property string $org_domain_hint
- * @property string $field_to_match_to_upn
- * @property bool $match_on_upn_alias
- * @property bool $enable_auto_provisioning
- * @property bool $enable_auto_forward_to_aad
- * @property bool $enable_aad_group_to_wp_role
- * @property array $aad_group_to_wp_role_map
- * @property string|null $default_wp_role
- * @property bool $enable_full_logout
- * @property string $openid_configuration_endpoint
- * @property string $authorization_endpoint
- * @property string $token_endpoint
- * @property string $jwks_uri
- * @property string $end_session_endpoint
- * @property string $graph_endpoint
- * @property string $graph_version
+ * @property string      $client_id
+ * @property string      $client_secret
+ * @property string      $redirect_uri
+ * @property string      $logout_redirect_uri
+ * @property string      $org_display_name
+ * @property string      $org_domain_hint
+ * @property string      $field_to_match_to_upn
+ * @property bool        $match_on_upn_alias
+ * @property bool        $enable_auto_provisioning
+ * @property bool        $enable_auto_forward_to_aad
+ * @property bool        $enable_aad_group_to_wp_role
+ * @property array       $aad_group_to_wp_role_map
+ * @property null|string $default_wp_role
+ * @property bool        $enable_full_logout
+ * @property string      $openid_configuration_endpoint
+ * @property string      $authorization_endpoint
+ * @property string      $token_endpoint
+ * @property string      $jwks_uri
+ * @property string      $end_session_endpoint
+ * @property string      $graph_endpoint
+ * @property string      $graph_version
  */
 class AADSSO_Settings
 {
-    /** @var self|null Singleton instance */
+    public string $client_id = '';
+
+    public string $client_secret = '';
+
+    public string $redirect_uri = '';
+
+    public string $logout_redirect_uri = '';
+
+    public string $org_display_name = '';
+
+    public string $org_domain_hint = '';
+
+    public string $field_to_match_to_upn = '';
+
+    public bool $match_on_upn_alias = false;
+
+    public bool $enable_auto_provisioning = false;
+
+    public bool $enable_auto_forward_to_aad = false;
+
+    public bool $enable_aad_group_to_wp_role = false;
+
+    public array $aad_group_to_wp_role_map = [];
+
+    public ?string $default_wp_role = null;
+
+    public bool $enable_full_logout = false;
+
+    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+
+    public string $authorization_endpoint = '';
+
+    public string $token_endpoint = '';
+
+    public string $jwks_uri = '';
+
+    public string $end_session_endpoint = '';
+
+    public string $graph_endpoint = 'https://graph.microsoft.com';
+
+    public string $graph_version = 'v1.0';
+
+    /**
+     * @var null|self Singleton instance
+     */
     private static ?AADSSO_Settings $instance = null;
 
-    /** @var OptionsResolver|null Options resolver instance */
+    /**
+     * @var null|OptionsResolver Options resolver instance
+     */
     private static ?OptionsResolver $options_resolver = null;
-
-    public string $client_id = '';
-    public string $client_secret = '';
-    public string $redirect_uri = '';
-    public string $logout_redirect_uri = '';
-    public string $org_display_name = '';
-    public string $org_domain_hint = '';
-    public string $field_to_match_to_upn = '';
-    public bool $match_on_upn_alias = false;
-    public bool $enable_auto_provisioning = false;
-    public bool $enable_auto_forward_to_aad = false;
-    public bool $enable_aad_group_to_wp_role = false;
-    public array $aad_group_to_wp_role_map = array();
-    public ?string $default_wp_role = null;
-    public bool $enable_full_logout = false;
-    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
-    public string $authorization_endpoint = '';
-    public string $token_endpoint = '';
-    public string $jwks_uri = '';
-    public string $end_session_endpoint = '';
-    public string $graph_endpoint = 'https://graph.microsoft.com';
-    public string $graph_version = 'v1.0';
 
     public static function get_defaults(?string $key = null): mixed
     {
-        $defaults = array(
+        $defaults = [
             'org_display_name' => get_bloginfo('name'),
             'field_to_match_to_upn' => 'email',
             'default_wp_role' => null,
@@ -79,7 +101,7 @@ class AADSSO_Settings
             'redirect_uri' => wp_login_url(),
             'logout_redirect_uri' => wp_login_url(),
             'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
-        );
+        ];
 
         if (null === $key) {
             return $defaults;
@@ -90,15 +112,16 @@ class AADSSO_Settings
 
     public static function get_instance(): self
     {
-        if (!self::$instance) {
+        if (null === self::$instance) {
             self::$instance = new self();
         }
+
         return self::$instance;
     }
 
     public static function get_options_resolver(): OptionsResolver
     {
-        if (self::$options_resolver === null) {
+        if (null === self::$options_resolver) {
             self::$options_resolver = new OptionsResolver();
 
             // Required fields - but we make them optional with defaults to handle OpenID config loading
@@ -150,7 +173,7 @@ class AADSSO_Settings
 
             self::$options_resolver->define('aad_group_to_wp_role_map')
                 ->allowedTypes('array')
-                ->default(array());
+                ->default([]);
 
             self::$options_resolver->define('default_wp_role')
                 ->allowedTypes('null', 'string')
@@ -187,11 +210,11 @@ class AADSSO_Settings
             self::$options_resolver->define('graph_version')
                 ->allowedTypes('string')
                 ->default('v1.0')
-                ->allowedValues(array('v1.0', 'beta'));
+                ->allowedValues('v1.0', 'beta');
 
             self::$options_resolver->define('role_map')
                 ->allowedTypes('array')
-                ->default(array());
+                ->default([]);
         }
 
         return self::$options_resolver;
@@ -228,11 +251,11 @@ class AADSSO_Settings
     private static function filter_to_known_settings(array $settings): array
     {
         $resolver = self::get_options_resolver();
-        $defined_options = array_keys($resolver->resolve(array()));
+        $defined_options = array_keys($resolver->resolve([]));
 
         return array_filter(
             $settings,
-            fn(string $key): bool => in_array($key, $defined_options, true),
+            fn(string $key): bool => \in_array($key, $defined_options, true),
             ARRAY_FILTER_USE_KEY
         );
     }
@@ -307,11 +330,11 @@ class AADSSO_Settings
     public static function get_remote_contents(string $url): string
     {
         try {
-            $response = AADSSO_HttpClient::get_instance()->get($url, array(
-                'headers' => array(
+            $response = AADSSO_HttpClient::get_instance()->get($url, [
+                'headers' => [
                     'Accept' => 'application/json',
-                ),
-            ));
+                ],
+            ]);
 
             $status_code = $response->getStatusCode();
 
@@ -323,11 +346,13 @@ class AADSSO_Settings
             }
 
             $body = $response->getBody()->getContents();
+
             return is_string($body) ? $body : '';
         } catch (\Throwable $e) {
             AADSSO_Logger::log_error(
                 'Failed to fetch remote contents: ' . $e->getMessage()
             );
+
             return '';
         }
     }
@@ -337,7 +362,7 @@ class AADSSO_Settings
      */
     private static function sanitize_setting(string $key, mixed $value): mixed
     {
-        $url_fields = array(
+        $url_fields = [
             'redirect_uri',
             'logout_redirect_uri',
             'authorization_endpoint',
@@ -346,9 +371,9 @@ class AADSSO_Settings
             'end_session_endpoint',
             'openid_configuration_endpoint',
             'graph_endpoint',
-        );
+        ];
 
-        if (in_array($key, $url_fields, true)) {
+        if (\in_array($key, $url_fields, true)) {
             return esc_url_raw((string) $value);
         }
 
@@ -363,28 +388,28 @@ class AADSSO_Settings
             'enable_auto_forward_to_aad',
             'enable_aad_group_to_wp_role',
             'enable_full_logout' => (bool) $value,
-            'aad_group_to_wp_role_map' => is_array($value) ? $value : array(),
+            'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
             default => $value,
         };
     }
 
     public function load_settings(?array $settings): self
     {
-        if (!is_array($settings) || empty($settings)) {
+        if (!\is_array($settings) || empty($settings)) {
             return $this;
         }
 
         // Convert legacy role_map format to aad_group_to_wp_role_map
         // Legacy format: role_map[role_slug] = "group1,group2" or array("group1", "group2")
         // New format: aad_group_to_wp_role_map[group_id] = role_slug
-        if (!empty($settings['role_map']) && is_array($settings['role_map'])) {
-            $settings['aad_group_to_wp_role_map'] = array();
+        if (!empty($settings['role_map']) && \is_array($settings['role_map'])) {
+            $settings['aad_group_to_wp_role_map'] = [];
             foreach ($settings['role_map'] as $role_slug => $group_ids_list) {
                 if (empty($group_ids_list)) {
                     continue;
                 }
                 // Handle array format (newer) or string format (legacy)
-                if (is_array($group_ids_list)) {
+                if (\is_array($group_ids_list)) {
                     foreach ($group_ids_list as $group_id) {
                         $group_id = trim(sanitize_text_field((string) $group_id));
                         if (!empty($group_id) && !isset($settings['aad_group_to_wp_role_map'][$group_id])) {
