@@ -35,7 +35,7 @@ class SettingsTest extends TestCase
         $this->assertSame($instance1, $instance2);
     }
 
-    public function test_get_defaults_returns_array(): void
+    public function test_get_defaults_returns_[]: void
     {
         $defaults = \AADSSO_Settings::get_defaults();
         $this->assertIsArray($defaults);
@@ -50,7 +50,7 @@ class SettingsTest extends TestCase
     public function test_load_settings_returns_self(): void
     {
         $settings = \AADSSO_Settings::get_instance();
-        $result = $settings->load_settings(array());
+        $result = $settings->load_settings([]);
         $this->assertSame($settings, $result);
     }
 
@@ -58,7 +58,7 @@ class SettingsTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
         $settings = \AADSSO_Settings::get_instance();
-        $settings->load_settings(array());
+        $settings->load_settings([]);
     }
 
     public function test_load_settings_with_null_does_not_throw(): void
@@ -182,6 +182,6 @@ class SettingsTest extends TestCase
         $this->assertFalse($settings->enable_auto_provisioning);
         $this->assertFalse($settings->enable_auto_forward_to_aad);
         $this->assertFalse($settings->enable_aad_group_to_wp_role);
-        $this->assertEquals(array(), $settings->aad_group_to_wp_role_map);
+        $this->assertEquals([], $settings->aad_group_to_wp_role_map);
     }
 }

@@ -5,8 +5,6 @@
  *
  * Provides centralized logging using Monolog and caching using Symfony Cache.
  * Log and cache directories are stored in WordPress uploads directory.
- *
- * @package AADSSO
  */
 declare(strict_types=1);
 
@@ -17,13 +15,13 @@ use Monolog\Processor\PsrLogMessageProcessor;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Symfony\Component\Cache\Psr16Cache;
 
-if (!defined('ABSPATH')) {
+if (!\defined('ABSPATH')) {
     exit;
 }
 
 // Define plugin directory if not already defined
-if (!defined('AADSSO_PLUGIN_DIR')) {
-    define('AADSSO_PLUGIN_DIR', dirname(__FILE__) . '/');
+if (!\defined('AADSSO_PLUGIN_DIR')) {
+    \define('AADSSO_PLUGIN_DIR', __DIR__ . '/');
 }
 
 /**
@@ -31,34 +29,38 @@ if (!defined('AADSSO_PLUGIN_DIR')) {
  */
 class AADSSO_Logger
 {
-    /** @var Logger|null */
+    /**
+     * @var null|Logger
+     */
     private static ?Logger $logger = null;
 
-    /** @var Psr16Cache|null */
+    /**
+     * @var null|Psr16Cache
+     */
     private static ?Psr16Cache $cache = null;
 
     public static function get_logger(): Logger
     {
-        if (self::$logger === null) {
+        if (null === self::$logger) {
             // Use WordPress uploads directory for logs (standard writable path)
             $log_dir = null;
-            if (function_exists('wp_upload_dir')) {
+            if (\function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
                 if (empty($upload_dir['error']) && !empty($upload_dir['basedir'])) {
                     $log_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-logs';
                 }
             }
 
-            if ($log_dir === null) {
+            if (null === $log_dir) {
                 // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $log_dir = AADSSO_PLUGIN_DIR . 'logs';
             }
 
             if (!is_dir($log_dir)) {
-                if (function_exists('wp_mkdir_p')) {
+                if (\function_exists('wp_mkdir_p')) {
                     wp_mkdir_p($log_dir);
                 } else {
-                    mkdir($log_dir, 0755, true);
+                    mkdir($log_dir, 0o755, true);
                 }
                 // Add security files to protect logs directory
                 if (!file_exists($log_dir . '/.htaccess')) {
@@ -87,26 +89,26 @@ class AADSSO_Logger
 
     public static function get_cache(): Psr16Cache
     {
-        if (self::$cache === null) {
+        if (null === self::$cache) {
             // Use WordPress uploads directory for cache (standard writable path)
             $cache_dir = null;
-            if (function_exists('wp_upload_dir')) {
+            if (\function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
                 if (empty($upload_dir['error']) && !empty($upload_dir['basedir'])) {
                     $cache_dir = trailingslashit($upload_dir['basedir']) . 'aad-sso-cache';
                 }
             }
 
-            if ($cache_dir === null) {
+            if (null === $cache_dir) {
                 // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $cache_dir = AADSSO_PLUGIN_DIR . 'cache';
             }
 
             if (!is_dir($cache_dir)) {
-                if (function_exists('wp_mkdir_p')) {
+                if (\function_exists('wp_mkdir_p')) {
                     wp_mkdir_p($cache_dir);
                 } else {
-                    mkdir($cache_dir, 0755, true);
+                    mkdir($cache_dir, 0o755, true);
                 }
                 // Add security files to protect cache directory from direct HTTP access
                 if (!file_exists($cache_dir . '/.htaccess')) {
@@ -130,7 +132,7 @@ class AADSSO_Logger
         $debug_level = apply_filters('aadsso_debug_level', AADSSO_DEBUG_LEVEL);
 
         // Handle both boolean and string "true" for compatibility
-        $is_enabled = filter_var($debug_enabled, FILTER_VALIDATE_BOOLEAN);
+        $is_enabled = filter_var($debug_enabled, \FILTER_VALIDATE_BOOLEAN);
 
         if (!$is_enabled || $debug_level < $level) {
             return;
@@ -139,32 +141,32 @@ class AADSSO_Logger
         self::get_logger()->debug($message);
     }
 
-    public static function log_info(string $message, array $context = array()): void
+    public static function log_info(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->info($message, $context);
     }
 
-    public static function log_warning(string $message, array $context = array()): void
+    public static function log_warning(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->warning($message, $context);
     }
 
-    public static function log_error(string $message, array $context = array()): void
+    public static function log_error(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->error($message, $context);
     }
 
-    public static function log_exception(\Throwable $exception, string $message = ''): void
+    public static function log_exception(Throwable $exception, string $message = ''): void
     {
-        $context = array(
+        $context = [
             'source' => 'AADSSO',
-            'exception_class' => get_class($exception),
+            'exception_class' => $exception::class,
             'exception_file' => $exception->getFile(),
             'exception_line' => $exception->getLine(),
-        );
+        ];
 
         $log_message = $message ?: $exception->getMessage();
 

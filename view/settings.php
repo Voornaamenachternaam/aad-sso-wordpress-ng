@@ -11,7 +11,7 @@ if (!current_user_can('manage_options')) {
     <h1><?php echo esc_html__('Microsoft Entra ID Settings', 'aad-sso-wordpress'); ?></h1>
 
     <?php
-    if (defined('AADSSO_SETTINGS_PATH') && file_exists(AADSSO_SETTINGS_PATH)) {
+    if (\defined('AADSSO_SETTINGS_PATH') && file_exists(AADSSO_SETTINGS_PATH)) {
         $reset_url = add_query_arg(array(
             'page' => 'aadsso_settings',
             'aadsso_nonce' => wp_create_nonce('aadsso_migrate_from_json'),

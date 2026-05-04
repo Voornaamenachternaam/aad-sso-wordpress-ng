@@ -252,14 +252,14 @@ if (!function_exists('delete_transient')) {
 }
 
 if (!function_exists('wp_remote_get')) {
-    function wp_remote_get($url, $args = array())
+    function wp_remote_get($url, $args = [])
     {
         return array('body' => '{}');
     }
 }
 
 if (!function_exists('wp_remote_post')) {
-    function wp_remote_post($url, $args = array())
+    function wp_remote_post($url, $args = [])
     {
         return array('body' => '{"access_token": "test"}');
     }
@@ -278,7 +278,7 @@ if (!function_exists('wp_remote_retrieve_body')) {
 if (!function_exists('wp_remote_retrieve_headers')) {
     function wp_remote_retrieve_headers($response)
     {
-        return array();
+        return [];
     }
 }
 
@@ -292,8 +292,8 @@ if (!function_exists('is_wp_error')) {
 if (!class_exists('WP_Error')) {
     class WP_Error
     {
-        public $errors = array();
-        public $error_data = array();
+        public $errors = [];
+        public $error_data = [];
 
         public function __construct($code = '', $message = '', $data = '')
         {
@@ -330,7 +330,7 @@ if (!class_exists('WP_Error')) {
         public function get_error_codes()
         {
             if (empty($this->errors)) {
-                return array();
+                return [];
             }
             return array_keys($this->errors);
         }
@@ -338,7 +338,7 @@ if (!class_exists('WP_Error')) {
         public function get_error_messages($code = '')
         {
             if (empty($code)) {
-                $all_messages = array();
+                $all_messages = [];
                 foreach ((array) $this->errors as $code => $messages) {
                     $all_messages = array_merge($all_messages, $messages);
                 }
@@ -347,7 +347,7 @@ if (!class_exists('WP_Error')) {
             if (isset($this->errors[$code])) {
                 return $this->errors[$code];
             }
-            return array();
+            return [];
         }
     }
 }
@@ -490,7 +490,7 @@ if (!function_exists('remove_query_arg')) {
 }
 
 if (!function_exists('wp_die')) {
-    function wp_die($message = '', $title = '', $args = array())
+    function wp_die($message = '', $title = '', $args = [])
     {
         throw new \Exception($message);
     }
@@ -681,12 +681,12 @@ if (!class_exists('AADSSO_HttpClient')) {
             return $this->createMockResponse();
         }
 
-        public function get(string $url, array $options = array()): \Psr\Http\Message\ResponseInterface
+        public function get(string $url, array $options = []): \Psr\Http\Message\ResponseInterface
         {
             return $this->createMockResponse();
         }
 
-        public function post(string $url, array $options = array()): \Psr\Http\Message\ResponseInterface
+        public function post(string $url, array $options = []): \Psr\Http\Message\ResponseInterface
         {
             return $this->createMockResponse();
         }
@@ -747,7 +747,7 @@ if (!class_exists('AADSSO_HttpClient')) {
 
                 public function getHeader(string $name): array
                 {
-                    return $this->headers[$name] ?? array();
+                    return $this->headers[$name] ?? [];
                 }
 
                 public function getHeaderLine(string $name): string
@@ -790,4 +790,4 @@ if (!class_exists('AADSSO_HttpClient')) {
     }
 }
 
-$_SESSION = array();
+$_SESSION = [];

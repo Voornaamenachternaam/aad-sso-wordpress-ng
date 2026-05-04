@@ -388,7 +388,7 @@ class AADSSO
 
     public function update_wp_user_roles(WP_User $user, $group_memberships): WP_User|WP_Error
     {
-        $roles_to_set = array();
+        $roles_to_set = [];
 
         if (!empty($group_memberships->value) && is_array($group_memberships->value)) {
             foreach ($this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role) {
@@ -576,3 +576,4 @@ if (!function_exists('aad_sso_create_uuid')) {
 
 $aadsso_settings_instance = AADSSO_Settings::init();
 $aadsso = AADSSO::get_instance($aadsso_settings_instance);
+

@@ -5,7 +5,7 @@
  *
  * Handles the WordPress admin settings page rendering and validation.
  *
- * @package AADSSO
+ 
  */
 declare(strict_types=1);
 
@@ -15,20 +15,20 @@ declare(strict_types=1);
 class AADSSO_Settings_Page
 {
     /** @var array<string, mixed> Plugin settings */
-    private array $settings = array();
+    private array $settings = [];
 
     /** @var int|false Options page ID */
     private int|false $options_page_id = false;
 
     public function __construct()
     {
-        add_action('admin_enqueue_scripts', array($this, 'maybe_include_jquery'));
-        add_action('admin_menu', array($this, 'add_options_page'));
-        add_action('admin_init', array($this, 'register_settings'));
-        add_action('admin_init', array($this, 'maybe_reset_settings'));
-        add_action('admin_init', array($this, 'maybe_migrate_settings'));
-        add_action('all_admin_notices', array($this, 'notify_if_reset_successful'));
-        add_action('all_admin_notices', array($this, 'notify_json_migrate_status'));
+        add_action('admin_enqueue_scripts', [$this, 'maybe_include_jquery'));
+        add_action('admin_menu', [$this, 'add_options_page'));
+        add_action('admin_init', [$this, 'register_settings'));
+        add_action('admin_init', [$this, 'maybe_reset_settings'));
+        add_action('admin_init', [$this, 'maybe_migrate_settings'));
+        add_action('all_admin_notices', [$this, 'notify_if_reset_successful'));
+        add_action('all_admin_notices', [$this, 'notify_json_migrate_status'));
 
         $default_settings = AADSSO_Settings::get_defaults();
         $this->settings = get_option('aadsso_settings', $default_settings);
@@ -70,7 +70,7 @@ class AADSSO_Settings_Page
         $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
         if ('' === $nonce
             || !wp_verify_nonce($nonce, 'aadsso_migrate_from_json')
-            || !defined('AADSSO_SETTINGS_PATH')
+            || !\defined('AADSSO_SETTINGS_PATH')
             || !file_exists(AADSSO_SETTINGS_PATH)
         ) {
             return;
@@ -85,7 +85,7 @@ class AADSSO_Settings_Page
 
         $legacy_settings = json_decode($json_content, true);
         $json_error = json_last_error();
-        if (null === $legacy_settings && JSON_ERROR_NONE !== $json_error) {
+        if (null === $legacy_settings && \JSON_ERROR_NONE !== $json_error) {
             AADSSO_Logger::log_error('JSON decode error during migration: ' . json_last_error_msg());
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
                 admin_url('options-general.php?page=aadsso_settings')));
@@ -94,7 +94,7 @@ class AADSSO_Settings_Page
 
         if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
             // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for UI compatibility
-            $legacy_settings['role_map'] = array();
+            $legacy_settings['role_map'] = [];
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
                 $role_slug = sanitize_text_field($role_slug);
                 $group_id = sanitize_text_field($group_id);
@@ -103,7 +103,7 @@ class AADSSO_Settings_Page
                 }
                 // Store as role_slug => array of group_ids (matching UI format)
                 if (!isset($legacy_settings['role_map'][$role_slug])) {
-                    $legacy_settings['role_map'][$role_slug] = array($group_id);
+                    $legacy_settings['role_map'][$role_slug] = [$group_id];
                 } else {
                     $legacy_settings['role_map'][$role_slug][] = $group_id;
                 }
@@ -113,7 +113,7 @@ class AADSSO_Settings_Page
         $sanitized_settings = $this->sanitize_settings($legacy_settings);
         update_option('aadsso_settings', $sanitized_settings);
 
-        $can_delete = is_writable(AADSSO_SETTINGS_PATH) && is_writable(dirname(AADSSO_SETTINGS_PATH));
+        $can_delete = is_writable(AADSSO_SETTINGS_PATH) && is_writable(\dirname(AADSSO_SETTINGS_PATH));
         if ($can_delete) {
             unlink(AADSSO_SETTINGS_PATH);
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'success',
@@ -364,7 +364,7 @@ class AADSSO_Settings_Page
 
     public function sanitize_settings(array $input): array
     {
-        $sanitized = array();
+        $sanitized = [];
 
         $sanitized['org_display_name'] = sanitize_text_field($input['org_display_name'] ?? '');
         $sanitized['org_domain_hint'] = sanitize_text_field($input['org_domain_hint'] ?? '');
@@ -374,7 +374,7 @@ class AADSSO_Settings_Page
         $sanitized['logout_redirect_uri'] = esc_url_raw($input['logout_redirect_uri'] ?? '');
 
         $sanitized['enable_full_logout'] = !empty($input['enable_full_logout']);
-        $sanitized['field_to_match_to_upn'] = in_array($input['field_to_match_to_upn'] ?? '', array('login', 'email'), true)
+        $sanitized['field_to_match_to_upn'] = \in_array($input['field_to_match_to_upn'] ?? '', ['''login''', ''email''], true)
             ? $input['field_to_match_to_upn']
             : 'email';
         $sanitized['match_on_upn_alias'] = !empty($input['match_on_upn_alias']);
@@ -399,18 +399,18 @@ class AADSSO_Settings_Page
 
         // Graph API settings
         $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
-        $sanitized['graph_version'] = in_array($input['graph_version'] ?? '', array('v1.0', 'beta'), true)
+        $sanitized['graph_version'] = \in_array($input['graph_version'] ?? '', ['''v1.0''', ''beta''], true)
             ? $input['graph_version']
             : 'v1.0';
 
         if (!empty($input['role_map']) && is_array($input['role_map'])) {
-            $sanitized['role_map'] = array();
+            $sanitized['role_map'] = [];
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
                 $role = sanitize_text_field($role);
                 $groups = is_array($groups) ? $groups : explode(',', $groups);
                 if (!empty($role) && in_array($role, $valid_roles, true)) {
-                    $group_ids = array();
+                    $group_ids = [];
                     foreach ($groups as $group_id) {
                         $group_id = sanitize_text_field(trim((string) $group_id));
                         if (!empty($group_id)) {
@@ -623,7 +623,7 @@ class AADSSO_Settings_Page
         echo '<th></th>';
         echo '</tr></thead><tbody>';
 
-        $role_map = $this->settings['role_map'] ?? array();
+        $role_map = $this->settings['role_map'] ?? [];
         $roles = $this->get_editable_roles();
         $row_index = 0;
 
@@ -636,7 +636,7 @@ class AADSSO_Settings_Page
             echo '<td><span class="description">'
                 . esc_html__('Enter comma-separated group Object IDs', 'aad-sso-wordpress') . '</span></td>';
             echo '</tr>';
-            $row_index++;
+            ++$row_index;
         }
 
         echo '</tbody></table>';
@@ -696,11 +696,11 @@ class AADSSO_Settings_Page
 
     private function get_editable_roles(): array
     {
-        if (!function_exists('wp_roles')) {
+        if (!\function_exists('wp_roles')) {
             global $wp_roles;
-            return $wp_roles->roles ?? array();
+            return $wp_roles->roles ?? [];
         }
         $roles = wp_roles();
-        return $roles->roles ?? array();
+        return $roles->roles ?? [];
     }
 }
