@@ -130,7 +130,7 @@ class AADSSO_Settings
             self::$options_resolver->define('field_to_match_to_upn')
                 ->allowedTypes('string')
                 ->default('email')
-                ->allowedValues(array('email', 'login'));
+                ->allowedValues('email', 'login');
 
             self::$options_resolver->define('match_on_upn_alias')
                 ->allowedTypes('bool')

@@ -192,7 +192,7 @@ $config
         'simplified_if_return' => true,
         'single_blank_line_at_eof' => true,
         'single_class_element_per_statement' => true,
-        'single_import_per_statement' => true,
+        'single_import_per_statement' => false,
         'single_line_after_imports' => true,
         'single_line_comment_style' => true,
         'single_line_empty_body' => true,
