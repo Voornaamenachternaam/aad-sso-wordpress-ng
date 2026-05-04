@@ -683,7 +683,7 @@ class AADSSO_Settings_Page
     public function is_on_options_page(): bool
     {
         $screen = get_current_screen();
-        return $screen && $screen->id === $this->options_page_id;
+        return $screen !== null && $this->options_page_id !== false && $screen->id === (string) $this->options_page_id;
     }
 
     public function maybe_include_jquery(): void
@@ -693,13 +693,27 @@ class AADSSO_Settings_Page
         }
     }
 
+    /**
+     * @return array<string, array{name: string}>
+     */
     private function get_editable_roles(): array
     {
         if (!\function_exists('wp_roles')) {
+            /** @var mixed $wp_roles */
             global $wp_roles;
-            return $wp_roles->roles ?? [];
+
+            /** @var array<string, array{name: string}> $roles */
+            $roles = $wp_roles->roles ?? [];
+
+            return $roles;
         }
-        $roles = wp_roles();
-        return $roles->roles ?? [];
+
+        /** @var WP_Roles $roles_obj */
+        $roles_obj = wp_roles();
+
+        /** @var array<string, array{name: string}> $roles */
+        $roles = $roles_obj->roles ?? [];
+
+        return $roles;
     }
 }
