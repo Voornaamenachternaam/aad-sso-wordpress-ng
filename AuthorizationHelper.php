@@ -8,18 +8,31 @@
  */
 declare(strict_types=1);
 
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\JWK;
+use Firebase\JWT\JWT;
+use Firebase\JWT\SignatureInvalidException;
+use Psr\Http\Message\ResponseInterface;
+
 /**
  * Authorization helper class.
  */
 class AADSSO_AuthorizationHelper
 {
-    /**
-     * @var null|AADSSO_HttpClient HTTP client instance
-     */
+    /** @var AADSSO_HttpClient|null HTTP client instance */
     private static ?AADSSO_HttpClient $http_client = null;
 
+    /** @var list<string> */
     private static array $allowed_algorithms = ['RS256'];
 
+    /**
+     * Get the authorization URL for Microsoft Entra ID.
+     *
+     * @param AADSSO_Settings $settings Plugin settings.
+     * @param string $antiforgery_id Anti-forgery state ID.
+     * @return string The authorization URL.
+     */
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
     {
         return $settings->authorization_endpoint . '?'
@@ -35,20 +48,34 @@ class AADSSO_AuthorizationHelper
             ]);
     }
 
+    /**
+     * Get access token using authorization code.
+     *
+     * @param string $code Authorization code from Microsoft Entra ID.
+     * @param AADSSO_Settings $settings Plugin settings.
+     * @return mixed|WP_Error Access token response or WP_Error on failure.
+     */
     public static function get_access_token(string $code, AADSSO_Settings $settings): mixed
     {
         $authentication_request_body = http_build_query([
             'grant_type' => 'authorization_code',
-            'code' => (string) $code,
-            'redirect_uri' => (string) $settings->redirect_uri,
-            'resource' => (string) $settings->graph_endpoint,
-            'client_id' => (string) $settings->client_id,
-            'client_secret' => (string) $settings->client_secret,
+            'code' => $code,
+            'redirect_uri' => $settings->redirect_uri,
+            'resource' => $settings->graph_endpoint,
+            'client_id' => $settings->client_id,
+            'client_secret' => $settings->client_secret,
         ]);
 
         return self::get_and_process_access_token($authentication_request_body, $settings);
     }
 
+    /**
+     * Get and process access token.
+     *
+     * @param string $authentication_request_body Request body.
+     * @param AADSSO_Settings $settings Plugin settings.
+     * @return mixed|WP_Error Access token response or WP_Error on failure.
+     */
     public static function get_and_process_access_token(
         string $authentication_request_body,
         AADSSO_Settings $settings
@@ -64,7 +91,7 @@ class AADSSO_AuthorizationHelper
             $response = self::get_http_client()->post($settings->token_endpoint, $options);
 
             return self::process_token_response($response);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             AADSSO_Logger::log_error(
                 'Token request error: ' . $e->getMessage()
             );
@@ -76,6 +103,15 @@ class AADSSO_AuthorizationHelper
         }
     }
 
+    /**
+     * Validate ID token from Microsoft Entra ID.
+     *
+     * @param string $id_token The ID token to validate.
+     * @param AADSSO_Settings $settings Plugin settings.
+     * @param string $antiforgery_id Expected nonce value.
+     * @return object The decoded and validated JWT.
+     * @throws DomainException If validation fails.
+     */
     public static function validate_id_token(
         string $id_token,
         AADSSO_Settings $settings,
@@ -85,13 +121,15 @@ class AADSSO_AuthorizationHelper
             $response = self::get_http_client()->get($settings->jwks_uri);
 
             return self::process_jwks_response($response, $id_token, $antiforgery_id);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Failed to fetch JWKS: ' . $e->getMessage());
         }
     }
 
     /**
      * Get the HTTP client instance.
+     *
+     * @return AADSSO_HttpClient
      */
     private static function get_http_client(): AADSSO_HttpClient
     {
@@ -105,11 +143,10 @@ class AADSSO_AuthorizationHelper
     /**
      * Process the token response.
      *
-     * @param Psr\Http\Message\ResponseInterface $response The PSR-7 response.
-     *
+     * @param ResponseInterface $response The PSR-7 response.
      * @return mixed The decoded response or WP_Error on failure.
      */
-    private static function process_token_response(Psr\Http\Message\ResponseInterface $response): mixed
+    private static function process_token_response(ResponseInterface $response): mixed
     {
         $status_code = $response->getStatusCode();
         $response_body = $response->getBody()->getContents();
@@ -123,6 +160,7 @@ class AADSSO_AuthorizationHelper
             );
         }
 
+        /** @var mixed $result */
         $result = json_decode($response_body, true);
 
         if (\JSON_ERROR_NONE !== json_last_error()) {
@@ -132,26 +170,29 @@ class AADSSO_AuthorizationHelper
         }
 
         if (isset($result['access_token']) && \PHP_SESSION_ACTIVE === session_status()) {
-            $_SESSION['aadsso_token_type'] = (string) ($result['token_type'] ?? 'Bearer');
-            $_SESSION['aadsso_access_token'] = (string) $result['access_token'];
+            /** @var string $token_type */
+            $token_type = $result['token_type'] ?? 'Bearer';
+            /** @var string $access_token */
+            $access_token = $result['access_token'];
+            $_SESSION['aadsso_token_type'] = $token_type;
+            $_SESSION['aadsso_access_token'] = $access_token;
         }
 
+        /** @var object */
         return (object) $result;
     }
 
     /**
      * Process JWKS response and validate ID token.
      *
-     * @param Psr\Http\Message\ResponseInterface $response       The PSR-7 response.
-     * @param string                             $id_token       The ID token to validate.
-     * @param string                             $antiforgery_id The expected nonce value.
-     *
-     * @throws DomainException If validation fails.
-     *
+     * @param ResponseInterface $response The PSR-7 response.
+     * @param string $id_token The ID token to validate.
+     * @param string $antiforgery_id The expected nonce value.
      * @return object The decoded and validated JWT.
+     * @throws DomainException If validation fails.
      */
     private static function process_jwks_response(
-        Psr\Http\Message\ResponseInterface $response,
+        ResponseInterface $response,
         string $id_token,
         string $antiforgery_id
     ): object {
@@ -162,6 +203,7 @@ class AADSSO_AuthorizationHelper
         }
 
         $jwks_body = $response->getBody()->getContents();
+        /** @var mixed $jwks */
         $jwks = json_decode($jwks_body, true);
 
         if (\JSON_ERROR_NONE !== json_last_error()) {
@@ -172,24 +214,29 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('jwks_uri does not contain valid keys');
         }
 
+        /** @var array<string, mixed> $jwks_keys */
+        $jwks_keys = $jwks;
         try {
-            $keys = Firebase\JWT\JWK::parseKeySet($jwks, 'RS256');
-        } catch (Throwable $e) {
+            /** @var array<string, \OpenSSLCertificate|string|resource> $keys */
+            $keys = JWK::parseKeySet($jwks_keys, 'RS256');
+        } catch (\Throwable $e) {
             throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
         }
 
         try {
-            $jwt = Firebase\JWT\JWT::decode($id_token, $keys, self::$allowed_algorithms);
-        } catch (Firebase\JWT\ExpiredException $e) {
+            /** @var array<string, \OpenSSLCertificate|string|resource> $keys */
+            $jwt = JWT::decode($id_token, $keys, self::$allowed_algorithms);
+        } catch (ExpiredException $e) {
             throw new DomainException('Token has expired');
-        } catch (Firebase\JWT\SignatureInvalidException $e) {
+        } catch (SignatureInvalidException $e) {
             throw new DomainException('Token signature verification failed');
-        } catch (Firebase\JWT\BeforeValidException $e) {
+        } catch (BeforeValidException $e) {
             throw new DomainException('Token is not yet valid');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             throw new DomainException('Token validation failed: ' . $e->getMessage());
         }
 
+        /** @var string $token_nonce */
         $token_nonce = isset($jwt->nonce) ? (string) $jwt->nonce : '';
         if ($token_nonce !== $antiforgery_id) {
             throw new DomainException(\sprintf('Nonce mismatch. Expecting %s', $antiforgery_id));

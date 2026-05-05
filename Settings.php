@@ -7,87 +7,111 @@
  */
 declare(strict_types=1);
 
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Plugin settings management class.
  *
- * @property string      $client_id
- * @property string      $client_secret
- * @property string      $redirect_uri
- * @property string      $logout_redirect_uri
- * @property string      $org_display_name
- * @property string      $org_domain_hint
- * @property string      $field_to_match_to_upn
- * @property bool        $match_on_upn_alias
- * @property bool        $enable_auto_provisioning
- * @property bool        $enable_auto_forward_to_aad
- * @property bool        $enable_aad_group_to_wp_role
- * @property array       $aad_group_to_wp_role_map
- * @property null|string $default_wp_role
- * @property bool        $enable_full_logout
- * @property string      $openid_configuration_endpoint
- * @property string      $authorization_endpoint
- * @property string      $token_endpoint
- * @property string      $jwks_uri
- * @property string      $end_session_endpoint
- * @property string      $graph_endpoint
- * @property string      $graph_version
+ * @property string $client_id
+ * @property string $client_secret
+ * @property string $redirect_uri
+ * @property string $logout_redirect_uri
+ * @property string $org_display_name
+ * @property string $org_domain_hint
+ * @property string $field_to_match_to_upn
+ * @property bool $match_on_upn_alias
+ * @property bool $enable_auto_provisioning
+ * @property bool $enable_auto_forward_to_aad
+ * @property bool $enable_aad_group_to_wp_role
+ * @property array<string, string> $aad_group_to_wp_role_map
+ * @property string|null $default_wp_role
+ * @property bool $enable_full_logout
+ * @property string $openid_configuration_endpoint
+ * @property string $authorization_endpoint
+ * @property string $token_endpoint
+ * @property string $jwks_uri
+ * @property string $end_session_endpoint
+ * @property string $graph_endpoint
+ * @property string $graph_version
  */
 class AADSSO_Settings
 {
+    /** @var string */
     public string $client_id = '';
 
+    /** @var string */
     public string $client_secret = '';
 
+    /** @var string */
     public string $redirect_uri = '';
 
+    /** @var string */
     public string $logout_redirect_uri = '';
 
+    /** @var string */
     public string $org_display_name = '';
 
+    /** @var string */
     public string $org_domain_hint = '';
 
+    /** @var string */
     public string $field_to_match_to_upn = '';
 
+    /** @var bool */
     public bool $match_on_upn_alias = false;
 
+    /** @var bool */
     public bool $enable_auto_provisioning = false;
 
+    /** @var bool */
     public bool $enable_auto_forward_to_aad = false;
 
+    /** @var bool */
     public bool $enable_aad_group_to_wp_role = false;
 
+    /** @var array<string, string> */
     public array $aad_group_to_wp_role_map = [];
 
+    /** @var string|null */
     public ?string $default_wp_role = null;
 
+    /** @var bool */
     public bool $enable_full_logout = false;
 
+    /** @var string */
     public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
 
+    /** @var string */
     public string $authorization_endpoint = '';
 
+    /** @var string */
     public string $token_endpoint = '';
 
+    /** @var string */
     public string $jwks_uri = '';
 
+    /** @var string */
     public string $end_session_endpoint = '';
 
+    /** @var string */
     public string $graph_endpoint = 'https://graph.microsoft.com';
 
+    /** @var string */
     public string $graph_version = 'v1.0';
 
-    /**
-     * @var null|self Singleton instance
-     */
-    private static ?AADSSO_Settings $instance = null;
+    /** @var self|null Singleton instance */
+    private static ?self $instance = null;
 
-    /**
-     * @var null|OptionsResolver Options resolver instance
-     */
+    /** @var OptionsResolver|null Options resolver instance */
     private static ?OptionsResolver $options_resolver = null;
 
+    /**
+     * Get default settings.
+     *
+     * @param string|null $key Optional key to get specific default value.
+     * @return mixed Array of defaults or specific default value.
+     */
     public static function get_defaults(?string $key = null): mixed
     {
         $defaults = [
@@ -110,6 +134,11 @@ class AADSSO_Settings
         return $defaults[$key] ?? null;
     }
 
+    /**
+     * Get singleton instance.
+     *
+     * @return self
+     */
     public static function get_instance(): self
     {
         if (null === self::$instance) {
@@ -119,13 +148,16 @@ class AADSSO_Settings
         return self::$instance;
     }
 
+    /**
+     * Get the options resolver.
+     *
+     * @return OptionsResolver
+     */
     public static function get_options_resolver(): OptionsResolver
     {
         if (null === self::$options_resolver) {
             self::$options_resolver = new OptionsResolver();
 
-            // Required fields - but we make them optional with defaults to handle OpenID config loading
-            // The init() method ensures required fields are validated before use
             self::$options_resolver->define('client_id')
                 ->allowedTypes('string')
                 ->default('');
@@ -220,21 +252,23 @@ class AADSSO_Settings
         return self::$options_resolver;
     }
 
+    /**
+     * Initialize settings from WordPress options and OpenID configuration.
+     *
+     * @return self
+     */
     public static function init(): self
     {
         $instance = self::get_instance();
 
-        // Load plugin settings from WordPress options
         $plugin_settings = get_option('aadsso_settings');
-        if (is_array($plugin_settings)) {
+        if (\is_array($plugin_settings)) {
             $instance->load_settings($plugin_settings);
         }
 
-        // Load OpenID configuration from Microsoft
         $openid_configuration = self::get_cached_openid_configuration();
 
-        if (!empty($openid_configuration) && is_array($openid_configuration)) {
-            // Filter to only known settings to prevent resolve() from throwing on unknown keys
+        if (!empty($openid_configuration) && \is_array($openid_configuration)) {
             $filtered_config = self::filter_to_known_settings($openid_configuration);
             if (!empty($filtered_config)) {
                 $instance->load_settings($filtered_config);
@@ -246,7 +280,6 @@ class AADSSO_Settings
 
     /**
      * Filter array to only include keys defined in OptionsResolver.
-     * Prevents resolve() from throwing UndefinedOptionsException on OpenID discovery fields.
      *
      * @param array<string, mixed> $settings
      * @return array<string, mixed>
@@ -263,6 +296,11 @@ class AADSSO_Settings
         );
     }
 
+    /**
+     * Get cached OpenID configuration or fetch if not cached.
+     *
+     * @return array<string, mixed>|null
+     */
     private static function get_cached_openid_configuration(): ?array
     {
         $force_reload = isset($_GET['aadsso_reload_openid_config']);
@@ -270,7 +308,6 @@ class AADSSO_Settings
         if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
             $config = self::fetch_openid_configuration();
 
-            // Update cache with fresh data after forced reload
             if (!empty($config)) {
                 try {
                     $cache = AADSSO_Logger::get_cache();
@@ -287,7 +324,7 @@ class AADSSO_Settings
 
         try {
             $cached = $cache->get('aadsso_openid_configuration');
-            if (is_array($cached)) {
+            if (\is_array($cached)) {
                 return $cached;
             }
         } catch (\Throwable $e) {
@@ -308,6 +345,8 @@ class AADSSO_Settings
     }
 
     /**
+     * Fetch OpenID configuration from the configured endpoint.
+     *
      * @return array<string, mixed>|null
      */
     private static function fetch_openid_configuration(): ?array
@@ -318,6 +357,7 @@ class AADSSO_Settings
         );
 
         if (!empty($remote_response)) {
+            /** @var mixed $openid_configuration */
             $openid_configuration = json_decode($remote_response, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -325,7 +365,7 @@ class AADSSO_Settings
                 return null;
             }
 
-            if (is_array($openid_configuration)) {
+            if (\is_array($openid_configuration)) {
                 return $openid_configuration;
             }
         }
@@ -333,10 +373,16 @@ class AADSSO_Settings
         return null;
     }
 
+    /**
+     * Fetch remote contents using HTTP client.
+     *
+     * @param string $url URL to fetch.
+     * @return string Response body or empty string on failure.
+     */
     public static function get_remote_contents(string $url): string
     {
         try {
-            /** @var Psr\Http\Message\ResponseInterface $response */
+            /** @var ResponseInterface $response */
             $response = AADSSO_HttpClient::get_instance()->get($url, [
                 'headers' => [
                     'Accept' => 'application/json',
@@ -354,7 +400,7 @@ class AADSSO_Settings
 
             $body = $response->getBody()->getContents();
 
-            return is_string($body) ? $body : '';
+            return \is_string($body) ? $body : '';
         } catch (\Throwable $e) {
             AADSSO_Logger::log_error(
                 'Failed to fetch remote contents: ' . $e->getMessage()
@@ -366,6 +412,10 @@ class AADSSO_Settings
 
     /**
      * Sanitize a setting value based on the option key.
+     *
+     * @param string $key Setting key.
+     * @param mixed $value Setting value.
+     * @return mixed Sanitized value.
      */
     private static function sanitize_setting(string $key, mixed $value): mixed
     {
@@ -401,7 +451,10 @@ class AADSSO_Settings
     }
 
     /**
-     * @param array<string, mixed>|null $settings
+     * Load and apply settings.
+     *
+     * @param array<string, mixed>|null $settings Settings array.
+     * @return self
      */
     public function load_settings(?array $settings): self
     {
@@ -409,16 +462,12 @@ class AADSSO_Settings
             return $this;
         }
 
-        // Convert legacy role_map format to aad_group_to_wp_role_map
-        // Legacy format: role_map[role_slug] = "group1,group2" or array("group1", "group2")
-        // New format: aad_group_to_wp_role_map[group_id] = role_slug
         if (!empty($settings['role_map']) && \is_array($settings['role_map'])) {
             $settings['aad_group_to_wp_role_map'] = [];
             foreach ($settings['role_map'] as $role_slug => $group_ids_list) {
                 if (empty($group_ids_list)) {
                     continue;
                 }
-                // Handle array format (newer) or string format (legacy)
                 if (\is_array($group_ids_list)) {
                     foreach ($group_ids_list as $group_id) {
                         $group_id = trim(sanitize_text_field((string) $group_id));
@@ -442,12 +491,10 @@ class AADSSO_Settings
             }
         }
 
-        // Use OptionsResolver to validate and get defaults for settings
         try {
             $resolved_settings = self::get_options_resolver()->resolve($settings);
             foreach ($resolved_settings as $key => $value) {
                 if (property_exists($this, $key)) {
-                    // Apply sanitization after resolution
                     $this->{$key} = self::sanitize_setting($key, $value);
                 }
             }

@@ -12,6 +12,8 @@ use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Monolog\Processor\PsrLogMessageProcessor;
+use Psr\Log\LoggerInterface;
+use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Symfony\Component\Cache\Psr16Cache;
 
@@ -19,7 +21,6 @@ if (!\defined('ABSPATH')) {
     exit;
 }
 
-// Define plugin directory if not already defined
 if (!\defined('AADSSO_PLUGIN_DIR')) {
     \define('AADSSO_PLUGIN_DIR', __DIR__ . '/');
 }
@@ -29,20 +30,20 @@ if (!\defined('AADSSO_PLUGIN_DIR')) {
  */
 class AADSSO_Logger
 {
-    /**
-     * @var null|Logger
-     */
-    private static ?Logger $logger = null;
+    /** @var LoggerInterface|null */
+    private static ?LoggerInterface $logger = null;
+
+    /** @var CacheInterface|null */
+    private static ?CacheInterface $cache = null;
 
     /**
-     * @var null|Psr16Cache
+     * Get the logger instance.
+     *
+     * @return LoggerInterface
      */
-    private static ?Psr16Cache $cache = null;
-
-    public static function get_logger(): Logger
+    public static function get_logger(): LoggerInterface
     {
         if (null === self::$logger) {
-            // Use WordPress uploads directory for logs (standard writable path)
             $log_dir = null;
             if (\function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
@@ -52,7 +53,6 @@ class AADSSO_Logger
             }
 
             if (null === $log_dir) {
-                // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $log_dir = AADSSO_PLUGIN_DIR . 'logs';
             }
 
@@ -62,7 +62,6 @@ class AADSSO_Logger
                 } else {
                     mkdir($log_dir, 0o755, true);
                 }
-                // Add security files to protect logs directory
                 if (!file_exists($log_dir . '/.htaccess')) {
                     file_put_contents($log_dir . '/.htaccess', 'Deny from all');
                 }
@@ -87,10 +86,14 @@ class AADSSO_Logger
         return self::$logger;
     }
 
-    public static function get_cache(): Psr16Cache
+    /**
+     * Get the cache instance.
+     *
+     * @return CacheInterface
+     */
+    public static function get_cache(): CacheInterface
     {
         if (null === self::$cache) {
-            // Use WordPress uploads directory for cache (standard writable path)
             $cache_dir = null;
             if (\function_exists('wp_upload_dir')) {
                 $upload_dir = wp_upload_dir();
@@ -100,7 +103,6 @@ class AADSSO_Logger
             }
 
             if (null === $cache_dir) {
-                // Fallback to plugin directory if WordPress not fully loaded or uploads misconfigured
                 $cache_dir = AADSSO_PLUGIN_DIR . 'cache';
             }
 
@@ -110,7 +112,6 @@ class AADSSO_Logger
                 } else {
                     mkdir($cache_dir, 0o755, true);
                 }
-                // Add security files to protect cache directory from direct HTTP access
                 if (!file_exists($cache_dir . '/.htaccess')) {
                     file_put_contents($cache_dir . '/.htaccess', 'Deny from all');
                 }
@@ -126,12 +127,17 @@ class AADSSO_Logger
         return self::$cache;
     }
 
+    /**
+     * Log a debug message.
+     *
+     * @param string $message The debug message.
+     * @param int $level Debug level threshold.
+     */
     public static function log_debug(string $message, int $level = 0): void
     {
         $debug_enabled = apply_filters('aadsso_debug', AADSSO_DEBUG);
         $debug_level = apply_filters('aadsso_debug_level', AADSSO_DEBUG_LEVEL);
 
-        // Handle both boolean and string "true" for compatibility
         $is_enabled = filter_var($debug_enabled, \FILTER_VALIDATE_BOOLEAN);
 
         if (!$is_enabled || $debug_level < $level) {
@@ -142,7 +148,10 @@ class AADSSO_Logger
     }
 
     /**
-     * @param array<string, mixed> $context
+     * Log an info message.
+     *
+     * @param string $message The info message.
+     * @param array<string, mixed> $context Additional context.
      */
     public static function log_info(string $message, array $context = []): void
     {
@@ -151,7 +160,10 @@ class AADSSO_Logger
     }
 
     /**
-     * @param array<string, mixed> $context
+     * Log a warning message.
+     *
+     * @param string $message The warning message.
+     * @param array<string, mixed> $context Additional context.
      */
     public static function log_warning(string $message, array $context = []): void
     {
@@ -160,7 +172,10 @@ class AADSSO_Logger
     }
 
     /**
-     * @param array<string, mixed> $context
+     * Log an error message.
+     *
+     * @param string $message The error message.
+     * @param array<string, mixed> $context Additional context.
      */
     public static function log_error(string $message, array $context = []): void
     {
@@ -168,6 +183,12 @@ class AADSSO_Logger
         self::get_logger()->error($message, $context);
     }
 
+    /**
+     * Log an exception.
+     *
+     * @param Throwable $exception The exception to log.
+     * @param string $message Optional message to prepend.
+     */
     public static function log_exception(Throwable $exception, string $message = ''): void
     {
         $context = [

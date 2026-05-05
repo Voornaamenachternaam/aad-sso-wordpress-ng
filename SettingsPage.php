@@ -361,8 +361,15 @@ class AADSSO_Settings_Page
         echo '</ul>';
     }
 
+    /**
+     * Sanitize settings input.
+     *
+     * @param array<string, mixed> $input Raw input from settings form.
+     * @return array<string, mixed> Sanitized settings.
+     */
     public function sanitize_settings(array $input): array
     {
+        /** @var array<string, mixed> $sanitized */
         $sanitized = [];
 
         $sanitized['org_display_name'] = sanitize_text_field($input['org_display_name'] ?? '');
@@ -374,7 +381,7 @@ class AADSSO_Settings_Page
 
         $sanitized['enable_full_logout'] = !empty($input['enable_full_logout']);
         $sanitized['field_to_match_to_upn'] = \in_array($input['field_to_match_to_upn'] ?? '', ['login', 'email'], true)
-            ? $input['field_to_match_to_upn']
+            ? (string) $input['field_to_match_to_upn']
             : 'email';
         $sanitized['match_on_upn_alias'] = !empty($input['match_on_upn_alias']);
         $sanitized['enable_auto_provisioning'] = !empty($input['enable_auto_provisioning']);
@@ -390,24 +397,23 @@ class AADSSO_Settings_Page
             'https://login.microsoftonline.com/common/.well-known/openid-configuration'
         );
 
-        // OpenID configuration endpoints (loaded from OpenID config, may be set manually)
         $sanitized['authorization_endpoint'] = esc_url_raw($input['authorization_endpoint'] ?? '');
         $sanitized['token_endpoint'] = esc_url_raw($input['token_endpoint'] ?? '');
         $sanitized['jwks_uri'] = esc_url_raw($input['jwks_uri'] ?? '');
         $sanitized['end_session_endpoint'] = esc_url_raw($input['end_session_endpoint'] ?? '');
 
-        // Graph API settings
         $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
         $sanitized['graph_version'] = \in_array($input['graph_version'] ?? '', ['v1.0', 'beta'], true)
-            ? $input['graph_version']
+            ? (string) $input['graph_version']
             : 'v1.0';
 
-        if (!empty($input['role_map']) && is_array($input['role_map'])) {
-            $sanitized['role_map'] = [];
+        if (!empty($input['role_map']) && \is_array($input['role_map'])) {
+            /** @var array<string, array<string>> $sanitized_role_map */
+            $sanitized_role_map = [];
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
-                $role = sanitize_text_field($role);
-                $groups = is_array($groups) ? $groups : explode(',', $groups);
+                $role = sanitize_text_field((string) $role);
+                $groups = \is_array($groups) ? $groups : explode(',', (string) $groups);
                 if (!empty($role) && in_array($role, $valid_roles, true)) {
                     $group_ids = [];
                     foreach ($groups as $group_id) {
@@ -417,10 +423,11 @@ class AADSSO_Settings_Page
                         }
                     }
                     if (!empty($group_ids)) {
-                        $sanitized['role_map'][$role] = $group_ids;
+                        $sanitized_role_map[$role] = $group_ids;
                     }
                 }
             }
+            $sanitized['role_map'] = $sanitized_role_map;
         }
 
         return $sanitized;
@@ -694,7 +701,9 @@ class AADSSO_Settings_Page
     }
 
     /**
-     * @return array<string, array{name: string}>
+     * Get editable WordPress roles.
+     *
+     * @return array<string, array{name: string}> Role slug to role info mapping.
      */
     private function get_editable_roles(): array
     {

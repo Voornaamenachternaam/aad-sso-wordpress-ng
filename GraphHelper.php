@@ -8,6 +8,8 @@
  */
 declare(strict_types=1);
 
+use Psr\Http\Message\ResponseInterface;
+
 /**
  * Microsoft Graph API helper class.
  */
@@ -15,16 +17,17 @@ class AADSSO_GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';
 
-    /**
-     * @var null|AADSSO_Settings Static settings reference
-     */
+    /** @var AADSSO_Settings|null Static settings reference */
     public static ?AADSSO_Settings $settings = null;
 
-    /**
-     * @var null|AADSSO_HttpClient HTTP client instance
-     */
+    /** @var AADSSO_HttpClient|null HTTP client instance */
     private static ?AADSSO_HttpClient $http_client = null;
 
+    /**
+     * Get the Graph API base URL.
+     *
+     * @return string
+     */
     public static function get_base_url(): string
     {
         $endpoint = self::$settings->graph_endpoint ?? 'https://graph.microsoft.com';
@@ -33,6 +36,13 @@ class AADSSO_GraphHelper
         return trailingslashit($endpoint) . $version;
     }
 
+    /**
+     * Check if a user is a member of the specified groups.
+     *
+     * @param string $user_id The user ID (object ID from Entra ID).
+     * @param array<string> $group_ids Array of group IDs to check membership.
+     * @return object|WP_Error Response object or WP_Error on failure.
+     */
     public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id) . '/checkMemberGroups';
@@ -40,6 +50,12 @@ class AADSSO_GraphHelper
         return self::post_request($url, [], ['groupIds' => $group_ids]);
     }
 
+    /**
+     * Get a user by their ID.
+     *
+     * @param string $user_id The user ID (object ID from Entra ID).
+     * @return object|WP_Error User object or WP_Error on failure.
+     */
     public static function get_user(string $user_id): object|WP_Error
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id);
@@ -47,6 +63,13 @@ class AADSSO_GraphHelper
         return self::get_request($url);
     }
 
+    /**
+     * Make a GET request to the Graph API.
+     *
+     * @param string $url The URL to request.
+     * @param array<string, mixed> $query_params Query parameters to append to URL.
+     * @return object|WP_Error Response object or WP_Error on failure.
+     */
     public static function get_request(string $url, array $query_params = []): object|WP_Error
     {
         if (!empty($query_params)) {
@@ -70,13 +93,21 @@ class AADSSO_GraphHelper
             $response = self::get_http_client()->get($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             AADSSO_Logger::log_error('Graph API GET request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());
         }
     }
 
+    /**
+     * Make a POST request to the Graph API.
+     *
+     * @param string $url The URL to request.
+     * @param array<string, mixed> $query_params Query parameters to append to URL.
+     * @param array<string, mixed> $data Request body data.
+     * @return object|WP_Error Response object or WP_Error on failure.
+     */
     public static function post_request(string $url, array $query_params = [], array $data = []): object|WP_Error
     {
         if (!empty($query_params)) {
@@ -96,7 +127,7 @@ class AADSSO_GraphHelper
             $response = self::get_http_client()->post($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             AADSSO_Logger::log_error('Graph API POST request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());
@@ -105,6 +136,8 @@ class AADSSO_GraphHelper
 
     /**
      * Get the HTTP client instance.
+     *
+     * @return AADSSO_HttpClient
      */
     private static function get_http_client(): AADSSO_HttpClient
     {
@@ -118,13 +151,13 @@ class AADSSO_GraphHelper
     /**
      * Parse and log a PSR-7 response.
      *
-     * @param Psr\Http\Message\ResponseInterface $response The PSR-7 response.
-     *
+     * @param ResponseInterface $response The PSR-7 response.
      * @return object|WP_Error The decoded response body or WP_Error on failure.
      */
-    private static function parse_and_log_response(Psr\Http\Message\ResponseInterface $response): object|WP_Error
+    private static function parse_and_log_response(ResponseInterface $response): object|WP_Error
     {
         $status_code = $response->getStatusCode();
+        /** @var array<string, string> $response_headers */
         $response_headers = [];
         foreach ($response->getHeaders() as $name => $values) {
             $response_headers[$name] = implode(', ', $values);
@@ -143,6 +176,7 @@ class AADSSO_GraphHelper
             );
         }
 
+        /** @var mixed $decoded */
         $decoded = json_decode($response_body, true);
 
         if (\JSON_ERROR_NONE !== json_last_error()) {
@@ -151,17 +185,27 @@ class AADSSO_GraphHelper
             return new WP_Error('invalid_json_response', 'Graph API response could not be decoded');
         }
 
+        /** @var object */
         return (object) $decoded;
     }
 
+    /**
+     * Get the required headers for Graph API requests.
+     *
+     * @return array<string, string>
+     */
     private static function get_required_headers_and_settings(): array
     {
         $token_type = 'Bearer';
         $access_token = '';
 
         if (\PHP_SESSION_ACTIVE === session_status()) {
-            $token_type = (string) ($_SESSION['aadsso_token_type'] ?? 'Bearer');
-            $access_token = (string) ($_SESSION['aadsso_access_token'] ?? '');
+            /** @var string $session_token_type */
+            $session_token_type = $_SESSION['aadsso_token_type'] ?? 'Bearer';
+            /** @var string $session_access_token */
+            $session_access_token = $_SESSION['aadsso_access_token'] ?? '';
+            $token_type = $session_token_type;
+            $access_token = $session_access_token;
         }
 
         return [
