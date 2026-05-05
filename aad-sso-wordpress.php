@@ -317,7 +317,7 @@ class AADSSO
         }
 
         if ($user instanceof WP_User) {
-            $_SESSION['aadsso_signed_in_with_azuread'] = true;
+            $_SESSION['aadsso_signed_in_with_entra_id'] = true;
         }
 
         /** @var WP_User|WP_Error|null $user */
@@ -365,8 +365,11 @@ class AADSSO
             ), 10);
         } else {
             if (true === $this->settings->enable_auto_provisioning) {
+                $has_group_memberships = $group_memberships !== false
+                    && isset($group_memberships->value)
+                    && is_array($group_memberships->value);
                 if (true === $this->settings->enable_aad_group_to_wp_role
-                    && (empty($group_memberships->value) || !is_array($group_memberships->value))
+                    && (!$has_group_memberships)
                     && empty($this->settings->default_wp_role)
                 ) {
                     return new WP_Error(
@@ -518,11 +521,11 @@ class AADSSO
 
     public function logout(): void
     {
-        $signed_in_with_azuread = isset($_SESSION['aadsso_signed_in_with_azuread'])
-            && true === $_SESSION['aadsso_signed_in_with_azuread'];
+        $signed_in_with_entra_id = isset($_SESSION['aadsso_signed_in_with_entra_id'])
+            && true === $_SESSION['aadsso_signed_in_with_entra_id'];
         $this->clear_session();
 
-        if ($signed_in_with_azuread && $this->settings->enable_full_logout) {
+        if ($signed_in_with_entra_id && $this->settings->enable_full_logout) {
             wp_safe_redirect($this->get_logout_url());
             exit;
         }
