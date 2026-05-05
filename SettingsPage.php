@@ -1,22 +1,11 @@
 <?php
 
-/**
- * Settings page class for Microsoft Entra ID SSO plugin.
- *
- * Handles the WordPress admin settings page rendering and validation.
- *
- */
 declare(strict_types=1);
 
-/**
- * Settings page class.
- */
 class AADSSO_Settings_Page
 {
-    /** @var array<string, mixed> Plugin settings */
     private array $settings = [];
 
-    /** @var int|false Options page ID */
     private int|false $options_page_id = false;
 
     public function __construct()
@@ -361,15 +350,8 @@ class AADSSO_Settings_Page
         echo '</ul>';
     }
 
-    /**
-     * Sanitize settings input.
-     *
-     * @param array<string, mixed> $input Raw input from settings form.
-     * @return array<string, mixed> Sanitized settings.
-     */
     public function sanitize_settings(array $input): array
     {
-        /** @var array<string, mixed> $sanitized */
         $sanitized = [];
 
         $sanitized['org_display_name'] = sanitize_text_field($input['org_display_name'] ?? '');
@@ -408,7 +390,6 @@ class AADSSO_Settings_Page
             : 'v1.0';
 
         if (!empty($input['role_map']) && \is_array($input['role_map'])) {
-            /** @var array<string, array<string>> $sanitized_role_map */
             $sanitized_role_map = [];
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
@@ -700,27 +681,18 @@ class AADSSO_Settings_Page
         }
     }
 
-    /**
-     * Get editable WordPress roles.
-     *
-     * @return array<string, array{name: string}> Role slug to role info mapping.
-     */
     private function get_editable_roles(): array
     {
         if (!\function_exists('wp_roles')) {
-            /** @var mixed $wp_roles */
             global $wp_roles;
 
-            /** @var array<string, array{name: string}> $roles */
             $roles = $wp_roles->roles ?? [];
 
             return $roles;
         }
 
-        /** @var WP_Roles $roles_obj */
         $roles_obj = wp_roles();
 
-        /** @var array<string, array{name: string}> $roles */
         $roles = $roles_obj->roles ?? [];
 
         return $roles;

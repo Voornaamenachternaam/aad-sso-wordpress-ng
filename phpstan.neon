@@ -8,6 +8,7 @@ parameters:
         - aad-sso-wordpress.php
         - AuthorizationHelper.php
         - GraphHelper.php
+        - HttpClient.php
         - Settings.php
         - SettingsPage.php
         - Logger.php
@@ -18,3 +19,8 @@ parameters:
         - tests/
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Constant AADSSO_SETTINGS_PATH is defined in wp-config.php by the user
+        - '#Constant AADSSO_SETTINGS_PATH not found#'
+        # WordPress global variable
+        - '#Property WP_Roles::\$roles#'
