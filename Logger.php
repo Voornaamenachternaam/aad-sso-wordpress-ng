@@ -1,11 +1,5 @@
 <?php
 
-/**
- * Logger class for Microsoft Entra ID SSO plugin.
- *
- * Provides centralized logging using Monolog and caching using Symfony Cache.
- * Log and cache directories are stored in WordPress uploads directory.
- */
 declare(strict_types=1);
 
 use Monolog\Handler\RotatingFileHandler;
@@ -25,22 +19,12 @@ if (!\defined('AADSSO_PLUGIN_DIR')) {
     \define('AADSSO_PLUGIN_DIR', __DIR__ . '/');
 }
 
-/**
- * Logger class for centralized logging and caching.
- */
 class AADSSO_Logger
 {
-    /** @var LoggerInterface|null */
     private static ?LoggerInterface $logger = null;
 
-    /** @var CacheInterface|null */
     private static ?CacheInterface $cache = null;
 
-    /**
-     * Get the logger instance.
-     *
-     * @return LoggerInterface
-     */
     public static function get_logger(): LoggerInterface
     {
         if (null === self::$logger) {
@@ -86,11 +70,6 @@ class AADSSO_Logger
         return self::$logger;
     }
 
-    /**
-     * Get the cache instance.
-     *
-     * @return CacheInterface
-     */
     public static function get_cache(): CacheInterface
     {
         if (null === self::$cache) {
@@ -127,12 +106,6 @@ class AADSSO_Logger
         return self::$cache;
     }
 
-    /**
-     * Log a debug message.
-     *
-     * @param string $message The debug message.
-     * @param int $level Debug level threshold.
-     */
     public static function log_debug(string $message, int $level = 0): void
     {
         $debug_enabled = apply_filters('aadsso_debug', AADSSO_DEBUG);
@@ -147,48 +120,24 @@ class AADSSO_Logger
         self::get_logger()->debug($message);
     }
 
-    /**
-     * Log an info message.
-     *
-     * @param string $message The info message.
-     * @param array<string, mixed> $context Additional context.
-     */
     public static function log_info(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->info($message, $context);
     }
 
-    /**
-     * Log a warning message.
-     *
-     * @param string $message The warning message.
-     * @param array<string, mixed> $context Additional context.
-     */
     public static function log_warning(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->warning($message, $context);
     }
 
-    /**
-     * Log an error message.
-     *
-     * @param string $message The error message.
-     * @param array<string, mixed> $context Additional context.
-     */
     public static function log_error(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->error($message, $context);
     }
 
-    /**
-     * Log an exception.
-     *
-     * @param Throwable $exception The exception to log.
-     * @param string $message Optional message to prepend.
-     */
     public static function log_exception(Throwable $exception, string $message = ''): void
     {
         $context = [

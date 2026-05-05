@@ -1,11 +1,5 @@
 <?php
 
-/**
- * HTTP Client wrapper implementing PSR-18 standard.
- *
- * Provides a consistent HTTP client interface for making requests
- * to Microsoft Entra ID and Graph API endpoints.
- */
 declare(strict_types=1);
 
 use Psr\Http\Client\ClientInterface;
@@ -23,28 +17,14 @@ if (!\defined('ABSPATH')) {
     exit;
 }
 
-/**
- * PSR-18 HTTP Client wrapper.
- *
- * Wraps Symfony HttpClient to provide PSR-18 compatible interface.
- * Used for Microsoft Entra ID and Graph API communications.
- */
 class AADSSO_HttpClient implements ClientInterface
 {
-    /** @var HttpClientInterface */
     private HttpClientInterface $http_client;
 
-    /** @var Psr18Client */
     private Psr18Client $psr18_client;
 
-    /** @var self|null Singleton instance */
     private static ?self $instance = null;
 
-    /**
-     * Constructor.
-     *
-     * @param HttpClientInterface|null $http_client Optional custom HTTP client.
-     */
     public function __construct(?HttpClientInterface $http_client = null)
     {
         if (null !== $http_client) {
@@ -60,9 +40,6 @@ class AADSSO_HttpClient implements ClientInterface
         $this->psr18_client = new Psr18Client($this->http_client);
     }
 
-    /**
-     * Get singleton instance.
-     */
     public static function get_instance(): self
     {
         if (null === self::$instance) {
@@ -72,26 +49,11 @@ class AADSSO_HttpClient implements ClientInterface
         return self::$instance;
     }
 
-    /**
-     * Send a PSR-7 request.
-     *
-     * @param RequestInterface $request The PSR-7 request to send.
-     * @return ResponseInterface The PSR-7 response.
-     * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
-     */
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
         return $this->psr18_client->sendRequest($request);
     }
 
-    /**
-     * Create and send a GET request.
-     *
-     * @param string $url The URL to request.
-     * @param array<string, mixed> $options Request options (headers, query params, etc.).
-     * @return ResponseInterface The PSR-7 response.
-     * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
-     */
     public function get(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('GET', $url, $options);
@@ -99,14 +61,6 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->sendRequest($request);
     }
 
-    /**
-     * Create and send a POST request.
-     *
-     * @param string $url The URL to request.
-     * @param array<string, mixed> $options Request options (headers, body, etc.).
-     * @return ResponseInterface The PSR-7 response.
-     * @throws \Psr\Http\Client\ClientExceptionInterface If an error occurs.
-     */
     public function post(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('POST', $url, $options);
@@ -114,17 +68,6 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->sendRequest($request);
     }
 
-    /**
-     * Create a PSR-7 request.
-     *
-     * @param string $method HTTP method (GET, POST, etc.).
-     * @param string $url The URL to request.
-     * @param array<string, mixed> $options Request options:
-     *   - headers: array<string, string|string[]>
-     *   - body: string|array|resource
-     *   - query: array<string, mixed> (appended to URL as query params)
-     * @return RequestInterface The PSR-7 request.
-     */
     public function createRequest(string $method, string $url, array $options = []): RequestInterface
     {
         if (!empty($options['query'])) {
@@ -138,7 +81,6 @@ class AADSSO_HttpClient implements ClientInterface
             throw new \RuntimeException('Request factory not available');
         }
 
-        /** @var array<string, string|string[]> $headers */
         $headers = $options['headers'] ?? [];
         $body = $options['body'] ?? '';
 
@@ -149,19 +91,14 @@ class AADSSO_HttpClient implements ClientInterface
             }
         }
 
-        /** @var RequestInterface $request */
         $request = $requestFactory->createRequest($method, $url);
 
         foreach ($headers as $name => $value) {
-            /** @var string $name */
-            /** @var string|string[] $value */
             if (\is_array($value)) {
                 foreach ($value as $single_value) {
-                    /** @var string $single_value */
                     $request = $request->withAddedHeader($name, $single_value);
                 }
             } else {
-                /** @var string $value */
                 $request = $request->withHeader($name, $value);
             }
         }
@@ -169,7 +106,6 @@ class AADSSO_HttpClient implements ClientInterface
         if (!empty($body) && \in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
             $streamFactory = $this->psr18_client->getStreamFactory();
             if (null !== $streamFactory) {
-                /** @var StreamInterface $stream */
                 $stream = $streamFactory->createStream($body);
                 $request = $request->withBody($stream);
             }
@@ -178,47 +114,26 @@ class AADSSO_HttpClient implements ClientInterface
         return $request;
     }
 
-    /**
-     * Get the underlying Symfony HTTP client.
-     *
-     * @return HttpClientInterface
-     */
     public function get_http_client(): HttpClientInterface
     {
         return $this->http_client;
     }
 
-    /**
-     * Create a PSR-7 Response from a response body array.
-     *
-     * Useful for testing and mocking.
-     *
-     * @param array<string, mixed> $data Response data (body, status, headers).
-     * @return ResponseInterface A PSR-7 response.
-     */
     public static function create_response(array $data): ResponseInterface
     {
         $status = $data['status'] ?? 200;
-        /** @var array<string, string|string[]> $headers */
         $headers = $data['headers'] ?? [];
         $body = is_string($data['body'] ?? null) ? $data['body'] : json_encode($data['body'] ?? '');
 
         return new class($status, $headers, $body) implements ResponseInterface {
             private int $statusCode;
-            /** @var array<string, array<string>> */
             private array $headers;
             private string $body;
             private string $reasonPhrase = '';
 
-            /**
-             * @param int $status
-             * @param array<string, string|string[]> $headers
-             * @param string $body
-             */
             public function __construct(int $status, array $headers, string $body)
             {
                 $this->statusCode = $status;
-                /** @var array<string, array<string>> $normalized_headers */
                 $normalized_headers = [];
                 foreach ($headers as $name => $values) {
                     if (\is_array($values)) {
@@ -259,9 +174,6 @@ class AADSSO_HttpClient implements ClientInterface
                 return clone $this;
             }
 
-            /**
-             * @return array<string, array<string>>
-             */
             public function getHeaders(): array
             {
                 return $this->headers;
@@ -272,9 +184,6 @@ class AADSSO_HttpClient implements ClientInterface
                 return isset($this->headers[$name]);
             }
 
-            /**
-             * @return array<string>
-             */
             public function getHeader(string $name): array
             {
                 return $this->headers[$name] ?? [];
@@ -285,10 +194,6 @@ class AADSSO_HttpClient implements ClientInterface
                 return implode(', ', $this->getHeader($name));
             }
 
-            /**
-             * @param string $name
-             * @param string|string[] $value
-             */
             public function withHeader(string $name, $value): self
             {
                 $clone = clone $this;
@@ -300,10 +205,6 @@ class AADSSO_HttpClient implements ClientInterface
                 return $clone;
             }
 
-            /**
-             * @param string $name
-             * @param string|string[] $value
-             */
             public function withAddedHeader(string $name, $value): self
             {
                 $clone = clone $this;
@@ -415,7 +316,6 @@ class AADSSO_HttpClient implements ClientInterface
                     {
                         $result = substr($this->content, $this->position, $length);
                         $this->position += \strlen($result);
-                        /** @var string */
                         return $result;
                     }
 
@@ -424,9 +324,6 @@ class AADSSO_HttpClient implements ClientInterface
                         return substr($this->content, $this->position);
                     }
 
-                    /**
-                     * @return array<string, mixed>
-                     */
                     public function getMetadata(?string $key = null): array
                     {
                         if (null === $key) {
@@ -445,9 +342,6 @@ class AADSSO_HttpClient implements ClientInterface
                 };
             }
 
-            /**
-             * @param StreamInterface $body
-             */
             public function withBody(StreamInterface $body): self
             {
                 $clone = clone $this;
