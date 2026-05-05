@@ -11,7 +11,8 @@ if (!current_user_can('manage_options')) {
     <h1><?php echo esc_html__('Microsoft Entra ID Settings', 'aad-sso-wordpress'); ?></h1>
 
     <?php
-    if (\defined('AADSSO_SETTINGS_PATH') && file_exists(AADSSO_SETTINGS_PATH)) {
+    $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
+    if ('' !== $settings_path && file_exists($settings_path)) {
         $reset_url = add_query_arg(array(
             'page' => 'aadsso_settings',
             'aadsso_nonce' => wp_create_nonce('aadsso_migrate_from_json'),
@@ -24,9 +25,9 @@ if (!current_user_can('manage_options')) {
                     sprintf(
                         /* translators: %s: path to settings file */
                         __('Old configuration data was found at %s.', 'aad-sso-wordpress'),
-                        '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>'
+                        '<code>' . esc_html($settings_path) . '</code>'
                     ),
-                    array('code' => array())
+                    ['code' => []]
                 );
                 ?>
             </p>

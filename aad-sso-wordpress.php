@@ -129,7 +129,8 @@ class AADSSO
 
     private function wants_to_login(): bool
     {
-        $action = isset($_REQUEST['action']) ? sanitize_text_field(wp_unslash($_REQUEST['action'])) : 'login';
+        $action_raw = $_REQUEST['action'] ?? 'login';
+        $action = \is_string($action_raw) ? sanitize_text_field(wp_unslash($action_raw)) : 'login';
         if (isset($_GET['loggedout'])) {
             $action = 'loggedout';
         }
@@ -150,8 +151,9 @@ class AADSSO
                 );
             }
 
-            $antiforgery_id = (string) $_SESSION['aadsso_antiforgery-id'];
-            $state_param = isset($_GET['state']) ? (string) wp_unslash($_GET['state']) : '';
+            $antiforgery_id_raw = $_SESSION['aadsso_antiforgery-id'];
+            $antiforgery_id = \is_string($antiforgery_id_raw) ? $antiforgery_id_raw : '';
+            $state_param = isset($_GET['state']) && \is_string($_GET['state']) ? (string) wp_unslash($_GET['state']) : '';
 
             if ('' === $state_param || $state_param !== $antiforgery_id) {
                 return new WP_Error(
@@ -195,7 +197,9 @@ class AADSSO
                 );
 
                 $jwt_json = wp_json_encode($jwt) ?: 'null';
-                AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt->iss . "', oid: '" . $jwt->oid, 10);
+                $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
+                $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
+                AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid, 10);
                 AADSSO_Logger::log_debug($jwt_json, 50);
             } catch (\Throwable $e) {
                 AADSSO_Logger::log_exception($e, 'ID token validation failed');
@@ -213,8 +217,9 @@ class AADSSO
                 AADSSO_GraphHelper::$settings = $this->settings;
 
                 $group_ids = array_keys($this->settings->aad_group_to_wp_role_map);
+                $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
                 $group_result = AADSSO_GraphHelper::user_check_member_groups(
-                    (string) $jwt->oid,
+                    $jwt_oid,
                     $group_ids
                 );
 
@@ -232,25 +237,28 @@ class AADSSO
                 }
 
                 $group_memberships = $group_result;
-                if (isset($group_memberships->value)) {
+                if (isset($group_memberships->value) && \is_array($group_memberships->value)) {
                     AADSSO_Logger::log_debug(sprintf(
                         "Microsoft Entra ID user '%s' is a member of [%s]",
-                        $jwt->oid,
+                        $jwt_oid,
                         implode(',', $group_memberships->value)
                     ), 20);
-                } elseif (isset($group_memberships->error)) {
+                } elseif (isset($group_memberships->error) && \is_object($group_memberships->error)) {
                     AADSSO_Logger::log_error(
                         'Error when checking group membership: ' . wp_json_encode($group_memberships)
                     );
                     $error_obj = $group_memberships->error;
+                    $error_code = isset($error_obj->code) && \is_string($error_obj->code) ? $error_obj->code : '';
+                    $error_message = isset($error_obj->message) && \is_string($error_obj->message) ? $error_obj->message : '';
+                    $error_inner = $error_obj->innerError ?? null;
                     return new WP_Error(
                         'error_checking_group_membership',
                         sprintf(
                             __('ERROR: Unable to check group membership with Microsoft Graph: '
                                 . '<b>%s</b> %s<br />%s', 'aad-sso-wordpress'),
-                            esc_html((string) ($error_obj->code ?? '')),
-                            esc_html((string) ($error_obj->message ?? '')),
-                            esc_html(wp_json_encode($error_obj->innerError ?? null))
+                            esc_html($error_code),
+                            esc_html($error_message),
+                            esc_html(wp_json_encode($error_inner))
                         )
                     );
                 } else {
@@ -275,11 +283,13 @@ class AADSSO
                 $user = $role_result;
             }
         } elseif (isset($_GET['error']) && is_string($_GET['error'])) {
+            $error_desc_raw = $_GET['error_description'] ?? $_GET['error'];
+            $error_desc = \is_string($error_desc_raw) ? sanitize_text_field(wp_unslash($error_desc_raw)) : '';
             return new WP_Error(
                 'oauth_error',
                 sprintf(
                     __('ERROR: Access denied to Microsoft Graph. %s', 'aad-sso-wordpress'),
-                    esc_html(sanitize_text_field(wp_unslash($_GET['error_description'] ?? $_GET['error'])))
+                    esc_html($error_desc)
                 )
             );
         }
@@ -293,9 +303,10 @@ class AADSSO
 
     public function get_wp_user_from_aad_user($jwt, $group_memberships): WP_User|WP_Error
     {
-        $upn = isset($jwt->upn) ? (string) $jwt->upn : null;
-        $unique_name = isset($jwt->unique_name) ? (string) $jwt->unique_name : null;
-        $unique_name = $upn ?? $unique_name;
+        $upn_raw = $jwt->upn ?? null;
+        $upn = \is_string($upn_raw) ? $upn_raw : null;
+        $unique_name_raw = $jwt->unique_name ?? null;
+        $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
         if (null === $unique_name) {
             return new WP_Error(
@@ -328,7 +339,7 @@ class AADSSO
             if (true === $this->settings->enable_auto_provisioning) {
                 $has_group_memberships = $group_memberships !== false
                     && isset($group_memberships->value)
-                    && is_array($group_memberships->value);
+                    && \is_array($group_memberships->value);
                 if (true === $this->settings->enable_aad_group_to_wp_role
                     && (!$has_group_memberships)
                     && empty($this->settings->default_wp_role)
@@ -343,12 +354,17 @@ class AADSSO
                     );
                 }
 
-                $userdata = array(
+                $given_name_raw = $jwt->given_name ?? '';
+                $given_name = \is_string($given_name_raw) ? sanitize_text_field($given_name_raw) : '';
+                $family_name_raw = $jwt->family_name ?? '';
+                $family_name = \is_string($family_name_raw) ? sanitize_text_field($family_name_raw) : '';
+
+                $userdata = [
                     'user_email' => sanitize_email($unique_name),
                     'user_login' => sanitize_user($unique_name, true),
-                    'first_name' => !empty($jwt->given_name) ? sanitize_text_field((string) $jwt->given_name) : '',
-                    'last_name' => !empty($jwt->family_name) ? sanitize_text_field((string) $jwt->family_name) : '',
-                );
+                    'first_name' => $given_name,
+                    'last_name' => $family_name,
+                ];
 
                 $new_user_id = wp_insert_user($userdata);
 
@@ -383,9 +399,13 @@ class AADSSO
     {
         $roles_to_set = [];
 
-        if (!empty($group_memberships->value) && is_array($group_memberships->value)) {
+        if (
+            $group_memberships !== false
+            && isset($group_memberships->value)
+            && \is_array($group_memberships->value)
+        ) {
             foreach ($this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role) {
-                if (in_array($aad_group, $group_memberships->value, true)) {
+                if (\is_string($wp_role) && in_array($aad_group, $group_memberships->value, true)) {
                     $roles_to_set[] = $wp_role;
                 }
             }
@@ -394,7 +414,9 @@ class AADSSO
         if (!empty($roles_to_set)) {
             $user->set_role('');
             foreach ($roles_to_set as $role) {
-                $user->add_role($role);
+                if (\is_string($role)) {
+                    $user->add_role($role);
+                }
             }
             AADSSO_Logger::log_debug(sprintf(
                 'Set roles [%s] for user [%s].',
@@ -439,7 +461,8 @@ class AADSSO
     {
         $logout_redirect_uri = $this->settings->logout_redirect_uri;
         if (empty($logout_redirect_uri)) {
-            $logout_redirect_uri = (string) AADSSO_Settings::get_defaults('logout_redirect_uri');
+            $default_logout = AADSSO_Settings::get_defaults('logout_redirect_uri');
+            $logout_redirect_uri = \is_string($default_logout) ? $default_logout : wp_login_url();
         }
 
         $end_session = $this->settings->end_session_endpoint;
@@ -448,7 +471,7 @@ class AADSSO
         }
 
         return $end_session
-            . '?' . http_build_query(array('post_logout_redirect_uri' => $logout_redirect_uri));
+            . '?' . http_build_query(['post_logout_redirect_uri' => $logout_redirect_uri]);
     }
 
     public function register_session(): void
@@ -509,9 +532,12 @@ class AADSSO
 
     public function print_login_link(): void
     {
-        $org_name = !empty($this->settings->org_display_name)
-            ? esc_html($this->settings->org_display_name)
-            : esc_html__('Organization', 'aad-sso-wordpress');
+        $org_name = '';
+        if (!empty($this->settings->org_display_name) && \is_string($this->settings->org_display_name)) {
+            $org_name = esc_html($this->settings->org_display_name);
+        } else {
+            $org_name = esc_html__('Organization', 'aad-sso-wordpress');
+        }
 
         printf(
             '<p class="aadsso-login-form-text">'
