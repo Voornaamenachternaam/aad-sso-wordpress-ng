@@ -19,13 +19,8 @@ if (!\defined('ABSPATH')) {
 
 class AADSSO_HttpClient implements ClientInterface
 {
-    /** @var HttpClientInterface */
-    private $http_client;
-
-    /** @var Psr18Client */
-    private $psr18_client;
-
-    /** @var self|null */
+    private HttpClientInterface $http_client;
+    private Psr18Client $psr18_client;
     private static ?self $instance = null;
 
     public function __construct(?HttpClientInterface $http_client = null)
@@ -75,7 +70,7 @@ class AADSSO_HttpClient implements ClientInterface
     {
         if (!empty($options['query'])) {
             $separator = (strpos($url, '?') !== false) ? '&' : '?';
-            $url .= $separator . http_build_query($options['query']);
+            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
             unset($options['query']);
         }
 
@@ -117,6 +112,24 @@ class AADSSO_HttpClient implements ClientInterface
         return $request;
     }
 
+    private static function normalizeQueryParams(mixed $query): array
+    {
+        if (!\is_array($query)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($query as $key => $value) {
+            if (\is_array($value)) {
+                $result[(string) $key] = array_map('strval', $value);
+            } else {
+                $result[(string) $key] = (string) $value;
+            }
+        }
+
+        return $result;
+    }
+
     public function get_http_client(): HttpClientInterface
     {
         return $this->http_client;
@@ -124,9 +137,10 @@ class AADSSO_HttpClient implements ClientInterface
 
     public static function create_response(array $data): ResponseInterface
     {
-        $status = $data['status'] ?? 200;
-        $headers = $data['headers'] ?? [];
-        $body = is_string($data['body'] ?? null) ? $data['body'] : json_encode($data['body'] ?? '');
+        $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
+        $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
+        $body_raw = $data['body'] ?? '';
+        $body = \is_string($body_raw) ? $body_raw : json_encode($body_raw);
 
         return new class($status, $headers, $body) implements ResponseInterface {
             private int $statusCode;
@@ -140,9 +154,9 @@ class AADSSO_HttpClient implements ClientInterface
                 $normalized_headers = [];
                 foreach ($headers as $name => $values) {
                     if (\is_array($values)) {
-                        $normalized_headers[$name] = $values;
+                        $normalized_headers[$name] = array_map('strval', $values);
                     } else {
-                        $normalized_headers[$name] = [$values];
+                        $normalized_headers[$name] = [(string) $values];
                     }
                 }
                 $this->headers = $normalized_headers;
@@ -260,7 +274,7 @@ class AADSSO_HttpClient implements ClientInterface
                         return null;
                     }
 
-                    public function getSize(): ?int
+                    public function getSize(): int
                     {
                         return \strlen($this->content);
                     }
@@ -339,7 +353,7 @@ class AADSSO_HttpClient implements ClientInterface
                         return match ($key) {
                             'seekable' => true,
                             'eof' => $this->eof(),
-                            default => null,
+                            default => [],
                         };
                     }
                 };

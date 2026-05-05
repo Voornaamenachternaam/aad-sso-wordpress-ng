@@ -11,9 +11,7 @@ use Psr\Http\Message\ResponseInterface;
 
 class AADSSO_AuthorizationHelper
 {
-    /** @var AADSSO_HttpClient|null */
     private static ?AADSSO_HttpClient $http_client = null;
-
     private static array $allowed_algorithms = ['RS256'];
 
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
@@ -119,7 +117,8 @@ class AADSSO_AuthorizationHelper
 
         if (isset($result['access_token']) && \PHP_SESSION_ACTIVE === session_status()) {
             $token_type = $result['token_type'] ?? 'Bearer';
-            $access_token = (string) $result['access_token'];
+            $access_token_raw = $result['access_token'];
+            $access_token = \is_string($access_token_raw) ? $access_token_raw : '';
             $_SESSION['aadsso_token_type'] = $token_type;
             $_SESSION['aadsso_access_token'] = $access_token;
         }
@@ -156,8 +155,11 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
         }
 
+        // Create allowed algorithms object for JWT::decode
+        $allowedAlgorithms = (object) ['RS256' => self::$allowed_algorithms];
+
         try {
-            $jwt = JWT::decode($id_token, $keys, self::$allowed_algorithms);
+            $jwt = JWT::decode($id_token, $keys, $allowedAlgorithms);
         } catch (ExpiredException $e) {
             throw new DomainException('Token has expired');
         } catch (SignatureInvalidException $e) {
@@ -166,6 +168,10 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Token is not yet valid');
         } catch (\Throwable $e) {
             throw new DomainException('Token validation failed: ' . $e->getMessage());
+        }
+
+        if (!\is_object($jwt)) {
+            throw new DomainException('JWT decode returned non-object');
         }
 
         $token_nonce = $jwt->nonce ?? '';

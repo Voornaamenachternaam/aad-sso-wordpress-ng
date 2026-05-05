@@ -189,8 +189,8 @@ class AADSSO_Settings
 
         return array_filter(
             $settings,
-            fn(string $key): bool => \in_array($key, $defined_options, true),
-            ARRAY_FILTER_USE_KEY
+            fn($value, string $key): bool => \in_array($key, $defined_options, true),
+            ARRAY_FILTER_USE_BOTH
         );
     }
 
@@ -304,15 +304,16 @@ class AADSSO_Settings
         ];
 
         if (\in_array($key, $url_fields, true)) {
-            return esc_url_raw((string) $value);
+            $url_value = \is_string($value) ? $value : '';
+            return esc_url_raw($url_value);
         }
 
         return match ($key) {
-            'client_id' => sanitize_text_field((string) $value),
-            'client_secret' => (string) $value,
+            'client_id' => sanitize_text_field(\is_string($value) ? $value : ''),
+            'client_secret' => \is_string($value) ? $value : '',
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
-            'graph_version' => sanitize_text_field((string) $value),
+            'graph_version' => sanitize_text_field(\is_string($value) ? $value : ''),
             'match_on_upn_alias',
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
@@ -337,20 +338,22 @@ class AADSSO_Settings
                 }
                 if (\is_array($group_ids_list)) {
                     foreach ($group_ids_list as $group_id) {
-                        $group_id = trim(sanitize_text_field((string) $group_id));
-                        if (!empty($group_id) && !isset($settings['aad_group_to_wp_role_map'][$group_id])) {
-                            $settings['aad_group_to_wp_role_map'][$group_id] = sanitize_text_field((string) $role_slug);
+                        $group_id_trimmed = \is_string($group_id) ? trim(sanitize_text_field($group_id)) : '';
+                        $role_slug_sanitized = \is_string($role_slug) ? sanitize_text_field($role_slug) : '';
+                        if (!empty($group_id_trimmed) && !isset($settings['aad_group_to_wp_role_map'][$group_id_trimmed])) {
+                            $settings['aad_group_to_wp_role_map'][$group_id_trimmed] = $role_slug_sanitized;
                         }
                     }
                 } else {
-                    $group_ids = explode(',', (string) $group_ids_list);
+                    $group_ids = \is_string($group_ids_list) ? explode(',', $group_ids_list) : [];
                     if (!empty($group_ids)) {
                         foreach ($group_ids as $group_id) {
-                            $group_id = trim(sanitize_text_field($group_id));
-                            if (!empty($group_id)
-                                && !isset($settings['aad_group_to_wp_role_map'][$group_id])
+                            $group_id_trimmed = \is_string($group_id) ? trim(sanitize_text_field($group_id)) : '';
+                            $role_slug_sanitized = \is_string($role_slug) ? sanitize_text_field($role_slug) : '';
+                            if (!empty($group_id_trimmed)
+                                && !isset($settings['aad_group_to_wp_role_map'][$group_id_trimmed])
                             ) {
-                                $settings['aad_group_to_wp_role_map'][$group_id] = sanitize_text_field((string) $role_slug);
+                                $settings['aad_group_to_wp_role_map'][$group_id_trimmed] = $role_slug_sanitized;
                             }
                         }
                     }

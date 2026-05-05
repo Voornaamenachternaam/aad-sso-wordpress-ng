@@ -8,16 +8,13 @@ class AADSSO_GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';
 
-    /** @var AADSSO_Settings|null */
     public static ?AADSSO_Settings $settings = null;
-
-    /** @var AADSSO_HttpClient|null */
     private static ?AADSSO_HttpClient $http_client = null;
 
     public static function get_base_url(): string
     {
-        $endpoint = self::$settings?->graph_endpoint ?? 'https://graph.microsoft.com';
-        $version = self::$settings?->graph_version ?? self::GRAPH_VERSION;
+        $endpoint = self::$settings->graph_endpoint ?? 'https://graph.microsoft.com';
+        $version = self::$settings->graph_version ?? self::GRAPH_VERSION;
 
         return trailingslashit($endpoint) . $version;
     }
@@ -141,8 +138,8 @@ class AADSSO_GraphHelper
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $session_token_type = $_SESSION['aadsso_token_type'] ?? 'Bearer';
             $session_access_token = $_SESSION['aadsso_access_token'] ?? '';
-            $token_type = (string) $session_token_type;
-            $access_token = (string) $session_access_token;
+            $token_type = \is_string($session_token_type) ? $session_token_type : 'Bearer';
+            $access_token = \is_string($session_access_token) ? $session_access_token : '';
         }
 
         return [

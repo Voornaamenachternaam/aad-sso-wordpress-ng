@@ -5,7 +5,6 @@ declare(strict_types=1);
 class AADSSO_Settings_Page
 {
     private array $settings = [];
-
     private int|false $options_page_id = false;
 
     public function __construct()
@@ -19,7 +18,9 @@ class AADSSO_Settings_Page
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
 
         $default_settings = AADSSO_Settings::get_defaults();
-        $this->settings = get_option('aadsso_settings', $default_settings);
+        $saved_settings = get_option('aadsso_settings');
+        $settings = \is_array($saved_settings) ? $saved_settings : [];
+        $this->settings = $settings;
         foreach ($default_settings as $key => $default_value) {
             if (!isset($this->settings[$key])) {
                 $this->settings[$key] = $default_value;
@@ -37,7 +38,7 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $nonce = sanitize_text_field(wp_unslash($_GET['aadsso_nonce']));
+        $nonce = sanitize_text_field(wp_unslash((string) ($_GET['aadsso_nonce'] ?? '')));
 
         if (!wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
             wp_safe_redirect(add_query_arg('aadsso_reset', 'failed', admin_url('options-general.php?page=aadsso_settings')));
@@ -55,16 +56,19 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $nonce = isset($_GET['aadsso_nonce']) ? sanitize_text_field(wp_unslash($_GET['aadsso_nonce'])) : '';
+        $nonce_raw = $_GET['aadsso_nonce'] ?? '';
+        $nonce = \is_string($nonce_raw) ? sanitize_text_field(wp_unslash($nonce_raw)) : '';
         if ('' === $nonce
             || !wp_verify_nonce($nonce, 'aadsso_migrate_from_json')
             || !\defined('AADSSO_SETTINGS_PATH')
+            || !\is_string(AADSSO_SETTINGS_PATH)
             || !file_exists(AADSSO_SETTINGS_PATH)
         ) {
             return;
         }
 
-        $json_content = file_get_contents(AADSSO_SETTINGS_PATH);
+        $settings_file_path = AADSSO_SETTINGS_PATH;
+        $json_content = file_get_contents($settings_file_path);
         if (false === $json_content) {
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
                 admin_url('options-general.php?page=aadsso_settings')));
@@ -80,20 +84,20 @@ class AADSSO_Settings_Page
             exit;
         }
 
-        if (isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
+        if (\is_array($legacy_settings) && isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
             // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for UI compatibility
             $legacy_settings['role_map'] = [];
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
-                $role_slug = sanitize_text_field($role_slug);
-                $group_id = sanitize_text_field($group_id);
-                if (empty($role_slug) || empty($group_id)) {
+                $role_slug_sanitized = \is_string($role_slug) ? sanitize_text_field($role_slug) : '';
+                $group_id_sanitized = \is_string($group_id) ? sanitize_text_field($group_id) : '';
+                if (empty($role_slug_sanitized) || empty($group_id_sanitized)) {
                     continue;
                 }
                 // Store as role_slug => array of group_ids (matching UI format)
-                if (!isset($legacy_settings['role_map'][$role_slug])) {
-                    $legacy_settings['role_map'][$role_slug] = [$group_id];
+                if (!isset($legacy_settings['role_map'][$role_slug_sanitized])) {
+                    $legacy_settings['role_map'][$role_slug_sanitized] = [$group_id_sanitized];
                 } else {
-                    $legacy_settings['role_map'][$role_slug][] = $group_id;
+                    $legacy_settings['role_map'][$role_slug_sanitized][] = $group_id_sanitized;
                 }
             }
         }
@@ -101,9 +105,10 @@ class AADSSO_Settings_Page
         $sanitized_settings = $this->sanitize_settings($legacy_settings);
         update_option('aadsso_settings', $sanitized_settings);
 
-        $can_delete = is_writable(AADSSO_SETTINGS_PATH) && is_writable(\dirname(AADSSO_SETTINGS_PATH));
+        $dirname = \is_string(\dirname($settings_file_path)) ? \dirname($settings_file_path) : '';
+        $can_delete = is_writable($settings_file_path) && '' !== $dirname && is_writable($dirname);
         if ($can_delete) {
-            unlink(AADSSO_SETTINGS_PATH);
+            unlink($settings_file_path);
             wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'success',
                 admin_url('options-general.php?page=aadsso_settings')));
         } else {
@@ -119,7 +124,8 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $status = sanitize_text_field(wp_unslash($_GET['aadsso_migrate_from_json_status']));
+        $status_raw = $_GET['aadsso_migrate_from_json_status'] ?? '';
+        $status = \is_string($status_raw) ? sanitize_text_field(wp_unslash($status_raw)) : '';
 
         if ('success' === $status) {
             echo '<div id="message" class="notice notice-success"><p>'
@@ -128,16 +134,18 @@ class AADSSO_Settings_Page
                 . ' ' . esc_html__('To finish migration, unset AADSSO_SETTINGS_PATH from wp-config.php.',
                     'aad-sso-wordpress') . '</p></div>';
         } elseif ('manual' === $status) {
+            $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
             echo '<div id="message" class="notice notice-warning"><p>'
                 . esc_html__('Legacy settings have been migrated successfully.', 'aad-sso-wordpress') . ' '
                 . sprintf(esc_html__('To finish migration, delete the file at the path %s.',
-                    'aad-sso-wordpress'), '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>')
+                    'aad-sso-wordpress'), '<code>' . esc_html($settings_path) . '</code>')
                 . ' ' . sprintf(esc_html__('Then, unset %s from %s.', 'aad-sso-wordpress'),
                     '<code>AADSSO_SETTINGS_PATH</code>', '<code>wp-config.php</code>') . '</p></div>';
         } elseif ('invalid_json' === $status) {
+            $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
             echo '<div id="message" class="notice notice-error"><p>'
                 . sprintf(esc_html__('Legacy settings could not be migrated from %s.', 'aad-sso-wordpress'),
-                    '<code>' . esc_html(AADSSO_SETTINGS_PATH) . '</code>')
+                    '<code>' . esc_html($settings_path) . '</code>')
                 . ' ' . esc_html__('File could not be parsed as JSON. Delete the file, or check its syntax.',
                     'aad-sso-wordpress') . '</p></div>';
         }
@@ -149,7 +157,8 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $status = sanitize_text_field(wp_unslash($_GET['aadsso_reset']));
+        $status_raw = $_GET['aadsso_reset'] ?? '';
+        $status = \is_string($status_raw) ? sanitize_text_field(wp_unslash($status_raw)) : '';
 
         if ('success' === $status) {
             echo '<div id="message" class="notice notice-warning"><p>'
@@ -168,13 +177,14 @@ class AADSSO_Settings_Page
 
     public function add_options_page(): void
     {
-        $this->options_page_id = add_options_page(
+        $page_id = add_options_page(
             esc_html__('Microsoft Entra ID Settings', 'aad-sso-wordpress'),
             esc_html__('Microsoft Entra ID', 'aad-sso-wordpress'),
             'manage_options',
             'aadsso_settings',
             array($this, 'render_admin_page')
         );
+        $this->options_page_id = $page_id;
     }
 
     public function render_admin_page(): void
@@ -354,57 +364,79 @@ class AADSSO_Settings_Page
     {
         $sanitized = [];
 
-        $sanitized['org_display_name'] = sanitize_text_field($input['org_display_name'] ?? '');
-        $sanitized['org_domain_hint'] = sanitize_text_field($input['org_domain_hint'] ?? '');
-        $sanitized['client_id'] = sanitize_text_field($input['client_id'] ?? '');
-        $sanitized['client_secret'] = sanitize_text_field($input['client_secret'] ?? '');
-        $sanitized['redirect_uri'] = esc_url_raw($input['redirect_uri'] ?? '');
-        $sanitized['logout_redirect_uri'] = esc_url_raw($input['logout_redirect_uri'] ?? '');
+        $org_display_name_raw = $input['org_display_name'] ?? '';
+        $sanitized['org_display_name'] = \is_string($org_display_name_raw) ? sanitize_text_field($org_display_name_raw) : '';
+
+        $org_domain_hint_raw = $input['org_domain_hint'] ?? '';
+        $sanitized['org_domain_hint'] = \is_string($org_domain_hint_raw) ? sanitize_text_field($org_domain_hint_raw) : '';
+
+        $client_id_raw = $input['client_id'] ?? '';
+        $sanitized['client_id'] = \is_string($client_id_raw) ? sanitize_text_field($client_id_raw) : '';
+
+        $client_secret_raw = $input['client_secret'] ?? '';
+        $sanitized['client_secret'] = \is_string($client_secret_raw) ? sanitize_text_field($client_secret_raw) : '';
+
+        $redirect_uri_raw = $input['redirect_uri'] ?? '';
+        $sanitized['redirect_uri'] = \is_string($redirect_uri_raw) ? esc_url_raw($redirect_uri_raw) : '';
+
+        $logout_redirect_uri_raw = $input['logout_redirect_uri'] ?? '';
+        $sanitized['logout_redirect_uri'] = \is_string($logout_redirect_uri_raw) ? esc_url_raw($logout_redirect_uri_raw) : '';
 
         $sanitized['enable_full_logout'] = !empty($input['enable_full_logout']);
-        $sanitized['field_to_match_to_upn'] = \in_array($input['field_to_match_to_upn'] ?? '', ['login', 'email'], true)
-            ? (string) $input['field_to_match_to_upn']
+
+        $field_to_match_raw = $input['field_to_match_to_upn'] ?? '';
+        $sanitized['field_to_match_to_upn'] = \in_array($field_to_match_raw, ['login', 'email'], true)
+            ? $field_to_match_raw
             : 'email';
         $sanitized['match_on_upn_alias'] = !empty($input['match_on_upn_alias']);
         $sanitized['enable_auto_provisioning'] = !empty($input['enable_auto_provisioning']);
         $sanitized['enable_auto_forward_to_aad'] = !empty($input['enable_auto_forward_to_aad']);
         $sanitized['enable_aad_group_to_wp_role'] = !empty($input['enable_aad_group_to_wp_role']);
 
-        $default_wp_role = sanitize_text_field($input['default_wp_role'] ?? '');
+        $default_wp_role_raw = $input['default_wp_role'] ?? '';
+        $default_wp_role = \is_string($default_wp_role_raw) ? sanitize_text_field($default_wp_role_raw) : '';
         $valid_roles = array_keys($this->get_editable_roles());
         $sanitized['default_wp_role'] = in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
-        $sanitized['openid_configuration_endpoint'] = esc_url_raw(
-            $input['openid_configuration_endpoint'] ??
-            'https://login.microsoftonline.com/common/.well-known/openid-configuration'
-        );
+        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
 
-        $sanitized['authorization_endpoint'] = esc_url_raw($input['authorization_endpoint'] ?? '');
-        $sanitized['token_endpoint'] = esc_url_raw($input['token_endpoint'] ?? '');
-        $sanitized['jwks_uri'] = esc_url_raw($input['jwks_uri'] ?? '');
-        $sanitized['end_session_endpoint'] = esc_url_raw($input['end_session_endpoint'] ?? '');
+        $auth_endpoint_raw = $input['authorization_endpoint'] ?? '';
+        $sanitized['authorization_endpoint'] = \is_string($auth_endpoint_raw) ? esc_url_raw($auth_endpoint_raw) : '';
 
-        $sanitized['graph_endpoint'] = esc_url_raw($input['graph_endpoint'] ?? 'https://graph.microsoft.com');
-        $sanitized['graph_version'] = \in_array($input['graph_version'] ?? '', ['v1.0', 'beta'], true)
-            ? (string) $input['graph_version']
+        $token_endpoint_raw = $input['token_endpoint'] ?? '';
+        $sanitized['token_endpoint'] = \is_string($token_endpoint_raw) ? esc_url_raw($token_endpoint_raw) : '';
+
+        $jwks_uri_raw = $input['jwks_uri'] ?? '';
+        $sanitized['jwks_uri'] = \is_string($jwks_uri_raw) ? esc_url_raw($jwks_uri_raw) : '';
+
+        $end_session_raw = $input['end_session_endpoint'] ?? '';
+        $sanitized['end_session_endpoint'] = \is_string($end_session_raw) ? esc_url_raw($end_session_raw) : '';
+
+        $graph_endpoint_raw = $input['graph_endpoint'] ?? 'https://graph.microsoft.com';
+        $sanitized['graph_endpoint'] = \is_string($graph_endpoint_raw) ? esc_url_raw($graph_endpoint_raw) : 'https://graph.microsoft.com';
+
+        $graph_version_raw = $input['graph_version'] ?? '';
+        $sanitized['graph_version'] = \in_array($graph_version_raw, ['v1.0', 'beta'], true)
+            ? $graph_version_raw
             : 'v1.0';
 
         if (!empty($input['role_map']) && \is_array($input['role_map'])) {
             $sanitized_role_map = [];
             $valid_roles = array_keys($this->get_editable_roles());
             foreach ($input['role_map'] as $role => $groups) {
-                $role = sanitize_text_field((string) $role);
-                $groups = \is_array($groups) ? $groups : explode(',', (string) $groups);
-                if (!empty($role) && in_array($role, $valid_roles, true)) {
+                $role_sanitized = \is_string($role) ? sanitize_text_field($role) : '';
+                $groups = \is_array($groups) ? $groups : (\is_string($groups) ? explode(',', $groups) : []);
+                if (!empty($role_sanitized) && in_array($role_sanitized, $valid_roles, true)) {
                     $group_ids = [];
                     foreach ($groups as $group_id) {
-                        $group_id = sanitize_text_field(trim((string) $group_id));
-                        if (!empty($group_id)) {
-                            $group_ids[] = $group_id;
+                        $group_id_sanitized = \is_string($group_id) ? sanitize_text_field(trim($group_id)) : '';
+                        if (!empty($group_id_sanitized)) {
+                            $group_ids[] = $group_id_sanitized;
                         }
                     }
                     if (!empty($group_ids)) {
-                        $sanitized_role_map[$role] = $group_ids;
+                        $sanitized_role_map[$role_sanitized] = $group_ids;
                     }
                 }
             }
@@ -584,11 +616,12 @@ class AADSSO_Settings_Page
         echo '<select name="aadsso_settings[default_wp_role]" id="default_wp_role">';
         printf('<option value="">%s</option>', esc_html__('(None, deny access)', 'aad-sso-wordpress'));
         foreach ($this->get_editable_roles() as $role_slug => $role) {
+            $role_name = \is_array($role) && isset($role['name']) && \is_string($role['name']) ? $role['name'] : '';
             printf(
                 '<option value="%s"%s>%s</option>',
                 esc_attr($role_slug),
-                selected($this->settings['default_wp_role'], $role_slug, false),
-                esc_html($role['name'])
+                selected($this->settings['default_wp_role'] ?? '', $role_slug, false),
+                esc_html($role_name)
             );
         }
         echo '</select>';
@@ -610,14 +643,19 @@ class AADSSO_Settings_Page
         echo '<th></th>';
         echo '</tr></thead><tbody>';
 
-        $role_map = $this->settings['role_map'] ?? [];
+        $role_map = isset($this->settings['role_map']) && \is_array($this->settings['role_map'])
+            ? $this->settings['role_map']
+            : [];
         $roles = $this->get_editable_roles();
         $row_index = 0;
 
         foreach ($roles as $role_slug => $role) {
-            $group_ids = $role_map[$role_slug] ?? '';
+            $group_ids = isset($role_map[$role_slug]) && \is_string($role_map[$role_slug])
+                ? $role_map[$role_slug]
+                : '';
+            $role_name = \is_array($role) && isset($role['name']) && \is_string($role['name']) ? $role['name'] : '';
             echo '<tr class="role_map_row">';
-            echo '<td>' . esc_html($role['name']) . '</td>';
+            echo '<td>' . esc_html($role_name) . '</td>';
             echo '<td><input type="text" class="regular-text" name="aadsso_settings[role_map]['
                 . esc_attr($role_slug) . ']" value="' . esc_attr($group_ids) . '" /></td>';
             echo '<td><span class="description">'
@@ -632,8 +670,10 @@ class AADSSO_Settings_Page
     public function openid_configuration_endpoint_callback(): void
     {
         $this->render_text_field('openid_configuration_endpoint');
+        $default_endpoint = AADSSO_Settings::get_defaults('openid_configuration_endpoint');
+        $default_url = \is_string($default_endpoint) ? $default_endpoint : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
-            . esc_url(AADSSO_Settings::get_defaults('openid_configuration_endpoint'))
+            . esc_url($default_url)
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';
         echo '<p class="description">' . wp_kses_post(
             __('The OpenID Connect configuration endpoint to use. To support Microsoft '
@@ -648,7 +688,9 @@ class AADSSO_Settings_Page
 
     public function render_text_field(string $name): void
     {
-        $value = isset($this->settings[$name]) ? esc_attr($this->settings[$name]) : '';
+        $value = isset($this->settings[$name]) && \is_string($this->settings[$name])
+            ? esc_attr($this->settings[$name])
+            : '';
         printf(
             '<input class="regular-text" type="text" '
             . 'name="aadsso_settings[%1$s]" id="%1$s" value="%2$s" />',
