@@ -664,10 +664,19 @@ if (!class_exists('Psr\Http\Message\StreamInterface')) {
 
 // Mock AADSSO_HttpClient for tests
 if (!class_exists('AADSSO_HttpClient')) {
+    /**
+     * @implements \Psr\Http\Client\ClientInterface
+     */
     class AADSSO_HttpClient implements \Psr\Http\Client\ClientInterface
     {
+        /** @var self|null */
         private static $instance = null;
 
+        /**
+         * Get singleton instance.
+         *
+         * @return self
+         */
         public static function get_instance(): self
         {
             if (self::$instance === null) {
@@ -676,26 +685,67 @@ if (!class_exists('AADSSO_HttpClient')) {
             return self::$instance;
         }
 
+        /**
+         * Send a request.
+         *
+         * @param \Psr\Http\Message\RequestInterface $request
+         * @return \Psr\Http\Message\ResponseInterface
+         */
         public function sendRequest(\Psr\Http\Message\RequestInterface $request): \Psr\Http\Message\ResponseInterface
         {
             return $this->createMockResponse();
         }
 
+        /**
+         * Make a GET request.
+         *
+         * @param string $url
+         * @param array<string, mixed> $options
+         * @return \Psr\Http\Message\ResponseInterface
+         */
         public function get(string $url, array $options = []): \Psr\Http\Message\ResponseInterface
         {
             return $this->createMockResponse();
         }
 
+        /**
+         * Make a POST request.
+         *
+         * @param string $url
+         * @param array<string, mixed> $options
+         * @return \Psr\Http\Message\ResponseInterface
+         */
         public function post(string $url, array $options = []): \Psr\Http\Message\ResponseInterface
         {
             return $this->createMockResponse();
         }
 
+        /**
+         * Get HTTP client.
+         *
+         * @return mixed
+         */
+        public function get_http_client()
+        {
+            return null;
+        }
+
+        /**
+         * Create a mock response.
+         *
+         * @return \Psr\Http\Message\ResponseInterface
+         */
         private function createMockResponse(): \Psr\Http\Message\ResponseInterface
         {
+            /**
+             * @implements \Psr\Http\Message\ResponseInterface
+             */
             return new class implements \Psr\Http\Message\ResponseInterface {
+                /** @var int */
                 private $statusCode = 200;
-                private $headers = array('Content-Type' => array('application/json'));
+                /** @var array<string, array<string>> */
+                private $headers = ['Content-Type' => ['application/json']];
+                /** @var object */
                 private $body;
 
                 public function __construct()
@@ -735,6 +785,9 @@ if (!class_exists('AADSSO_HttpClient')) {
                     return clone $this;
                 }
 
+                /**
+                 * @return array<string, array<string>>
+                 */
                 public function getHeaders(): array
                 {
                     return $this->headers;
@@ -745,6 +798,9 @@ if (!class_exists('AADSSO_HttpClient')) {
                     return isset($this->headers[$name]);
                 }
 
+                /**
+                 * @return array<string>
+                 */
                 public function getHeader(string $name): array
                 {
                     return $this->headers[$name] ?? [];
@@ -755,6 +811,10 @@ if (!class_exists('AADSSO_HttpClient')) {
                     return implode(', ', $this->getHeader($name));
                 }
 
+                /**
+                 * @param string $name
+                 * @param string|string[] $value
+                 */
                 public function withHeader(string $name, $value): self
                 {
                     $clone = clone $this;
@@ -762,6 +822,10 @@ if (!class_exists('AADSSO_HttpClient')) {
                     return $clone;
                 }
 
+                /**
+                 * @param string $name
+                 * @param string|string[] $value
+                 */
                 public function withAddedHeader(string $name, $value): self
                 {
                     return $this->withHeader($name, $value);
@@ -779,6 +843,9 @@ if (!class_exists('AADSSO_HttpClient')) {
                     return $this->body;
                 }
 
+                /**
+                 * @param \Psr\Http\Message\StreamInterface $body
+                 */
                 public function withBody(\Psr\Http\Message\StreamInterface $body): self
                 {
                     $clone = clone $this;
