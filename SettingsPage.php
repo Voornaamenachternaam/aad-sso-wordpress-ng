@@ -686,15 +686,23 @@ class AADSSO_Settings_Page
         if (!\function_exists('wp_roles')) {
             global $wp_roles;
 
+            if (!isset($wp_roles) || !\is_object($wp_roles)) {
+                return [];
+            }
+
             $roles = $wp_roles->roles ?? [];
 
-            return $roles;
+            return \is_array($roles) ? $roles : [];
         }
 
         $roles_obj = wp_roles();
 
+        if (!\is_object($roles_obj)) {
+            return [];
+        }
+
         $roles = $roles_obj->roles ?? [];
 
-        return $roles;
+        return \is_array($roles) ? $roles : [];
     }
 }

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class AADSSO_Settings

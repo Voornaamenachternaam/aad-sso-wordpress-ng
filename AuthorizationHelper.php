@@ -11,9 +11,10 @@ use Psr\Http\Message\ResponseInterface;
 
 class AADSSO_AuthorizationHelper
 {
-    private static AADSSO_HttpClient $http_client;
+    /** @var AADSSO_HttpClient|null */
+    private static ?AADSSO_HttpClient $http_client = null;
 
-    private static list<string> $allowed_algorithms = ['RS256'];
+    private static array $allowed_algorithms = ['RS256'];
 
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
     {
