@@ -8,14 +8,16 @@ class AADSSO_GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';
 
+    /** @var AADSSO_Settings|null */
     public static ?AADSSO_Settings $settings = null;
 
-    private static AADSSO_HttpClient $http_client;
+    /** @var AADSSO_HttpClient|null */
+    private static ?AADSSO_HttpClient $http_client = null;
 
     public static function get_base_url(): string
     {
-        $endpoint = self::$settings->graph_endpoint ?? 'https://graph.microsoft.com';
-        $version = self::$settings->graph_version ?? self::GRAPH_VERSION;
+        $endpoint = self::$settings?->graph_endpoint ?? 'https://graph.microsoft.com';
+        $version = self::$settings?->graph_version ?? self::GRAPH_VERSION;
 
         return trailingslashit($endpoint) . $version;
     }

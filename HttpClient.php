@@ -19,10 +19,13 @@ if (!\defined('ABSPATH')) {
 
 class AADSSO_HttpClient implements ClientInterface
 {
-    private HttpClientInterface $http_client;
+    /** @var HttpClientInterface */
+    private $http_client;
 
-    private Psr18Client $psr18_client;
+    /** @var Psr18Client */
+    private $psr18_client;
 
+    /** @var self|null */
     private static ?self $instance = null;
 
     public function __construct(?HttpClientInterface $http_client = null)
