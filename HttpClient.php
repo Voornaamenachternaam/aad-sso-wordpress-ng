@@ -391,12 +391,15 @@ class AADSSO_HttpClient implements ClientInterface
             return [];
         }
 
+        /** @var array<string, mixed> $queryArray */
+        $queryArray = $query;
+        /** @var array<string, string> $result */
         $result = [];
-        foreach ($query as $key => $value) {
-            /** @var string $key */
+        foreach ($queryArray as $key => $value) {
             if (\is_array($value)) {
                 /** @var list<string|int|float|bool> $arrValues */
                 $arrValues = array_values($value);
+                /** @var list<string> $stringParts */
                 $stringParts = [];
                 foreach ($arrValues as $v) {
                     $stringParts[] = (string) $v;
