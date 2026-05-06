@@ -75,6 +75,7 @@ class AADSSO_HttpClient implements ClientInterface
             /** @var array<string, array<string>> */
             private array $headers;
             private string $body;
+            private string $protocolVersion;
 
             /**
              * @param array<string, array<string>> $headers
@@ -85,6 +86,7 @@ class AADSSO_HttpClient implements ClientInterface
                 $this->reasonPhrase = $reasonPhrase;
                 $this->headers = $headers;
                 $this->body = $body;
+                $this->protocolVersion = '1.1';
             }
 
             public function getStatusCode(): int
@@ -107,12 +109,14 @@ class AADSSO_HttpClient implements ClientInterface
 
             public function getProtocolVersion(): string
             {
-                return '1.1';
+                return $this->protocolVersion;
             }
 
             public function withProtocolVersion(string $version): self
             {
-                return clone $this;
+                $clone = clone $this;
+                $clone->protocolVersion = $version;
+                return $clone;
             }
 
             /**
@@ -457,6 +461,7 @@ class AADSSO_HttpClient implements ClientInterface
             private array $headers;
             private string $body;
             private string $reasonPhrase = '';
+            private string $protocolVersion;
 
             /**
              * @param array<string, array<string>> $headers
@@ -467,6 +472,7 @@ class AADSSO_HttpClient implements ClientInterface
                 $this->reasonPhrase = $reasonPhrase;
                 $this->headers = $headers;
                 $this->body = $body;
+                $this->protocolVersion = '1.1';
             }
 
             public function getStatusCode(): int
@@ -489,12 +495,14 @@ class AADSSO_HttpClient implements ClientInterface
 
             public function getProtocolVersion(): string
             {
-                return '1.1';
+                return $this->protocolVersion;
             }
 
             public function withProtocolVersion(string $version): self
             {
-                return clone $this;
+                $clone = clone $this;
+                $clone->protocolVersion = $version;
+                return $clone;
             }
 
             /**
