@@ -305,7 +305,7 @@ class AADSSO_HttpClient implements ClientInterface
 
     /**
      * @param array<string, mixed> $options
-     * @return array<string, mixed>
+     * @return array{url: string, options: array<string, mixed>}
      */
     private function createRequestOptions(string $method, string $url, array $options): array
     {
@@ -315,7 +315,7 @@ class AADSSO_HttpClient implements ClientInterface
             unset($options['query']);
         }
 
-        return $options;
+        return ['url' => $url, 'options' => $options];
     }
 
     /**
@@ -338,8 +338,8 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function get(string $url, array $options = []): ResponseInterface
     {
-        $options = $this->createRequestOptions('GET', $url, $options);
-        $request = $this->createRequest('GET', $url, $options);
+        $result = $this->createRequestOptions('GET', $url, $options);
+        $request = $this->createRequest('GET', $result['url'], $result['options']);
         return $this->sendRequest($request);
     }
 
@@ -348,8 +348,8 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function post(string $url, array $options = []): ResponseInterface
     {
-        $options = $this->createRequestOptions('POST', $url, $options);
-        $request = $this->createRequest('POST', $url, $options);
+        $result = $this->createRequestOptions('POST', $url, $options);
+        $request = $this->createRequest('POST', $result['url'], $result['options']);
         return $this->sendRequest($request);
     }
 
