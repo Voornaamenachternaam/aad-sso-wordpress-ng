@@ -276,9 +276,9 @@ class AADSSO_HttpClient implements ClientInterface
                     }
 
                     /**
-                     * @return array<string, mixed>
+                     * @return array<string, mixed>|mixed
                      */
-                    public function getMetadata(?string $key = null): array
+                    public function getMetadata(?string $key = null): mixed
                     {
                         $metadata = [
                             'seekable' => true,
@@ -289,7 +289,7 @@ class AADSSO_HttpClient implements ClientInterface
                             return $metadata;
                         }
 
-                        return [$key => $metadata[$key] ?? []];
+                        return $metadata[$key] ?? null;
                     }
                 };
             }
@@ -662,9 +662,9 @@ class AADSSO_HttpClient implements ClientInterface
                     }
 
                     /**
-                     * @return array<string, mixed>
+                     * @return array<string, mixed>|mixed
                      */
-                    public function getMetadata(?string $key = null): array
+                    public function getMetadata(?string $key = null): mixed
                     {
                         $metadata = [
                             'seekable' => true,
@@ -675,7 +675,7 @@ class AADSSO_HttpClient implements ClientInterface
                             return $metadata;
                         }
 
-                        return [$key => $metadata[$key] ?? []];
+                        return $metadata[$key] ?? null;
                     }
                 };
             }
