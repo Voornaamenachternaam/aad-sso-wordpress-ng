@@ -120,7 +120,8 @@ class AADSSO
     public function redirect_after_login(string $redirect_to, string $requested_redirect_to, ?WP_User $user): string
     {
         if ($user instanceof WP_User && isset($_SESSION['aadsso_redirect_to'])) {
-            $redirect_to = sanitize_url((string) $_SESSION['aadsso_redirect_to']);
+            $redirect_raw = $_SESSION['aadsso_redirect_to'];
+            $redirect_to = \is_string($redirect_raw) ? sanitize_url($redirect_raw) : $redirect_to;
             unset($_SESSION['aadsso_redirect_to']);
         }
 
@@ -403,6 +404,7 @@ class AADSSO
 
     public function update_wp_user_roles(WP_User $user, mixed $group_memberships): WP_User|WP_Error
     {
+        /** @var list<string> $roles_to_set */
         $roles_to_set = [];
 
         if (
@@ -410,8 +412,8 @@ class AADSSO
             && isset($group_memberships->value)
             && \is_array($group_memberships->value)
         ) {
-            /** @var stdClass $group_memberships */
             foreach ($this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role) {
+                /** @phpstan-ignore-next-line */
                 if (\is_string($wp_role) && in_array($aad_group, $group_memberships->value, true)) {
                     $roles_to_set[] = $wp_role;
                 }
@@ -421,17 +423,15 @@ class AADSSO
         if (!empty($roles_to_set)) {
             $user->set_role('');
             foreach ($roles_to_set as $role) {
-                if (\is_string($role)) {
-                    $user->add_role($role);
-                }
+                $user->add_role($role);
             }
             AADSSO_Logger::log_debug(sprintf(
                 'Set roles [%s] for user [%s].',
                 implode(', ', $roles_to_set),
-                (string) $user->ID
+                $user->ID
             ), 10);
         } elseif (!empty($this->settings->default_wp_role)) {
-            $user->set_role((string) $this->settings->default_wp_role);
+            $user->set_role($this->settings->default_wp_role);
             AADSSO_Logger::log_debug(sprintf(
                 'Set default role [%s] for user [%s].',
                 (string) $this->settings->default_wp_role,
@@ -456,12 +456,10 @@ class AADSSO
      */
     public function add_settings_link(array $links): array
     {
-        /** @var non-empty-string $new_link */
         $new_link = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
             . esc_html__('Settings', 'aad-sso-wordpress') . '</a>';
         $links[] = $new_link;
-        /** @var array<string, string> */
-        return $links;
+        return array_values($links);
     }
 
     public function get_login_url(): string

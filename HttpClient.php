@@ -319,9 +319,12 @@ class AADSSO_HttpClient implements ClientInterface
      */
     private function getFlattenedHeaders(RequestInterface $request): array
     {
+        /** @var array<string, string> $flattened */
         $flattened = [];
         foreach ($request->getHeaders() as $name => $values) {
-            $flattened[$name] = implode(', ', $values);
+            /** @var string $headerValue */
+            $headerValue = implode(', ', $values);
+            $flattened[$name] = $headerValue;
         }
         return $flattened;
     }
@@ -388,12 +391,17 @@ class AADSSO_HttpClient implements ClientInterface
             return [];
         }
 
+        /** @var array<string, string> $result */
         $result = [];
         foreach ($query as $key => $value) {
             if (\is_array($value)) {
-                /** @var list<scalar> $stringable */
-                $stringable = array_values($value);
-                $result[(string) $key] = implode(',', array_map('strval', $stringable));
+                /** @var list<string|int|float|bool> $arrValues */
+                $arrValues = array_values($value);
+                $stringParts = [];
+                foreach ($arrValues as $v) {
+                    $stringParts[] = (string) $v;
+                }
+                $result[(string) $key] = implode(',', $stringParts);
             } else {
                 $result[(string) $key] = (string) $value;
             }
@@ -426,7 +434,10 @@ class AADSSO_HttpClient implements ClientInterface
                 /** @var list<scalar> $flattenValues */
                 $flattenValues = array_values($values);
                 /** @var list<string> $stringValues */
-                $stringValues = array_map('strval', $flattenValues);
+                $stringValues = [];
+                foreach ($flattenValues as $fv) {
+                    $stringValues[] = (string) $fv;
+                }
                 $normalized_headers[(string) $name] = $stringValues;
             } else {
                 $normalized_headers[(string) $name] = [(string) $values];

@@ -34,6 +34,9 @@ class AADSSO_Settings
     /** @var OptionsResolver|null */
     private static ?OptionsResolver $options_resolver = null;
 
+    /**
+     * @return array<string, mixed>|mixed
+     */
     public static function get_defaults(?string $key = null): mixed
     {
         $defaults = [
@@ -304,7 +307,7 @@ class AADSSO_Settings
 
             $body = $response->getBody()->getContents();
 
-            return \is_string($body) ? $body : '';
+            return $body;
         } catch (\Throwable $e) {
             AADSSO_Logger::log_error(
                 'Failed to fetch remote contents: ' . $e->getMessage()
@@ -375,8 +378,8 @@ class AADSSO_Settings
                     $group_ids = \is_string($group_ids_list) ? explode(',', $group_ids_list) : [];
                     if (!empty($group_ids)) {
                         foreach ($group_ids as $group_id) {
-                            $group_id_trimmed = \is_string($group_id) ? trim(sanitize_text_field($group_id)) : '';
-                            $role_slug_sanitized = \is_string($role_slug) ? sanitize_text_field($role_slug) : '';
+                            $group_id_trimmed = trim(sanitize_text_field($group_id));
+                            $role_slug_sanitized = sanitize_text_field($role_slug);
                             if (!empty($group_id_trimmed)
                                 && !isset($settings['aad_group_to_wp_role_map'][$group_id_trimmed])
                             ) {

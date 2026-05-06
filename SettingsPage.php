@@ -20,12 +20,13 @@ class AADSSO_Settings_Page
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
 
         $default_settings = AADSSO_Settings::get_defaults();
+        /** @var array<string, mixed> $defaultSettingsArr */
+        $defaultSettingsArr = \is_array($default_settings) ? $default_settings : [];
         $saved_settings = get_option('aadsso_settings');
         /** @var array<string, mixed> $settings */
         $settings = \is_array($saved_settings) ? $saved_settings : [];
         $this->settings = $settings;
-        foreach ($default_settings as $key => $default_value) {
-            /** @var string $key */
+        foreach ($defaultSettingsArr as $key => $default_value) {
             if (!isset($this->settings[$key])) {
                 $this->settings[$key] = $default_value;
             }
@@ -42,8 +43,8 @@ class AADSSO_Settings_Page
             return;
         }
 
-        $nonce = sanitize_text_field(wp_unslash((string) ($_GET['aadsso_nonce'] ?? '')));
-
+        $nonce_raw = $_GET['aadsso_nonce'] ?? '';
+        $nonce = \is_string($nonce_raw) ? sanitize_text_field(wp_unslash($nonce_raw)) : '';
         if (!wp_verify_nonce($nonce, 'aadsso_reset_settings')) {
             wp_safe_redirect(add_query_arg('aadsso_reset', 'failed', admin_url('options-general.php?page=aadsso_settings')));
             exit;
@@ -109,7 +110,7 @@ class AADSSO_Settings_Page
         $sanitized_settings = $this->sanitize_settings($legacy_settings);
         update_option('aadsso_settings', $sanitized_settings);
 
-        $dirname = \is_string(\dirname($settings_file_path)) ? \dirname($settings_file_path) : '';
+        $dirname = \dirname($settings_file_path);
         $can_delete = is_writable($settings_file_path) && '' !== $dirname && is_writable($dirname);
         if ($can_delete) {
             unlink($settings_file_path);

@@ -179,8 +179,9 @@ class AADSSO_AuthorizationHelper
         }
 
         $token_nonce = $jwt->nonce ?? '';
-        /** @var string $token_nonce_str */
-        $token_nonce_str = \is_string($token_nonce) ? $token_nonce : strval($token_nonce);
+        /** @var mixed $nonce_val */
+        $nonce_val = $token_nonce;
+        $token_nonce_str = \is_string($nonce_val) ? $nonce_val : '';
         if ($token_nonce_str !== $antiforgery_id) {
             throw new DomainException(\sprintf('Nonce mismatch. Expecting %s', $antiforgery_id));
         }
