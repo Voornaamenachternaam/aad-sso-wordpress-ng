@@ -11,7 +11,9 @@ use Psr\Http\Message\ResponseInterface;
 
 class AADSSO_AuthorizationHelper
 {
+    /** @var AADSSO_HttpClient|null */
     private static ?AADSSO_HttpClient $http_client = null;
+    /** @var array<int, string> */
     private static array $allowed_algorithms = ['RS256'];
 
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
@@ -170,6 +172,7 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Token validation failed: ' . $e->getMessage());
         }
 
+        // Defensive check - though JWT::decode() is declared to return object
         if (!\is_object($jwt)) {
             throw new DomainException('JWT decode returned non-object');
         }

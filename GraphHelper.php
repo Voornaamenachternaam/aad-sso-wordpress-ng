@@ -33,6 +33,9 @@ class AADSSO_GraphHelper
         return self::get_request($url);
     }
 
+    /**
+     * @param array<string, mixed> $query_params
+     */
     public static function get_request(string $url, array $query_params = []): object|WP_Error
     {
         if (!empty($query_params)) {
@@ -63,6 +66,10 @@ class AADSSO_GraphHelper
         }
     }
 
+    /**
+     * @param array<string, mixed> $query_params
+     * @param array<string, mixed> $data
+     */
     public static function post_request(string $url, array $query_params = [], array $data = []): object|WP_Error
     {
         if (!empty($query_params)) {
@@ -130,6 +137,9 @@ class AADSSO_GraphHelper
         return (object) $decoded;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private static function get_required_headers_and_settings(): array
     {
         $token_type = 'Bearer';

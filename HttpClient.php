@@ -19,8 +19,15 @@ if (!\defined('ABSPATH')) {
 
 class AADSSO_HttpClient implements ClientInterface
 {
+    /** @var HttpClientInterface */
     private HttpClientInterface $http_client;
+    /** @var Psr18Client */
     private Psr18Client $psr18_client;
+    /** @var RequestFactoryInterface|null */
+    private ?RequestFactoryInterface $request_factory = null;
+    /** @var StreamFactoryInterface|null */
+    private ?StreamFactoryInterface $stream_factory = null;
+    /** @var self|null */
     private static ?self $instance = null;
 
     public function __construct(?HttpClientInterface $http_client = null)
@@ -36,6 +43,8 @@ class AADSSO_HttpClient implements ClientInterface
         }
 
         $this->psr18_client = new Psr18Client($this->http_client);
+        $this->request_factory = $this->psr18_client->getRequestFactory();
+        $this->stream_factory = $this->psr18_client->getStreamFactory();
     }
 
     public static function get_instance(): self
@@ -52,6 +61,9 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->psr18_client->sendRequest($request);
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function get(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('GET', $url, $options);
@@ -59,6 +71,9 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->sendRequest($request);
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function post(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('POST', $url, $options);
@@ -66,6 +81,9 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->sendRequest($request);
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function createRequest(string $method, string $url, array $options = []): RequestInterface
     {
         if (!empty($options['query'])) {
@@ -74,8 +92,7 @@ class AADSSO_HttpClient implements ClientInterface
             unset($options['query']);
         }
 
-        $requestFactory = $this->psr18_client->getRequestFactory();
-        if (null === $requestFactory) {
+        if (null === $this->request_factory) {
             throw new \RuntimeException('Request factory not available');
         }
 
@@ -89,7 +106,7 @@ class AADSSO_HttpClient implements ClientInterface
             }
         }
 
-        $request = $requestFactory->createRequest($method, $url);
+        $request = $this->request_factory->createRequest($method, $url);
 
         foreach ($headers as $name => $value) {
             if (\is_array($value)) {
@@ -102,9 +119,8 @@ class AADSSO_HttpClient implements ClientInterface
         }
 
         if (!empty($body) && \in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
-            $streamFactory = $this->psr18_client->getStreamFactory();
-            if (null !== $streamFactory) {
-                $stream = $streamFactory->createStream($body);
+            if (null !== $this->stream_factory) {
+                $stream = $this->stream_factory->createStream($body);
                 $request = $request->withBody($stream);
             }
         }
@@ -112,6 +128,10 @@ class AADSSO_HttpClient implements ClientInterface
         return $request;
     }
 
+    /**
+     * @param mixed $query
+     * @return array<string, string>
+     */
     private static function normalizeQueryParams(mixed $query): array
     {
         if (!\is_array($query)) {
@@ -121,7 +141,7 @@ class AADSSO_HttpClient implements ClientInterface
         $result = [];
         foreach ($query as $key => $value) {
             if (\is_array($value)) {
-                $result[(string) $key] = array_map('strval', $value);
+                $result[(string) $key] = implode(',', array_map('strval', $value));
             } else {
                 $result[(string) $key] = (string) $value;
             }
@@ -135,22 +155,31 @@ class AADSSO_HttpClient implements ClientInterface
         return $this->http_client;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function create_response(array $data): ResponseInterface
     {
         $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
         $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
         $body_raw = $data['body'] ?? '';
-        $body = \is_string($body_raw) ? $body_raw : json_encode($body_raw);
+        /** @var string */
+        $body = \is_string($body_raw) ? $body_raw : (json_encode($body_raw) ?: '');
 
         return new class($status, $headers, $body) implements ResponseInterface {
             private int $statusCode;
+            /** @var array<string, array<string>> */
             private array $headers;
             private string $body;
             private string $reasonPhrase = '';
 
+            /**
+             * @param array<string, mixed> $headers
+             */
             public function __construct(int $status, array $headers, string $body)
             {
                 $this->statusCode = $status;
+                /** @var array<string, array<string>> */
                 $normalized_headers = [];
                 foreach ($headers as $name => $values) {
                     if (\is_array($values)) {
@@ -191,6 +220,9 @@ class AADSSO_HttpClient implements ClientInterface
                 return clone $this;
             }
 
+            /**
+             * @return array<string, array<string>>
+             */
             public function getHeaders(): array
             {
                 return $this->headers;
@@ -201,6 +233,9 @@ class AADSSO_HttpClient implements ClientInterface
                 return isset($this->headers[$name]);
             }
 
+            /**
+             * @return array<string>
+             */
             public function getHeader(string $name): array
             {
                 return $this->headers[$name] ?? [];
@@ -341,6 +376,9 @@ class AADSSO_HttpClient implements ClientInterface
                         return substr($this->content, $this->position);
                     }
 
+                    /**
+                     * @return array<string, mixed>
+                     */
                     public function getMetadata(?string $key = null): array
                     {
                         if (null === $key) {

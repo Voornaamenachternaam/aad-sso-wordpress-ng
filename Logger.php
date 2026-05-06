@@ -120,18 +120,27 @@ class AADSSO_Logger
         self::get_logger()->debug($message);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public static function log_info(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->info($message, $context);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public static function log_warning(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
         self::get_logger()->warning($message, $context);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     public static function log_error(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 class AADSSO_Settings_Page
 {
+    /** @var array<string, mixed> */
     private array $settings = [];
-    private int|false $options_page_id = false;
+    /** @var int|false */
+    private $options_page_id = false;
 
     public function __construct()
     {
@@ -360,6 +362,10 @@ class AADSSO_Settings_Page
         echo '</ul>';
     }
 
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
     public function sanitize_settings(array $input): array
     {
         $sanitized = [];
@@ -713,7 +719,10 @@ class AADSSO_Settings_Page
     public function is_on_options_page(): bool
     {
         $screen = get_current_screen();
-        return $screen !== null && $this->options_page_id !== false && $screen->id === (string) $this->options_page_id;
+        if ($screen === null || $this->options_page_id === false) {
+            return false;
+        }
+        return $screen->id === (string) $this->options_page_id;
     }
 
     public function maybe_include_jquery(): void
@@ -723,11 +732,15 @@ class AADSSO_Settings_Page
         }
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
     private function get_editable_roles(): array
     {
         if (!\function_exists('wp_roles')) {
             global $wp_roles;
 
+            // Defensive check - $wp_roles is WP_Roles object in WordPress context
             if (!isset($wp_roles) || !\is_object($wp_roles)) {
                 return [];
             }
@@ -739,6 +752,7 @@ class AADSSO_Settings_Page
 
         $roles_obj = wp_roles();
 
+        // Defensive check - wp_roles() returns WP_Roles object
         if (!\is_object($roles_obj)) {
             return [];
         }

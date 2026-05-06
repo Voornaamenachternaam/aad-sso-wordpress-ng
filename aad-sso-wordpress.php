@@ -166,9 +166,11 @@ class AADSSO
             }
 
             $code = (string) wp_unslash($_GET['code']);
+            /** @var mixed */
             $token_raw = AADSSO_AuthorizationHelper::get_access_token($code, $this->settings);
 
             if (is_wp_error($token_raw)) {
+                /** @var WP_Error $token */
                 $token = $token_raw;
                 AADSSO_Logger::log_error('Token request failed: ' . $token->get_error_message());
                 return new WP_Error(
@@ -180,6 +182,7 @@ class AADSSO
                 );
             }
 
+            /** @var object $token */
             $token = (object) $token_raw;
             if (!isset($token->access_token)) {
                 AADSSO_Logger::log_error('Token response missing access_token');
@@ -189,28 +192,21 @@ class AADSSO
                 );
             }
 
-            try {
-                $jwt = AADSSO_AuthorizationHelper::validate_id_token(
-                    (string) $token->id_token,
-                    $this->settings,
-                    $antiforgery_id
-                );
+            /** @var mixed */
+            $id_token_raw = $token->id_token ?? '';
+            $id_token_str = \is_string($id_token_raw) ? $id_token_raw : '';
+            /** @var object $jwt */
+            $jwt = AADSSO_AuthorizationHelper::validate_id_token(
+                $id_token_str,
+                $this->settings,
+                $antiforgery_id
+            );
 
-                $jwt_json = wp_json_encode($jwt) ?: 'null';
-                $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
-                $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
-                AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid, 10);
-                AADSSO_Logger::log_debug($jwt_json, 50);
-            } catch (\Throwable $e) {
-                AADSSO_Logger::log_exception($e, 'ID token validation failed');
-                return new WP_Error(
-                    'invalid_id_token',
-                    sprintf(
-                        __('ERROR: Invalid id_token. %s', 'aad-sso-wordpress'),
-                        esc_html($e->getMessage())
-                    )
-                );
-            }
+            $jwt_json = wp_json_encode($jwt) ?: 'null';
+            $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
+            $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
+            AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid, 10);
+            AADSSO_Logger::log_debug($jwt_json, 50);
 
             $group_memberships = false;
             if (true === $this->settings->enable_aad_group_to_wp_role) {
@@ -238,10 +234,11 @@ class AADSSO
 
                 $group_memberships = $group_result;
                 if (isset($group_memberships->value) && \is_array($group_memberships->value)) {
+                    $group_values = array_values(array_filter($group_memberships->value, 'is_string'));
                     AADSSO_Logger::log_debug(sprintf(
                         "Microsoft Entra ID user '%s' is a member of [%s]",
                         $jwt_oid,
-                        implode(',', $group_memberships->value)
+                        implode(',', $group_values)
                     ), 20);
                 } elseif (isset($group_memberships->error) && \is_object($group_memberships->error)) {
                     AADSSO_Logger::log_error(
@@ -251,6 +248,7 @@ class AADSSO
                     $error_code = isset($error_obj->code) && \is_string($error_obj->code) ? $error_obj->code : '';
                     $error_message = isset($error_obj->message) && \is_string($error_obj->message) ? $error_obj->message : '';
                     $error_inner = $error_obj->innerError ?? null;
+                    $error_inner_json = is_string($error_inner) ? $error_inner : (wp_json_encode($error_inner) ?: '');
                     return new WP_Error(
                         'error_checking_group_membership',
                         sprintf(
@@ -258,7 +256,7 @@ class AADSSO
                                 . '<b>%s</b> %s<br />%s', 'aad-sso-wordpress'),
                             esc_html($error_code),
                             esc_html($error_message),
-                            esc_html(wp_json_encode($error_inner))
+                            esc_html($error_inner_json)
                         )
                     );
                 } else {
@@ -301,10 +299,12 @@ class AADSSO
         return $user;
     }
 
-    public function get_wp_user_from_aad_user($jwt, $group_memberships): WP_User|WP_Error
+    public function get_wp_user_from_aad_user(object $jwt, mixed $group_memberships): WP_User|WP_Error
     {
+        /** @var mixed */
         $upn_raw = $jwt->upn ?? null;
         $upn = \is_string($upn_raw) ? $upn_raw : null;
+        /** @var mixed */
         $unique_name_raw = $jwt->unique_name ?? null;
         $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
@@ -354,8 +354,10 @@ class AADSSO
                     );
                 }
 
+                /** @var mixed */
                 $given_name_raw = $jwt->given_name ?? '';
                 $given_name = \is_string($given_name_raw) ? sanitize_text_field($given_name_raw) : '';
+                /** @var mixed */
                 $family_name_raw = $jwt->family_name ?? '';
                 $family_name = \is_string($family_name_raw) ? sanitize_text_field($family_name_raw) : '';
 
@@ -395,7 +397,7 @@ class AADSSO
         return $user;
     }
 
-    public function update_wp_user_roles(WP_User $user, $group_memberships): WP_User|WP_Error
+    public function update_wp_user_roles(WP_User $user, mixed $group_memberships): WP_User|WP_Error
     {
         $roles_to_set = [];
 
@@ -443,6 +445,10 @@ class AADSSO
         return $user;
     }
 
+    /**
+     * @param array<string, string> $links
+     * @return array<string, string>
+     */
     public function add_settings_link(array $links): array
     {
         $links[] = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
@@ -553,6 +559,9 @@ class AADSSO
         );
     }
 
+    /**
+     * @param mixed $message
+     */
     public static function debug_log($message, int $level = 0): void
     {
         do_action('aadsso_debug_log', $message);

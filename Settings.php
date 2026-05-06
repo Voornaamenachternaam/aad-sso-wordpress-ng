@@ -17,6 +17,7 @@ class AADSSO_Settings
     public bool $enable_auto_provisioning = false;
     public bool $enable_auto_forward_to_aad = false;
     public bool $enable_aad_group_to_wp_role = false;
+    /** @var array<string, string> */
     public array $aad_group_to_wp_role_map = [];
     public ?string $default_wp_role = null;
     public bool $enable_full_logout = false;
@@ -28,7 +29,9 @@ class AADSSO_Settings
     public string $graph_endpoint = 'https://graph.microsoft.com';
     public string $graph_version = 'v1.0';
 
+    /** @var self|null */
     private static ?self $instance = null;
+    /** @var OptionsResolver|null */
     private static ?OptionsResolver $options_resolver = null;
 
     public static function get_defaults(?string $key = null): mixed
@@ -187,6 +190,7 @@ class AADSSO_Settings
         $resolver = self::get_options_resolver();
         $defined_options = array_keys($resolver->resolve([]));
 
+        /** @var array<string, mixed> */
         return array_filter(
             $settings,
             fn($value, string $key): bool => \in_array($key, $defined_options, true),
@@ -194,6 +198,9 @@ class AADSSO_Settings
         );
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private static function get_cached_openid_configuration(): ?array
     {
         $force_reload = isset($_GET['aadsso_reload_openid_config']);
@@ -237,6 +244,9 @@ class AADSSO_Settings
         return $config;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private static function fetch_openid_configuration(): ?array
     {
         $instance = self::get_instance();
@@ -324,6 +334,9 @@ class AADSSO_Settings
         };
     }
 
+    /**
+     * @param array<string, mixed> $settings
+     */
     public function load_settings(?array $settings): self
     {
         if (!\is_array($settings) || empty($settings)) {
