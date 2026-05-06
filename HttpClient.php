@@ -319,13 +319,13 @@ class AADSSO_HttpClient implements ClientInterface
      */
     private function getFlattenedHeaders(RequestInterface $request): array
     {
-        /** @var array<string, string> $flattened */
         $flattened = [];
         foreach ($request->getHeaders() as $name => $values) {
-            /** @var string $headerValue */
             $headerValue = implode(', ', $values);
+            /** @var string $headerValue */
             $flattened[$name] = $headerValue;
         }
+        /** @var array<string, string> */
         return $flattened;
     }
 
@@ -391,9 +391,9 @@ class AADSSO_HttpClient implements ClientInterface
             return [];
         }
 
-        /** @var array<string, string> $result */
         $result = [];
         foreach ($query as $key => $value) {
+            /** @var string $key */
             if (\is_array($value)) {
                 /** @var list<string|int|float|bool> $arrValues */
                 $arrValues = array_values($value);
@@ -401,9 +401,9 @@ class AADSSO_HttpClient implements ClientInterface
                 foreach ($arrValues as $v) {
                     $stringParts[] = (string) $v;
                 }
-                $result[(string) $key] = implode(',', $stringParts);
+                $result[$key] = implode(',', $stringParts);
             } else {
-                $result[(string) $key] = (string) $value;
+                $result[$key] = (string) $value;
             }
         }
 
@@ -430,6 +430,7 @@ class AADSSO_HttpClient implements ClientInterface
         /** @var array<string, array<string>> $normalized_headers */
         $normalized_headers = [];
         foreach ($headers as $name => $values) {
+            /** @var string $name */
             if (\is_array($values)) {
                 /** @var list<scalar> $flattenValues */
                 $flattenValues = array_values($values);
@@ -438,9 +439,9 @@ class AADSSO_HttpClient implements ClientInterface
                 foreach ($flattenValues as $fv) {
                     $stringValues[] = (string) $fv;
                 }
-                $normalized_headers[(string) $name] = $stringValues;
+                $normalized_headers[$name] = $stringValues;
             } else {
-                $normalized_headers[(string) $name] = [(string) $values];
+                $normalized_headers[$name] = [\is_string($values) ? $values : ''];
             }
         }
 

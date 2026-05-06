@@ -413,9 +413,11 @@ class AADSSO
             && \is_array($group_memberships->value)
         ) {
             foreach ($this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role) {
-                /** @phpstan-ignore-next-line */
-                if (\is_string($wp_role) && in_array($aad_group, $group_memberships->value, true)) {
-                    $roles_to_set[] = $wp_role;
+                if (\is_string($wp_role)) {
+                    /** @var stdClass $group_memberships */
+                    if (in_array($aad_group, $group_memberships->value, true)) {
+                        $roles_to_set[] = $wp_role;
+                    }
                 }
             }
         }
@@ -459,7 +461,7 @@ class AADSSO
         $new_link = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
             . esc_html__('Settings', 'aad-sso-wordpress') . '</a>';
         $links[] = $new_link;
-        return array_values($links);
+        return $links;
     }
 
     public function get_login_url(): string
