@@ -69,7 +69,7 @@ class AADSSO_HttpClient implements ClientInterface
             $responseHeaders[$name] = $values;
         }
 
-        return new class($statusCode, $reasonPhrase, $responseHeaders, $response->getContent()) implements ResponseInterface {
+        return new class($statusCode, $reasonPhrase, $responseHeaders, $response->getContent(false)) implements ResponseInterface {
             private int $statusCode;
             private string $reasonPhrase;
             /** @var array<string, array<string>> */
