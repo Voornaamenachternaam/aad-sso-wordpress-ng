@@ -185,23 +185,34 @@ class AADSSO_Settings
         return $instance;
     }
 
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
     private static function filter_to_known_settings(array $settings): array
     {
         $resolver = self::get_options_resolver();
         $defined_options = array_keys($resolver->resolve([]));
 
         /** @var array<string, mixed> */
-        return array_filter(
+        $filtered = array_filter(
             $settings,
             fn($value, string $key): bool => \in_array($key, $defined_options, true),
             ARRAY_FILTER_USE_BOTH
         );
+
+        // Ensure the result has string keys
+        /** @var array<string, mixed> */
+        return array_combine(
+            array_map('strval', array_keys($filtered)),
+            array_values($filtered)
+        ) ?: $filtered;
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>|false
      */
-    private static function get_cached_openid_configuration(): ?array
+    private static function get_cached_openid_configuration(): array|false
     {
         $force_reload = isset($_GET['aadsso_reload_openid_config']);
 
@@ -245,9 +256,9 @@ class AADSSO_Settings
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>|false
      */
-    private static function fetch_openid_configuration(): ?array
+    private static function fetch_openid_configuration(): array|false
     {
         $instance = self::get_instance();
         $remote_response = self::get_remote_contents(
@@ -259,15 +270,16 @@ class AADSSO_Settings
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 AADSSO_Logger::log_error('OpenID configuration JSON decode error: ' . json_last_error_msg());
-                return null;
+                return false;
             }
 
             if (\is_array($openid_configuration) && !empty($openid_configuration)) {
+                /** @var array<string, mixed> */
                 return $openid_configuration;
             }
         }
 
-        return null;
+        return false;
     }
 
     public static function get_remote_contents(string $url): string
@@ -375,6 +387,7 @@ class AADSSO_Settings
         }
 
         try {
+            /** @var array<string, mixed> $resolved_settings */
             $resolved_settings = self::get_options_resolver()->resolve($settings);
             foreach ($resolved_settings as $key => $value) {
                 if (property_exists($this, $key)) {

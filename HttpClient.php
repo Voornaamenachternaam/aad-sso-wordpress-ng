@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Psr7\HttpFactory;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
@@ -10,7 +11,6 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Component\HttpClient\Psr18Client;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 if (!\defined('ABSPATH')) {
@@ -21,12 +21,10 @@ class AADSSO_HttpClient implements ClientInterface
 {
     /** @var HttpClientInterface */
     private HttpClientInterface $http_client;
-    /** @var Psr18Client */
-    private Psr18Client $psr18_client;
-    /** @var RequestFactoryInterface|null */
-    private ?RequestFactoryInterface $request_factory = null;
-    /** @var StreamFactoryInterface|null */
-    private ?StreamFactoryInterface $stream_factory = null;
+    /** @var RequestFactoryInterface */
+    private RequestFactoryInterface $request_factory;
+    /** @var StreamFactoryInterface */
+    private StreamFactoryInterface $stream_factory;
     /** @var self|null */
     private static ?self $instance = null;
 
@@ -42,9 +40,9 @@ class AADSSO_HttpClient implements ClientInterface
             ]);
         }
 
-        $this->psr18_client = new Psr18Client($this->http_client);
-        $this->request_factory = $this->psr18_client->getRequestFactory();
-        $this->stream_factory = $this->psr18_client->getStreamFactory();
+        $httpFactory = new HttpFactory();
+        $this->request_factory = $httpFactory;
+        $this->stream_factory = $httpFactory;
     }
 
     public static function get_instance(): self
@@ -58,137 +56,33 @@ class AADSSO_HttpClient implements ClientInterface
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
-        return $this->psr18_client->sendRequest($request);
-    }
+        $response = $this->http_client->request($request->getMethod(), (string) $request->getUri(), [
+            'headers' => $this->getFlattenedHeaders($request),
+            'body' => $request->getBody()->getContents(),
+        ]);
 
-    /**
-     * @param array<string, mixed> $options
-     */
-    public function get(string $url, array $options = []): ResponseInterface
-    {
-        $request = $this->createRequest('GET', $url, $options);
-
-        return $this->sendRequest($request);
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     */
-    public function post(string $url, array $options = []): ResponseInterface
-    {
-        $request = $this->createRequest('POST', $url, $options);
-
-        return $this->sendRequest($request);
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     */
-    public function createRequest(string $method, string $url, array $options = []): RequestInterface
-    {
-        if (!empty($options['query'])) {
-            $separator = (strpos($url, '?') !== false) ? '&' : '?';
-            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
-            unset($options['query']);
+        $statusCode = $response->getStatusCode();
+        $reasonPhrase = $response->getReasonPhrase();
+        $responseHeaders = [];
+        foreach ($response->getHeaders() as $name => $values) {
+            $responseHeaders[$name] = $values;
         }
 
-        if (null === $this->request_factory) {
-            throw new \RuntimeException('Request factory not available');
-        }
-
-        $headers = $options['headers'] ?? [];
-        $body = $options['body'] ?? '';
-
-        if (\is_array($body)) {
-            $body = http_build_query($body);
-            if (!isset($headers['Content-Type'])) {
-                $headers['Content-Type'] = 'application/x-www-form-urlencoded';
-            }
-        }
-
-        $request = $this->request_factory->createRequest($method, $url);
-
-        foreach ($headers as $name => $value) {
-            if (\is_array($value)) {
-                foreach ($value as $single_value) {
-                    $request = $request->withAddedHeader($name, $single_value);
-                }
-            } else {
-                $request = $request->withHeader($name, $value);
-            }
-        }
-
-        if (!empty($body) && \in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
-            if (null !== $this->stream_factory) {
-                $stream = $this->stream_factory->createStream($body);
-                $request = $request->withBody($stream);
-            }
-        }
-
-        return $request;
-    }
-
-    /**
-     * @param mixed $query
-     * @return array<string, string>
-     */
-    private static function normalizeQueryParams(mixed $query): array
-    {
-        if (!\is_array($query)) {
-            return [];
-        }
-
-        $result = [];
-        foreach ($query as $key => $value) {
-            if (\is_array($value)) {
-                $result[(string) $key] = implode(',', array_map('strval', $value));
-            } else {
-                $result[(string) $key] = (string) $value;
-            }
-        }
-
-        return $result;
-    }
-
-    public function get_http_client(): HttpClientInterface
-    {
-        return $this->http_client;
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    public static function create_response(array $data): ResponseInterface
-    {
-        $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
-        $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
-        $body_raw = $data['body'] ?? '';
-        /** @var string */
-        $body = \is_string($body_raw) ? $body_raw : (json_encode($body_raw) ?: '');
-
-        return new class($status, $headers, $body) implements ResponseInterface {
+        return new class($statusCode, $reasonPhrase, $responseHeaders, $response->getContent()) implements ResponseInterface {
             private int $statusCode;
+            private string $reasonPhrase;
             /** @var array<string, array<string>> */
             private array $headers;
             private string $body;
-            private string $reasonPhrase = '';
 
             /**
-             * @param array<string, mixed> $headers
+             * @param array<string, array<string>> $headers
              */
-            public function __construct(int $status, array $headers, string $body)
+            public function __construct(int $statusCode, string $reasonPhrase, array $headers, string $body)
             {
-                $this->statusCode = $status;
-                /** @var array<string, array<string>> */
-                $normalized_headers = [];
-                foreach ($headers as $name => $values) {
-                    if (\is_array($values)) {
-                        $normalized_headers[$name] = array_map('strval', $values);
-                    } else {
-                        $normalized_headers[$name] = [(string) $values];
-                    }
-                }
-                $this->headers = $normalized_headers;
+                $this->statusCode = $statusCode;
+                $this->reasonPhrase = $reasonPhrase;
+                $this->headers = $headers;
                 $this->body = $body;
             }
 
@@ -381,18 +275,377 @@ class AADSSO_HttpClient implements ClientInterface
                      */
                     public function getMetadata(?string $key = null): array
                     {
-                        if (null === $key) {
-                            return [
-                                'seekable' => true,
-                                'eof' => $this->eof(),
-                            ];
-                        }
-
-                        return match ($key) {
+                        $metadata = [
                             'seekable' => true,
                             'eof' => $this->eof(),
-                            default => [],
-                        };
+                        ];
+
+                        if (null === $key) {
+                            return $metadata;
+                        }
+
+                        return [$key => $metadata[$key] ?? []];
+                    }
+                };
+            }
+
+            public function withBody(StreamInterface $body): self
+            {
+                $clone = clone $this;
+                $clone->body = $body->getContents();
+                return $clone;
+            }
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function createRequestOptions(string $method, string $url, array $options): array
+    {
+        if (!empty($options['query'])) {
+            $separator = (strpos($url, '?') !== false) ? '&' : '?';
+            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
+            unset($options['query']);
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param array<int, mixed> $headers
+     * @return array<string, string>
+     */
+    private function getFlattenedHeaders(RequestInterface $request): array
+    {
+        $flattened = [];
+        foreach ($request->getHeaders() as $name => $values) {
+            $flattened[$name] = implode(', ', $values);
+        }
+        return $flattened;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function get(string $url, array $options = []): ResponseInterface
+    {
+        $options = $this->createRequestOptions('GET', $url, $options);
+        $request = $this->createRequest('GET', $url, $options);
+        return $this->sendRequest($request);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function post(string $url, array $options = []): ResponseInterface
+    {
+        $options = $this->createRequestOptions('POST', $url, $options);
+        $request = $this->createRequest('POST', $url, $options);
+        return $this->sendRequest($request);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function createRequest(string $method, string $url, array $options = []): RequestInterface
+    {
+        /** @var array<string, string|array<string>> $headers */
+        $headers = $options['headers'] ?? [];
+        $body = $options['body'] ?? '';
+
+        $request = $this->request_factory->createRequest($method, $url);
+
+        foreach ($headers as $name => $value) {
+            if (\is_array($value)) {
+                foreach ($value as $singleValue) {
+                    /** @var string $singleValue */
+                    $request = $request->withAddedHeader($name, $singleValue);
+                }
+            } else {
+                /** @var string $value */
+                $request = $request->withHeader($name, $value);
+            }
+        }
+
+        if (!empty($body) && \in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
+            /** @var string $body */
+            $stream = $this->stream_factory->createStream($body);
+            $request = $request->withBody($stream);
+        }
+
+        return $request;
+    }
+
+    /**
+     * @param mixed $query
+     * @return array<string, string>
+     */
+    private static function normalizeQueryParams(mixed $query): array
+    {
+        if (!\is_array($query)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($query as $key => $value) {
+            if (\is_array($value)) {
+                $result[(string) $key] = implode(',', array_map('strval', $value));
+            } else {
+                $result[(string) $key] = (string) $value;
+            }
+        }
+
+        return $result;
+    }
+
+    public function get_http_client(): HttpClientInterface
+    {
+        return $this->http_client;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function create_response(array $data): ResponseInterface
+    {
+        $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
+        $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
+        $body_raw = $data['body'] ?? '';
+        /** @var string */
+        $body = \is_string($body_raw) ? $body_raw : (json_encode($body_raw) ?: '');
+
+        // Normalize headers to array<string, array<string>>
+        /** @var array<string, array<string>> $normalized_headers */
+        $normalized_headers = [];
+        foreach ($headers as $name => $values) {
+            if (\is_array($values)) {
+                /** @var list<string> $stringValues */
+                $stringValues = array_map('strval', $values);
+                $normalized_headers[(string) $name] = $stringValues;
+            } else {
+                $normalized_headers[(string) $name] = [(string) $values];
+            }
+        }
+
+        return new class($status, '', $normalized_headers, $body) implements ResponseInterface {
+            private int $statusCode;
+            /** @var array<string, array<string>> */
+            private array $headers;
+            private string $body;
+            private string $reasonPhrase = '';
+
+            /**
+             * @param array<string, array<string>> $headers
+             */
+            public function __construct(int $status, string $reasonPhrase, array $headers, string $body)
+            {
+                $this->statusCode = $status;
+                $this->reasonPhrase = $reasonPhrase;
+                $this->headers = $headers;
+                $this->body = $body;
+            }
+
+            public function getStatusCode(): int
+            {
+                return $this->statusCode;
+            }
+
+            public function withStatus(int $code, string $reasonPhrase = ''): self
+            {
+                $clone = clone $this;
+                $clone->statusCode = $code;
+                $clone->reasonPhrase = $reasonPhrase;
+                return $clone;
+            }
+
+            public function getReasonPhrase(): string
+            {
+                return $this->reasonPhrase;
+            }
+
+            public function getProtocolVersion(): string
+            {
+                return '1.1';
+            }
+
+            public function withProtocolVersion(string $version): self
+            {
+                return clone $this;
+            }
+
+            /**
+             * @return array<string, array<string>>
+             */
+            public function getHeaders(): array
+            {
+                return $this->headers;
+            }
+
+            public function hasHeader(string $name): bool
+            {
+                return isset($this->headers[$name]);
+            }
+
+            /**
+             * @return array<string>
+             */
+            public function getHeader(string $name): array
+            {
+                return $this->headers[$name] ?? [];
+            }
+
+            public function getHeaderLine(string $name): string
+            {
+                return implode(', ', $this->getHeader($name));
+            }
+
+            public function withHeader(string $name, $value): self
+            {
+                $clone = clone $this;
+                if (\is_array($value)) {
+                    $clone->headers[$name] = $value;
+                } else {
+                    $clone->headers[$name] = [$value];
+                }
+                return $clone;
+            }
+
+            public function withAddedHeader(string $name, $value): self
+            {
+                $clone = clone $this;
+                if (\is_array($value)) {
+                    if (!isset($clone->headers[$name])) {
+                        $clone->headers[$name] = [];
+                    }
+                    foreach ($value as $v) {
+                        $clone->headers[$name][] = $v;
+                    }
+                } else {
+                    if (!isset($clone->headers[$name])) {
+                        $clone->headers[$name] = [];
+                    }
+                    $clone->headers[$name][] = $value;
+                }
+                return $clone;
+            }
+
+            public function withoutHeader(string $name): self
+            {
+                $clone = clone $this;
+                unset($clone->headers[$name]);
+                return $clone;
+            }
+
+            public function getBody(): StreamInterface
+            {
+                return new class($this->body) implements StreamInterface {
+                    private string $content;
+                    private int $position = 0;
+
+                    public function __construct(string $content)
+                    {
+                        $this->content = $content;
+                    }
+
+                    public function __toString(): string
+                    {
+                        return $this->content;
+                    }
+
+                    public function close(): void
+                    {
+                        $this->position = 0;
+                    }
+
+                    public function detach(): mixed
+                    {
+                        return null;
+                    }
+
+                    public function getSize(): int
+                    {
+                        return \strlen($this->content);
+                    }
+
+                    public function tell(): int
+                    {
+                        return $this->position;
+                    }
+
+                    public function eof(): bool
+                    {
+                        return $this->position >= \strlen($this->content);
+                    }
+
+                    public function isSeekable(): bool
+                    {
+                        return true;
+                    }
+
+                    public function seek(int $offset, int $whence = SEEK_SET): void
+                    {
+                        switch ($whence) {
+                            case SEEK_SET:
+                                $this->position = $offset;
+                                break;
+                            case SEEK_CUR:
+                                $this->position += $offset;
+                                break;
+                            case SEEK_END:
+                                $this->position = \strlen($this->content) + $offset;
+                                break;
+                        }
+                    }
+
+                    public function rewind(): void
+                    {
+                        $this->position = 0;
+                    }
+
+                    public function isWritable(): bool
+                    {
+                        return false;
+                    }
+
+                    public function write(string $string): int
+                    {
+                        return 0;
+                    }
+
+                    public function isReadable(): bool
+                    {
+                        return true;
+                    }
+
+                    public function read(int $length): string
+                    {
+                        $result = substr($this->content, $this->position, $length);
+                        $this->position += \strlen($result);
+                        return $result;
+                    }
+
+                    public function getContents(): string
+                    {
+                        return substr($this->content, $this->position);
+                    }
+
+                    /**
+                     * @return array<string, mixed>
+                     */
+                    public function getMetadata(?string $key = null): array
+                    {
+                        $metadata = [
+                            'seekable' => true,
+                            'eof' => $this->eof(),
+                        ];
+
+                        if (null === $key) {
+                            return $metadata;
+                        }
+
+                        return [$key => $metadata[$key] ?? []];
                     }
                 };
             }

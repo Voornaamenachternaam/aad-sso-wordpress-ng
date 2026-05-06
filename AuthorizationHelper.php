@@ -173,12 +173,14 @@ class AADSSO_AuthorizationHelper
         }
 
         // Defensive check - though JWT::decode() is declared to return object
+        /** @phpstan-ignore-next-line */
         if (!\is_object($jwt)) {
             throw new DomainException('JWT decode returned non-object');
         }
 
         $token_nonce = $jwt->nonce ?? '';
-        $token_nonce_str = (string) $token_nonce;
+        /** @var string */
+        $token_nonce_str = \is_string($token_nonce) ? $token_nonce : (string) $token_nonce;
         if ($token_nonce_str !== $antiforgery_id) {
             throw new DomainException(\sprintf('Nonce mismatch. Expecting %s', $antiforgery_id));
         }

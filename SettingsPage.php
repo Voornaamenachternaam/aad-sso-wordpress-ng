@@ -6,8 +6,8 @@ class AADSSO_Settings_Page
 {
     /** @var array<string, mixed> */
     private array $settings = [];
-    /** @var int|false */
-    private $options_page_id = false;
+    /** @var string|false */
+    private string|false $options_page_id = false;
 
     public function __construct()
     {
@@ -21,6 +21,7 @@ class AADSSO_Settings_Page
 
         $default_settings = AADSSO_Settings::get_defaults();
         $saved_settings = get_option('aadsso_settings');
+        /** @var array<string, mixed> $settings */
         $settings = \is_array($saved_settings) ? $saved_settings : [];
         $this->settings = $settings;
         foreach ($default_settings as $key => $default_value) {
@@ -186,7 +187,7 @@ class AADSSO_Settings_Page
             'aadsso_settings',
             array($this, 'render_admin_page')
         );
-        $this->options_page_id = $page_id;
+        $this->options_page_id = (string) $page_id;
     }
 
     public function render_admin_page(): void
@@ -366,8 +367,10 @@ class AADSSO_Settings_Page
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function sanitize_settings(array $input): array
+    public function sanitize_settings(mixed $input): array
     {
+        /** @var array<string, mixed> $input */
+        $input = \is_array($input) ? $input : [];
         $sanitized = [];
 
         $org_display_name_raw = $input['org_display_name'] ?? '';
@@ -742,9 +745,11 @@ class AADSSO_Settings_Page
 
             // Defensive check - $wp_roles is WP_Roles object in WordPress context
             if (!isset($wp_roles) || !\is_object($wp_roles)) {
+                /** @var array<string, array<string, mixed>> */
                 return [];
             }
 
+            /** @var array<string, array<string, mixed>> $roles */
             $roles = $wp_roles->roles ?? [];
 
             return \is_array($roles) ? $roles : [];
@@ -754,9 +759,11 @@ class AADSSO_Settings_Page
 
         // Defensive check - wp_roles() returns WP_Roles object
         if (!\is_object($roles_obj)) {
+            /** @var array<string, array<string, mixed>> */
             return [];
         }
 
+        /** @var array<string, array<string, mixed>> $roles */
         $roles = $roles_obj->roles ?? [];
 
         return \is_array($roles) ? $roles : [];

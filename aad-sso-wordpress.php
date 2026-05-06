@@ -143,7 +143,7 @@ class AADSSO
             return $user;
         }
 
-        if (isset($_GET['code']) && is_string($_GET['code'])) {
+        if (isset($_GET['code']) && \is_string($_GET['code'])) {
             if (!isset($_SESSION['aadsso_antiforgery-id'])) {
                 return new WP_Error(
                     'missing_antiforgery_id',
@@ -152,6 +152,7 @@ class AADSSO
             }
 
             $antiforgery_id_raw = $_SESSION['aadsso_antiforgery-id'];
+            /** @var string $antiforgery_id_raw */
             $antiforgery_id = \is_string($antiforgery_id_raw) ? $antiforgery_id_raw : '';
             $state_param = isset($_GET['state']) && \is_string($_GET['state']) ? (string) wp_unslash($_GET['state']) : '';
 
@@ -182,7 +183,7 @@ class AADSSO
                 );
             }
 
-            /** @var object $token */
+            /** @var stdClass $token */
             $token = (object) $token_raw;
             if (!isset($token->access_token)) {
                 AADSSO_Logger::log_error('Token response missing access_token');
@@ -195,7 +196,7 @@ class AADSSO
             /** @var mixed */
             $id_token_raw = $token->id_token ?? '';
             $id_token_str = \is_string($id_token_raw) ? $id_token_raw : '';
-            /** @var object $jwt */
+            /** @var stdClass $jwt */
             $jwt = AADSSO_AuthorizationHelper::validate_id_token(
                 $id_token_str,
                 $this->settings,
@@ -233,6 +234,7 @@ class AADSSO
                 }
 
                 $group_memberships = $group_result;
+                /** @var stdClass $group_memberships */
                 if (isset($group_memberships->value) && \is_array($group_memberships->value)) {
                     $group_values = array_values(array_filter($group_memberships->value, 'is_string'));
                     AADSSO_Logger::log_debug(sprintf(
@@ -451,8 +453,10 @@ class AADSSO
      */
     public function add_settings_link(array $links): array
     {
-        $links[] = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
+        /** @var string $new_link */
+        $new_link = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
             . esc_html__('Settings', 'aad-sso-wordpress') . '</a>';
+        $links[] = $new_link;
         return $links;
     }
 
