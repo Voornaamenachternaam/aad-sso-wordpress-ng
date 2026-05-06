@@ -409,7 +409,7 @@ class AADSSO_HttpClient implements ClientInterface
             }
         }
 
-        /** @var array<string, mixed> */
+        /** @var array<string, array<mixed>|string> */
         return $result;
     }
 
