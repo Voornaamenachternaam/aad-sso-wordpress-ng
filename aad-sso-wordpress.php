@@ -199,6 +199,7 @@ class AADSSO
             $id_token_str = \is_string($id_token_raw) ? $id_token_raw : '';
 
             /** @var stdClass $jwt */
+            $jwt = null;
             try {
                 $jwt = AADSSO_AuthorizationHelper::validate_id_token(
                     $id_token_str,
@@ -215,6 +216,8 @@ class AADSSO
                     )
                 );
             }
+
+            assert($jwt instanceof stdClass);
 
             $jwt_json = wp_json_encode($jwt) ?: 'null';
             $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
