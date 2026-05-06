@@ -393,7 +393,6 @@ class AADSSO_HttpClient implements ClientInterface
 
         /** @var array<string, mixed> $queryArray */
         $queryArray = $query;
-        /** @var array<string, string> $result */
         $result = [];
         foreach ($queryArray as $key => $value) {
             if (\is_array($value)) {
@@ -402,14 +401,18 @@ class AADSSO_HttpClient implements ClientInterface
                 /** @var list<string> $stringParts */
                 $stringParts = [];
                 foreach ($arrValues as $v) {
+                    /** @var string $v */
                     $stringParts[] = (string) $v;
                 }
                 $result[$key] = implode(',', $stringParts);
             } else {
-                $result[$key] = (string) $value;
+                $stringValue = (string) $value;
+                /** @var string $stringValue */
+                $result[$key] = $stringValue;
             }
         }
 
+        /** @var array<string, string> */
         return $result;
     }
 
