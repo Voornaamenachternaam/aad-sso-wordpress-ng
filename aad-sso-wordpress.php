@@ -460,7 +460,7 @@ class AADSSO
     {
         $new_link = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
             . esc_html__('Settings', 'aad-sso-wordpress') . '</a>';
-        /** @var array<string, string> */
+        /** @var array<string, string> $links */
         $links['aadsso_settings'] = $new_link;
         return $links;
     }

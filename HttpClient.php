@@ -405,10 +405,10 @@ class AADSSO_HttpClient implements ClientInterface
                     $stringParts[] = (string) $v;
                 }
                 $result[$key] = implode(',', $stringParts);
-            } else {
-                $stringValue = (string) $value;
-                /** @var string $stringValue */
-                $result[$key] = $stringValue;
+            } elseif (\is_string($value)) {
+                $result[$key] = $value;
+            } elseif (\is_scalar($value)) {
+                $result[$key] = (string) $value;
             }
         }
 
