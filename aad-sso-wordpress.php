@@ -198,11 +198,23 @@ class AADSSO
             $id_token_raw = $token->id_token ?? '';
             $id_token_str = \is_string($id_token_raw) ? $id_token_raw : '';
             /** @var stdClass $jwt */
-            $jwt = AADSSO_AuthorizationHelper::validate_id_token(
-                $id_token_str,
-                $this->settings,
-                $antiforgery_id
-            );
+            try {
+                /** @var stdClass $jwt */
+                $jwt = AADSSO_AuthorizationHelper::validate_id_token(
+                    $id_token_str,
+                    $this->settings,
+                    $antiforgery_id
+                );
+            } catch (\Throwable $e) {
+                AADSSO_Logger::log_exception($e, 'ID token validation failed');
+                return new WP_Error(
+                    'invalid_id_token',
+                    sprintf(
+                        __('ERROR: Invalid id_token. %s', 'aad-sso-wordpress'),
+                        esc_html($e->getMessage())
+                    )
+                );
+            }
 
             $jwt_json = wp_json_encode($jwt) ?: 'null';
             $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
