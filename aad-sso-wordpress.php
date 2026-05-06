@@ -137,7 +137,7 @@ class AADSSO
         return 'login' === $action;
     }
 
-    public function authenticate($user, ?string $username, ?string $password): WP_User|WP_Error|null
+    public function authenticate(mixed $user, ?string $username, ?string $password): WP_User|WP_Error|null
     {
         if ($user instanceof WP_User) {
             return $user;
@@ -298,6 +298,7 @@ class AADSSO
             $_SESSION['aadsso_signed_in_with_entra_id'] = true;
         }
 
+        /** @var WP_User|null */
         return $user;
     }
 
@@ -339,6 +340,7 @@ class AADSSO
             ), 10);
         } else {
             if (true === $this->settings->enable_auto_provisioning) {
+                /** @var stdClass $group_memberships */
                 $has_group_memberships = $group_memberships !== false
                     && isset($group_memberships->value)
                     && \is_array($group_memberships->value);
@@ -408,6 +410,7 @@ class AADSSO
             && isset($group_memberships->value)
             && \is_array($group_memberships->value)
         ) {
+            /** @var stdClass $group_memberships */
             foreach ($this->settings->aad_group_to_wp_role_map as $aad_group => $wp_role) {
                 if (\is_string($wp_role) && in_array($aad_group, $group_memberships->value, true)) {
                     $roles_to_set[] = $wp_role;
@@ -453,10 +456,11 @@ class AADSSO
      */
     public function add_settings_link(array $links): array
     {
-        /** @var string $new_link */
+        /** @var non-empty-string $new_link */
         $new_link = '<a href="' . esc_url(admin_url('options-general.php?page=aadsso_settings')) . '">'
             . esc_html__('Settings', 'aad-sso-wordpress') . '</a>';
         $links[] = $new_link;
+        /** @var array<string, string> */
         return $links;
     }
 

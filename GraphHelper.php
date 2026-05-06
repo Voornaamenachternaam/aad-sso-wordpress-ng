@@ -19,10 +19,11 @@ class AADSSO_GraphHelper
         return trailingslashit($endpoint) . $version;
     }
 
+    /**
+     * @param list<string> $group_ids
+     */
     public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
     {
-        /** @var list<string> $group_ids */
-        $group_ids = $group_ids;
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id) . '/checkMemberGroups';
 
         return self::post_request($url, [], ['groupIds' => $group_ids]);

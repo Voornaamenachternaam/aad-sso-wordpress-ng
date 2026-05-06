@@ -25,6 +25,7 @@ class AADSSO_Settings_Page
         $settings = \is_array($saved_settings) ? $saved_settings : [];
         $this->settings = $settings;
         foreach ($default_settings as $key => $default_value) {
+            /** @var string $key */
             if (!isset($this->settings[$key])) {
                 $this->settings[$key] = $default_value;
             }
@@ -364,13 +365,15 @@ class AADSSO_Settings_Page
     }
 
     /**
-     * @param array<string, mixed> $input
+     * @param mixed $input
      * @return array<string, mixed>
      */
     public function sanitize_settings(mixed $input): array
     {
+        if (!\is_array($input)) {
+            return [];
+        }
         /** @var array<string, mixed> $input */
-        $input = \is_array($input) ? $input : [];
         $sanitized = [];
 
         $org_display_name_raw = $input['org_display_name'] ?? '';
@@ -496,7 +499,9 @@ class AADSSO_Settings_Page
 
     public function client_secret_callback(): void
     {
-        $value = isset($this->settings['client_secret']) ? esc_attr($this->settings['client_secret']) : '';
+        /** @var string */
+        $clientSecret = \is_string($this->settings['client_secret'] ?? null) ? $this->settings['client_secret'] : '';
+        $value = esc_attr($clientSecret);
         printf(
             '<input class="regular-text" type="password" autocomplete="new-password" '
             . 'name="aadsso_settings[client_secret]" id="client_secret" value="%s" />',

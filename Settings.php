@@ -170,12 +170,13 @@ class AADSSO_Settings
 
         $plugin_settings = get_option('aadsso_settings');
         if (\is_array($plugin_settings) && !empty($plugin_settings)) {
+            /** @var array<string, mixed> $plugin_settings */
             $instance->load_settings($plugin_settings);
         }
 
         $openid_configuration = self::get_cached_openid_configuration();
 
-        if (!empty($openid_configuration) && \is_array($openid_configuration)) {
+        if (\is_array($openid_configuration) && !empty($openid_configuration)) {
             $filtered_config = self::filter_to_known_settings($openid_configuration);
             if (!empty($filtered_config)) {
                 $instance->load_settings($filtered_config);
@@ -219,7 +220,7 @@ class AADSSO_Settings
         if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
             $config = self::fetch_openid_configuration();
 
-            if (!empty($config)) {
+            if (\is_array($config) && !empty($config)) {
                 try {
                     $cache = AADSSO_Logger::get_cache();
                     $cache->set('aadsso_openid_configuration', $config, 3600);
@@ -236,6 +237,7 @@ class AADSSO_Settings
         try {
             $cached = $cache->get('aadsso_openid_configuration');
             if (\is_array($cached) && !empty($cached)) {
+                /** @var array<string, mixed> */
                 return $cached;
             }
         } catch (\Throwable $e) {
@@ -244,7 +246,7 @@ class AADSSO_Settings
 
         $config = self::fetch_openid_configuration();
 
-        if (!empty($config)) {
+        if (\is_array($config) && !empty($config)) {
             try {
                 $cache->set('aadsso_openid_configuration', $config, 3600);
             } catch (\Throwable $e) {

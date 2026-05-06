@@ -62,7 +62,8 @@ class AADSSO_HttpClient implements ClientInterface
         ]);
 
         $statusCode = $response->getStatusCode();
-        $reasonPhrase = $response->getReasonPhrase();
+        /** @var string $reasonPhrase */
+        $reasonPhrase = $response->getInfo('reason_phrase') ?: '';
         $responseHeaders = [];
         foreach ($response->getHeaders() as $name => $values) {
             $responseHeaders[$name] = $values;
@@ -314,7 +315,6 @@ class AADSSO_HttpClient implements ClientInterface
     }
 
     /**
-     * @param array<int, mixed> $headers
      * @return array<string, string>
      */
     private function getFlattenedHeaders(RequestInterface $request): array
@@ -391,7 +391,9 @@ class AADSSO_HttpClient implements ClientInterface
         $result = [];
         foreach ($query as $key => $value) {
             if (\is_array($value)) {
-                $result[(string) $key] = implode(',', array_map('strval', $value));
+                /** @var list<scalar> $stringable */
+                $stringable = array_values($value);
+                $result[(string) $key] = implode(',', array_map('strval', $stringable));
             } else {
                 $result[(string) $key] = (string) $value;
             }
@@ -421,8 +423,10 @@ class AADSSO_HttpClient implements ClientInterface
         $normalized_headers = [];
         foreach ($headers as $name => $values) {
             if (\is_array($values)) {
+                /** @var list<scalar> $flattenValues */
+                $flattenValues = array_values($values);
                 /** @var list<string> $stringValues */
-                $stringValues = array_map('strval', $values);
+                $stringValues = array_map('strval', $flattenValues);
                 $normalized_headers[(string) $name] = $stringValues;
             } else {
                 $normalized_headers[(string) $name] = [(string) $values];
