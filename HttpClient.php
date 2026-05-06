@@ -358,6 +358,12 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function createRequest(string $method, string $url, array $options = []): RequestInterface
     {
+        if (!empty($options['query'])) {
+            $separator = (strpos($url, '?') !== false) ? '&' : '?';
+            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
+            unset($options['query']);
+        }
+
         /** @var array<string, string|array<string>> $headers */
         $headers = $options['headers'] ?? [];
         $body = $options['body'] ?? '';
