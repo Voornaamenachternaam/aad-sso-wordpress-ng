@@ -219,11 +219,9 @@ class AADSSO
             /** @var stdClass $jwt */
             $jwt = $jwt;
 
-            $jwt_json = wp_json_encode($jwt) ?: 'null';
             $jwt_iss = isset($jwt->iss) && \is_string($jwt->iss) ? $jwt->iss : '';
             $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
-            AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid, 10);
-            AADSSO_Logger::log_debug($jwt_json, 50);
+            AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
             $group_memberships = false;
             if (true === $this->settings->enable_aad_group_to_wp_role) {
