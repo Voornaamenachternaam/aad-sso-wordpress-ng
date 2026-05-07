@@ -174,7 +174,7 @@ class AADSSO_HttpClient implements ClientInterface
     private static function scalarToString(mixed $value): string
     {
         if (\is_bool($value)) {
-            return $value ? '1' : '0';
+            return $value ? 'true' : 'false';
         }
 
         return (string) $value;
@@ -210,12 +210,6 @@ class AADSSO_HttpClient implements ClientInterface
                     /** @var string $key */
                     $result[$key] = $values;
                 }
-            } elseif (\is_bool($value)) {
-                /** @var string $key */
-                $result[$key] = $value ? 'true' : 'false';
-            } elseif (\is_string($value)) {
-                /** @var string $key */
-                $result[$key] = $value;
             } elseif (\is_scalar($value)) {
                 /** @var string $key */
                 $result[$key] = self::scalarToString($value);
@@ -257,7 +251,7 @@ class AADSSO_HttpClient implements ClientInterface
                 }
                 $normalized_headers[$name] = $stringValues;
             } else {
-                $normalized_headers[$name] = [\is_string($values) ? $values : ''];
+                $normalized_headers[$name] = [\is_string($values) ? $values : (string) $values];
             }
         }
 
