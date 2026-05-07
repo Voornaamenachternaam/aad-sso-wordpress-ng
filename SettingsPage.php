@@ -373,8 +373,9 @@ class AADSSO_Settings_Page
     {
         if (!\is_array($input)) {
             // Return current settings to prevent data loss
+            /** @var array<string, mixed> */
             $current = get_option('aadsso_settings', []);
-            return \is_array($current) ? $current : [];
+            return $current;
         }
         /** @var array<string, mixed> $input */
         $sanitized = [];
