@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 use Psr\Http\Message\ResponseInterface;
 
-class AADSSO_GraphHelper
+class GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';
 
     public static ?AADSSO_Settings $settings = null;
+
     private static ?AADSSO_HttpClient $http_client = null;
 
     public static function get_base_url(): string
@@ -19,6 +20,9 @@ class AADSSO_GraphHelper
         return trailingslashit($endpoint) . $version;
     }
 
+    /**
+     * @param list<string> $group_ids
+     */
     public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id) . '/checkMemberGroups';
@@ -33,12 +37,11 @@ class AADSSO_GraphHelper
         return self::get_request($url);
     }
 
+    /**
+     * @param array<string, mixed> $query_params
+     */
     public static function get_request(string $url, array $query_params = []): object|WP_Error
     {
-        if (!empty($query_params)) {
-            $url = $url . '?' . http_build_query($query_params);
-        }
-
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $_SESSION['aadsso_last_request'] = [
                 'method' => 'GET',
@@ -52,22 +55,27 @@ class AADSSO_GraphHelper
             'headers' => self::get_required_headers_and_settings(),
         ];
 
+        if (!empty($query_params)) {
+            $options['query'] = $query_params;
+        }
+
         try {
             $response = self::get_http_client()->get($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error('Graph API GET request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());
         }
     }
 
+    /**
+     * @param array<string, mixed> $query_params
+     * @param array<string, mixed> $data
+     */
     public static function post_request(string $url, array $query_params = [], array $data = []): object|WP_Error
     {
-        if (!empty($query_params)) {
-            $url = $url . '?' . http_build_query($query_params);
-        }
         $payload = (string) wp_json_encode($data);
 
         AADSSO_Logger::log_debug('POST ' . $url, 50);
@@ -78,11 +86,15 @@ class AADSSO_GraphHelper
             'headers' => self::get_required_headers_and_settings(),
         ];
 
+        if (!empty($query_params)) {
+            $options['query'] = $query_params;
+        }
+
         try {
             $response = self::get_http_client()->post($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error('Graph API POST request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());
@@ -130,6 +142,9 @@ class AADSSO_GraphHelper
         return (object) $decoded;
     }
 
+    /**
+     * @return array<string, string>
+     */
     private static function get_required_headers_and_settings(): array
     {
         $token_type = 'Bearer';

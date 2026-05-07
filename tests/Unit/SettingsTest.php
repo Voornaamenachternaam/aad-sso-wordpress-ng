@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Settings unit tests.
+ *
+ * @internal
  */
 class SettingsTest extends TestCase
 {
@@ -30,7 +32,7 @@ class SettingsTest extends TestCase
     /**
      * Test settings class exists.
      */
-    public function test_settings_class_exists(): void
+    public function testSettingsClassExists(): void
     {
         $this->assertTrue(class_exists('AADSSO_Settings'));
     }
@@ -38,7 +40,7 @@ class SettingsTest extends TestCase
     /**
      * Test get_instance returns singleton.
      */
-    public function test_get_instance_returns_singleton(): void
+    public function testGetInstanceReturnsSingleton(): void
     {
         $instance1 = \AADSSO_Settings::get_instance();
         $instance2 = \AADSSO_Settings::get_instance();
@@ -48,7 +50,7 @@ class SettingsTest extends TestCase
     /**
      * Test get_defaults returns array.
      */
-    public function test_get_defaults_returns_array(): void
+    public function testGetDefaultsReturnsArray(): void
     {
         $defaults = \AADSSO_Settings::get_defaults();
         $this->assertIsArray($defaults);
@@ -57,7 +59,7 @@ class SettingsTest extends TestCase
     /**
      * Test get_defaults with key returns value.
      */
-    public function test_get_defaults_with_key_returns_value(): void
+    public function testGetDefaultsWithKeyReturnsValue(): void
     {
         $default = \AADSSO_Settings::get_defaults('field_to_match_to_upn');
         $this->assertEquals('email', $default);
@@ -66,7 +68,7 @@ class SettingsTest extends TestCase
     /**
      * Test load_settings returns self.
      */
-    public function test_load_settings_returns_self(): void
+    public function testLoadSettingsReturnsSelf(): void
     {
         $settings = \AADSSO_Settings::get_instance();
         $result = $settings->load_settings([]);
@@ -76,7 +78,7 @@ class SettingsTest extends TestCase
     /**
      * Test load_settings with empty array does not throw.
      */
-    public function test_load_settings_with_empty_array_does_not_throw(): void
+    public function testLoadSettingsWithEmptyArrayDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         $settings = \AADSSO_Settings::get_instance();
@@ -86,7 +88,7 @@ class SettingsTest extends TestCase
     /**
      * Test load_settings with null does not throw.
      */
-    public function test_load_settings_with_null_does_not_throw(): void
+    public function testLoadSettingsWithNullDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         $settings = \AADSSO_Settings::get_instance();
@@ -96,7 +98,7 @@ class SettingsTest extends TestCase
     /**
      * Test get_options_resolver returns options resolver.
      */
-    public function test_get_options_resolver_returns_options_resolver(): void
+    public function testGetOptionsResolverReturnsOptionsResolver(): void
     {
         $resolver = \AADSSO_Settings::get_options_resolver();
         $this->assertInstanceOf(\Symfony\Component\OptionsResolver\OptionsResolver::class, $resolver);
@@ -105,7 +107,7 @@ class SettingsTest extends TestCase
     /**
      * Test load_settings uses options resolver.
      */
-    public function test_load_settings_uses_options_resolver(): void
+    public function testLoadSettingsUsesOptionsResolver(): void
     {
         $settings = \AADSSO_Settings::get_instance();
 
@@ -132,7 +134,7 @@ class SettingsTest extends TestCase
     /**
      * Test load_settings with role_map converts to aad_group_to_wp_role_map.
      */
-    public function test_load_settings_with_role_map_converts_to_aad_group_to_wp_role_map(): void
+    public function testLoadSettingsWithRoleMapConvertsToAadGroupToWpRoleMap(): void
     {
         $settings = \AADSSO_Settings::get_instance();
 
@@ -162,7 +164,7 @@ class SettingsTest extends TestCase
     /**
      * Test options resolver validates allowed values.
      */
-    public function test_options_resolver_validates_allowed_values(): void
+    public function testOptionsResolverValidatesAllowedValues(): void
     {
         $resolver = \AADSSO_Settings::get_options_resolver();
 
@@ -179,7 +181,7 @@ class SettingsTest extends TestCase
     /**
      * Test options resolver applies defaults.
      */
-    public function test_options_resolver_applies_defaults(): void
+    public function testOptionsResolverAppliesDefaults(): void
     {
         $resolver = \AADSSO_Settings::get_options_resolver();
 
@@ -197,7 +199,7 @@ class SettingsTest extends TestCase
     /**
      * Test options resolver allows only email or login for field to match.
      */
-    public function test_options_resolver_allows_only_email_or_login_for_field_to_match(): void
+    public function testOptionsResolverAllowsOnlyEmailOrLoginForFieldToMatch(): void
     {
         $resolver = \AADSSO_Settings::get_options_resolver();
 
@@ -213,7 +215,7 @@ class SettingsTest extends TestCase
     /**
      * Test settings properties have correct defaults.
      */
-    public function test_settings_properties_have_correct_defaults(): void
+    public function testSettingsPropertiesHaveCorrectDefaults(): void
     {
         $settings = \AADSSO_Settings::get_instance();
 

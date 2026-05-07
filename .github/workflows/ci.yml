@@ -132,7 +132,7 @@ jobs:
   code-quality:
     name: Code Quality Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -154,6 +154,49 @@ jobs:
 
       - name: Check Composer
         run: composer validate
+
+  auto-fix-cs:
+    name: Auto-Fix Coding Standards
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.37.0
+        with:
+          php-version: '8.5'
+          extensions: mbstring, json, openssl
+
+      - name: Install Composer dependencies
+        run: |
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer install --no-interaction --prefer-dist
+
+      - name: Run PHP-CS-Fixer
+        id: cs-fixer
+        run: |
+          vendor/bin/php-cs-fixer fix --using-cache=no
+        continue-on-error: true
+
+      - name: Commit and push auto-fixes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "style: apply PHP-CS-Fixer auto-fixes"
+            git push
+          else
+            echo "No changes to commit"
+          fi
 
   security-audit:
     name: Security Audit
@@ -188,3 +231,28 @@ jobs:
           if [ -f vendor/bin/phpstan ]; then
             vendor/bin/phpstan analyse --level=max --no-progress --configuration=phpstan.neon 2>/dev/null || true
           fi
+
+  wordpress-plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.37.0
+        with:
+          php-version: '8.5'
+          extensions: mbstring, json, openssl, curl, zip, gd, imagick
+
+      - name: Install Composer dependencies
+        run: |
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer install --no-interaction --prefer-dist
+
+      - name: Run WordPress Plugin Check
+        uses: WordPress/plugin-check-action@v1.1.5
+        with:
+          build-dir: .
+        continue-on-error: true

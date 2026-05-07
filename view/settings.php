@@ -12,24 +12,24 @@ if (!current_user_can('manage_options')) {
 
     <?php
     $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
-    if ('' !== $settings_path && file_exists($settings_path)) {
-        $reset_url = add_query_arg(array(
-            'page' => 'aadsso_settings',
-            'aadsso_nonce' => wp_create_nonce('aadsso_migrate_from_json'),
-        ), admin_url('options-general.php'));
-        ?>
+if ('' !== $settings_path && file_exists($settings_path)) {
+    $reset_url = add_query_arg([
+        'page' => 'aadsso_settings',
+        'aadsso_nonce' => wp_create_nonce('aadsso_migrate_from_json'),
+    ], admin_url('options-general.php'));
+    ?>
         <div class="notice notice-info">
             <p>
                 <?php
-                echo wp_kses(
-                    sprintf(
-                        /* translators: %s: path to settings file */
-                        __('Old configuration data was found at %s.', 'aad-sso-wordpress'),
-                        '<code>' . esc_html($settings_path) . '</code>'
-                    ),
-                    ['code' => []]
-                );
-                ?>
+            echo wp_kses(
+                \sprintf(
+                    // translators: %s: path to settings file
+                    __('Old configuration data was found at %s.', 'aad-sso-wordpress'),
+                    '<code>' . esc_html($settings_path) . '</code>'
+                ),
+                ['code' => []]
+            );
+    ?>
             </p>
             <p><?php esc_html_e('This configuration data can be migrated automatically.', 'aad-sso-wordpress'); ?></p>
             <p><?php esc_html_e('If migration is successful, migration will delete this configuration file.', 'aad-sso-wordpress'); ?></p>
@@ -40,8 +40,8 @@ if (!current_user_can('manage_options')) {
             </p>
         </div>
         <?php
-    }
-    ?>
+}
+?>
 
     <form method="post" action="options.php" id="aadsso-settings-form">
         <?php settings_fields('aadsso_settings'); ?>
@@ -54,10 +54,10 @@ if (!current_user_can('manage_options')) {
     <h2><?php esc_html_e('Reset Plugin', 'aad-sso-wordpress'); ?></h2>
     <p><?php esc_html_e('Resetting the plugin will completely remove all settings.', 'aad-sso-wordpress'); ?></p>
     <p>
-        <a href="<?php echo esc_url(add_query_arg(array(
+        <a href="<?php echo esc_url(add_query_arg([
             'page' => 'aadsso_settings',
             'aadsso_nonce' => wp_create_nonce('aadsso_reset_settings'),
-        ), admin_url('options-general.php'))); ?>" class="button" onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings? This cannot be undone.', 'aad-sso-wordpress'); ?>')">
+        ], admin_url('options-general.php'))); ?>" class="button" onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings? This cannot be undone.', 'aad-sso-wordpress'); ?>')">
             <?php esc_html_e('Reset Settings', 'aad-sso-wordpress'); ?>
         </a>
     </p>
