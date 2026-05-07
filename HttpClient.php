@@ -158,14 +158,26 @@ class AADSSO_HttpClient implements ClientInterface
             $encodedKey = \rawurlencode((string) $key);
             if (\is_array($value)) {
                 foreach ($value as $item) {
-                    $parts[] = $encodedKey . '=' . \rawurlencode($item);
+                    $parts[] = $encodedKey . '=' . \rawurlencode(self::scalarToString($item));
                 }
             } else {
-                $parts[] = $encodedKey . '=' . \rawurlencode($value);
+                $parts[] = $encodedKey . '=' . \rawurlencode(self::scalarToString($value));
             }
         }
 
         return implode('&', $parts);
+    }
+
+    /**
+     * @param scalar $value
+     */
+    private static function scalarToString(mixed $value): string
+    {
+        if (\is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        return (string) $value;
     }
 
     /**
@@ -190,7 +202,7 @@ class AADSSO_HttpClient implements ClientInterface
                 $values = [];
                 foreach ($value as $item) {
                     if (\is_scalar($item)) {
-                        $values[] = (string) $item;
+                        $values[] = self::scalarToString($item);
                     }
                 }
                 // Only add if we have values after filtering
@@ -198,12 +210,15 @@ class AADSSO_HttpClient implements ClientInterface
                     /** @var string $key */
                     $result[$key] = $values;
                 }
+            } elseif (\is_bool($value)) {
+                /** @var string $key */
+                $result[$key] = $value ? 'true' : 'false';
             } elseif (\is_string($value)) {
                 /** @var string $key */
                 $result[$key] = $value;
             } elseif (\is_scalar($value)) {
                 /** @var string $key */
-                $result[$key] = (string) $value;
+                $result[$key] = self::scalarToString($value);
             }
         }
 
@@ -253,22 +268,15 @@ class AADSSO_HttpClient implements ClientInterface
 class AADSSO_HttpClientNetworkException extends \RuntimeException implements NetworkExceptionInterface
 {
     private RequestInterface $request;
-    private \Throwable $previous;
 
     public function __construct(string $message, RequestInterface $request, \Throwable $previous)
     {
         parent::__construct($message, 0, $previous);
         $this->request = $request;
-        $this->previous = $previous;
     }
 
     public function getRequest(): RequestInterface
     {
         return $this->request;
-    }
-
-    public function getPrevious(): \Throwable
-    {
-        return $this->previous;
     }
 }
