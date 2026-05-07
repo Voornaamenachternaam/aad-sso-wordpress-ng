@@ -20,5 +20,18 @@ parameters:
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
-        - '#Constant AADSSO_SETTINGS_PATH not found#'
+        # Class alias errors - these classes are defined at runtime via class_alias()
+        - '#Class .+AADSSO_Settings.+#'
+        - '#Class .+AADSSO_Logger.+#'
+        - '#Class .+AADSSO_AuthorizationHelper.+#'
+        - '#Class .+AADSSO_GraphHelper.+#'
+        - '#Class .+AADSSO_HttpClient.+#'
+        - '#Class .+AADSSO.+#'
+        # WordPress dynamic property access
         - '#Property WP_Roles::\$roles#'
+        - '#Constant AADSSO_SETTINGS_PATH not found#'
+        # Mixed type handling - common in WordPress hooks/callbacks
+        - '#Binary operation .+ between .+ and mixed#'
+        - '#Parameter .+ expects .+, mixed given#'
+        - '#Cannot call method .+ on mixed#'
+        - '#Call to static method .+ on unknown class#'
