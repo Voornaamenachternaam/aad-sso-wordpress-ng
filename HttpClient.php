@@ -324,8 +324,13 @@ class AADSSO_HttpClient implements ClientInterface
         $result = [];
         foreach ($queryArray as $key => $value) {
             if (\is_array($value)) {
-                // Preserve arrays for http_build_query to generate repeated keys (e.g., key[]=val1&key[]=val2)
-                $result[$key] = $value;
+                // Flatten arrays into repeated keys (e.g., key=val1&key=val2)
+                // instead of bracketed notation (e.g., key[0]=val1&key[1]=val2)
+                foreach ($value as $item) {
+                    if (\is_scalar($item)) {
+                        $result[$key][] = (string) $item;
+                    }
+                }
             } elseif (\is_string($value)) {
                 $result[$key] = $value;
             } elseif (\is_scalar($value)) {
