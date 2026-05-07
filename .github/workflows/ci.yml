@@ -132,7 +132,7 @@ jobs:
   code-quality:
     name: Code Quality Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -154,6 +154,50 @@ jobs:
 
       - name: Check Composer
         run: composer validate
+
+  auto-fix-cs:
+    name: Auto-Fix Coding Standards
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.37.0
+        with:
+          php-version: '8.5'
+          extensions: mbstring, json, openssl
+
+      - name: Install Composer dependencies
+        run: |
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer install --no-interaction --prefer-dist
+
+      - name: Run PHP-CS-Fixer and create PR with fixes
+        id: cs-fixer
+        run: |
+          vendor/bin/php-cs-fixer fix --using-cache=no
+
+      - name: Create Pull Request with coding standard fixes
+        uses: peter-evans/create-pull-request@v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "style: apply PHP-CS-Fixer auto-fixes"
+          title: "Style: Auto-fix coding standards"
+          body: |
+            This PR applies auto-fixes from PHP-CS-Fixer.
+
+            Review the changes and merge if acceptable.
+          branch: php-cs-fixer/auto-fix
+          delete-branch: true
+          labels: |
+            automated
+            php-cs-fixer
 
   security-audit:
     name: Security Audit
