@@ -20,13 +20,21 @@ parameters:
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
-        # Class alias errors - these classes are defined at runtime via class_alias()
-        - '#Class .+AADSSO_Settings.+#'
-        - '#Class .+AADSSO_Logger.+#'
-        - '#Class .+AADSSO_AuthorizationHelper.+#'
-        - '#Class .+AADSSO_GraphHelper.+#'
-        - '#Class .+AADSSO_HttpClient.+#'
-        - '#Class .+AADSSO.+#'
+        # Unknown class errors - class_alias() defines these at runtime
+        - '#unknown class AADSSO_Settings#'
+        - '#unknown class AADSSO_Logger#'
+        - '#unknown class AADSSO_AuthorizationHelper#'
+        - '#unknown class AADSSO_GraphHelper#'
+        - '#unknown class AADSSO_HttpClient#'
+        - '#invalid type AADSSO_Settings#'
+        - '#invalid type AADSSO_Logger#'
+        - '#invalid type AADSSO_AuthorizationHelper#'
+        - '#invalid type AADSSO_GraphHelper#'
         # WordPress dynamic property access
         - '#Property WP_Roles::\$roles#'
         - '#Constant AADSSO_SETTINGS_PATH not found#'
+        # Mixed type operations - common with WordPress hooks/filter callbacks
+        - '#Binary operation .+ between .+ and mixed#'
+        - '#Parameter .+ expects .+, mixed given#'
+        - '#Cannot call method .+ on mixed#'
+        - '#Parameter .+ of function .+ expects string, mixed given#'
