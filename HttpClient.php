@@ -7,7 +7,6 @@ use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
@@ -239,109 +238,5 @@ class AADSSO_HttpClient implements ClientInterface
         }
 
         return new GuzzleResponse($status, $normalized_headers, $body);
-    }
-}
-
-/**
- * Shared trait for StreamInterface implementations in HttpClient.
- */
-trait AADSSO_HttpClientStreamTrait
-{
-    private int $position = 0;
-
-    abstract protected function getContent(): string;
-
-    public function close(): void
-    {
-        $this->position = 0;
-    }
-
-    public function detach(): mixed
-    {
-        return null;
-    }
-
-    public function getSize(): int
-    {
-        return \strlen($this->getContent());
-    }
-
-    public function tell(): int
-    {
-        return $this->position;
-    }
-
-    public function eof(): bool
-    {
-        return $this->position >= \strlen($this->getContent());
-    }
-
-    public function isSeekable(): bool
-    {
-        return true;
-    }
-
-    public function seek(int $offset, int $whence = SEEK_SET): void
-    {
-        switch ($whence) {
-            case SEEK_SET:
-                $this->position = $offset;
-                break;
-            case SEEK_CUR:
-                $this->position += $offset;
-                break;
-            case SEEK_END:
-                $this->position = \strlen($this->getContent()) + $offset;
-                break;
-        }
-    }
-
-    public function rewind(): void
-    {
-        $this->position = 0;
-    }
-
-    public function isWritable(): bool
-    {
-        return false;
-    }
-
-    public function write(string $string): int
-    {
-        return 0;
-    }
-
-    public function isReadable(): bool
-    {
-        return true;
-    }
-
-    public function read(int $length): string
-    {
-        $result = substr($this->getContent(), $this->position, $length);
-        $this->position += \strlen($result);
-        return $result;
-    }
-
-    public function getContents(): string
-    {
-        return substr($this->getContent(), $this->position);
-    }
-
-    /**
-     * @return array<string, mixed>|mixed
-     */
-    public function getMetadata(?string $key = null): mixed
-    {
-        $metadata = [
-            'seekable' => true,
-            'eof' => $this->eof(),
-        ];
-
-        if (null === $key) {
-            return $metadata;
-        }
-
-        return $metadata[$key] ?? null;
     }
 }
