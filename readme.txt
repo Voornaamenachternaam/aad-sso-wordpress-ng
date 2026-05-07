@@ -4,7 +4,7 @@ Tags: entra-id, azure-ad, sso, azure-active-directory, office-365, microsoft-ent
 Requires at least: 6.9.4
 Tested up to: 6.9.4
 Requires PHP: 8.5.5
-Stable tag: 0.8.0
+Stable tag: 0.9.0
 License: MIT
 License URI: https://github.com/psignoret/aad-sso-wordpress/blob/master/LICENSE.md
 
@@ -29,6 +29,14 @@ In the typical flow:
 5. (Optional) Membership to certain groups in Microsoft Entra ID can be mapped to roles in WordPress, and group membership can be used to restrict access.
 
 == Changelog ==
+
+= 0.9.0 =
+* Migrated from V1.0 OAuth flow (deprecated `resource` parameter) to V2.0 OAuth flow (`scope` parameter)
+* Expanded OAuth scope to include `email`, `profile`, and `offline_access` for full OpenID Connect support
+* Added automatic inclusion of Microsoft Graph scopes (`User.Read`, `GroupMember.Read.All`) when group-based role mapping is enabled
+* Added configurable custom OAuth scopes for advanced users
+* Updated documentation to recommend `GroupMember.Read.All` over `Directory.Read.All` (least privilege principle)
+* Improved permission documentation for clearer setup instructions
 
 = 0.8.0 =
 * Updated to require PHP 8.1+ for modern features and security
@@ -81,13 +89,27 @@ With these steps, you will create a Microsoft Entra ID app registration. This wi
 
     ![API permissions](https://user-images.githubusercontent.com/231140/66045425-03fce700-e524-11e9-82ae-8772fa4e9724.png)
 
-5. Verify that the delegated permission *User.Read* for Microsoft Graph is already be selected. This permission is all you need if you do not require mapping Microsoft Entra ID group membership to WordPress roles. 
+5. Verify that the delegated permissions for Microsoft Graph are configured. The plugin uses the following permissions:
 
-    ![User.Read delegated permission for Microsoft Graph](https://user-images.githubusercontent.com/231140/66046005-23484400-e525-11e9-9712-fed4c5273040.png)
+   **For basic SSO (sign-in only):**
+   - `openid` (included automatically)
+   - `email`
+   - `profile`
+   - `offline_access` (for refresh token support)
+   - `User.Read` (to read user profile from Microsoft Graph)
 
-   > **Note**: If you do wish to map Microsoft Entra ID groups to WordPress roles, you must also select the delegated permission *Directory.Read.All* (click "Add a permission" > Microsoft Graph > Delegated > *Directory.Read.All*).
-    
-   > **Important**: Some permissions *require* administrator consent before it can be used, and in some organizations, administrator consent is required for *any* permission. A tenant administrator can use the **Grant admin consent** option to grant the permissions (i.e. consent) on behalf of all users in the organization.
+   **Additionally, for group-based role mapping:**
+   - `GroupMember.Read.All` (to check group memberships for WordPress role assignment)
+
+   **Important**: If you only require basic sign-in without group-based role mapping, `User.Read` is sufficient. If you need to map Microsoft Entra ID groups to WordPress roles, you must add `GroupMember.Read.All`.
+
+   **Note**: `GroupMember.Read.All` is preferred over the older `Directory.Read.All` permission because it provides only the minimum permissions needed (reading group memberships) rather than full directory access. Both will work, but `GroupMember.Read.All` follows the principle of least privilege.
+
+   To add permissions: Click "Add a permission" > Microsoft Graph > Delegated > select the required permissions.
+
+   ![Adding delegated permissions for Microsoft Graph](https://user-images.githubusercontent.com/231140/66045425-03fce700-e524-11e9-82ae-8772fa4e9724.png)
+
+   **Important**: Some permissions *require* administrator consent before they can be used, and in some organizations, administrator consent is required for *any* permission. A tenant administrator can use the **Grant admin consent** option to grant the permissions (i.e. consent) on behalf of all users in the organization.
 
 6. Under **Certificates & secrets**, create a new client secret. Provide a description and choose a duration (I recommend no longer than two years). After clicking **Add**, the secret value will appear. Copy it, as this is the only time it will be available.
 
