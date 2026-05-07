@@ -17,15 +17,71 @@ class AuthorizationHelper
      */
     private static array $allowed_algorithms = ['RS256'];
 
+    /**
+     * Base scopes required for OpenID Connect authentication.
+     */
+    private const BASE_SCOPES = ['openid', 'email', 'profile'];
+
+    /**
+     * Scopes required for Microsoft Graph API access.
+     */
+    private const GRAPH_SCOPES = [
+        'User.Read',
+        'GroupMember.Read.All',
+    ];
+
+    /**
+     * Builds the OAuth scope string for the authorization request.
+     * Uses V2.0 pattern with scope parameter instead of V1.0 resource parameter.
+     *
+     * @param AADSSO_Settings $settings
+     *
+     * @return string Space-separated list of scopes
+     */
+    public static function build_scope_string(AADSSO_Settings $settings): string
+    {
+        $scopes = self::BASE_SCOPES;
+
+        // Add offline_access for refresh token support
+        $scopes[] = 'offline_access';
+
+        // Add Graph API scopes if group-based role mapping is enabled
+        if ($settings->enable_aad_group_to_wp_role) {
+            foreach (self::GRAPH_SCOPES as $graph_scope) {
+                $full_scope = 'https://graph.microsoft.com/' . $graph_scope;
+                if (!\in_array($full_scope, $scopes, true)) {
+                    $scopes[] = $full_scope;
+                }
+            }
+        }
+
+        // Add any custom scopes configured by the administrator
+        $custom_scope = $settings->custom_scope ?? '';
+        if (!empty($custom_scope) && \is_string($custom_scope)) {
+            $custom_scopes = array_filter(
+                array_map('trim', explode(' ', $custom_scope))
+            );
+            foreach ($custom_scopes as $custom_scope_item) {
+                if (!empty($custom_scope_item) && !\in_array($custom_scope_item, $scopes, true)) {
+                    $scopes[] = $custom_scope_item;
+                }
+            }
+        }
+
+        return implode(' ', $scopes);
+    }
+
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
     {
+        $scope_string = self::build_scope_string($settings);
+
+        // Use V2.0 endpoint query parameters for scope-based authorization
         return $settings->authorization_endpoint . '?'
             . http_build_query([
                 'response_type' => 'code',
-                'scope' => 'openid',
+                'scope' => $scope_string,
                 'domain_hint' => $settings->org_domain_hint,
                 'client_id' => $settings->client_id,
-                'resource' => $settings->graph_endpoint,
                 'redirect_uri' => $settings->redirect_uri,
                 'state' => $antiforgery_id,
                 'nonce' => $antiforgery_id,
@@ -34,11 +90,14 @@ class AuthorizationHelper
 
     public static function get_access_token(string $code, AADSSO_Settings $settings): mixed
     {
+        $scope_string = self::build_scope_string($settings);
+
+        // Use V2.0 token request with scope parameter instead of resource parameter
         $authentication_request_body = http_build_query([
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $settings->redirect_uri,
-            'resource' => $settings->graph_endpoint,
+            'scope' => $scope_string,
             'client_id' => $settings->client_id,
             'client_secret' => $settings->client_secret,
         ]);

@@ -51,6 +51,8 @@ class Settings
 
     public string $graph_version = 'v1.0';
 
+    public string $custom_scope = '';
+
     /**
      * @var null|self
      */
@@ -189,6 +191,10 @@ class Settings
                 ->allowedTypes('string')
                 ->default('v1.0')
                 ->allowedValues('v1.0', 'beta');
+
+            self::$options_resolver->define('custom_scope')
+                ->allowedTypes('string')
+                ->default('');
 
             self::$options_resolver->define('role_map')
                 ->allowedTypes('array')
@@ -452,7 +458,7 @@ class Settings
             'client_secret' => \is_string($value) ? $value : '',
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
-            'graph_version' => sanitize_text_field(\is_string($value) ? $value : ''),
+            'graph_version', 'custom_scope' => sanitize_text_field(\is_string($value) ? $value : ''),
             'match_on_upn_alias',
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',

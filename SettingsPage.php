@@ -370,6 +370,14 @@ class SettingsPage
         );
 
         add_settings_field(
+            'custom_scope',
+            esc_html__('Custom OAuth scopes', 'aad-sso-wordpress'),
+            [$this, 'custom_scope_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_advanced'
+        );
+
+        add_settings_field(
             'aadsso_settings_security_info',
             esc_html__('Security Information', 'aad-sso-wordpress'),
             [$this, 'security_info_callback'],
@@ -466,6 +474,9 @@ class SettingsPage
         $sanitized['graph_version'] = \in_array($graph_version_raw, ['v1.0', 'beta'], true)
             ? $graph_version_raw
             : 'v1.0';
+
+        $custom_scope_raw = $input['custom_scope'] ?? '';
+        $sanitized['custom_scope'] = \is_string($custom_scope_raw) ? sanitize_text_field($custom_scope_raw) : '';
 
         if (!empty($input['role_map']) && \is_array($input['role_map'])) {
             $sanitized_role_map = [];
@@ -737,6 +748,21 @@ class SettingsPage
                 . 'directories, known sometimes as "B2B users") you must use: '
                 . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
                 . 'where <code>{tenant-id}</code> is the tenant ID or a verified domain name of your directory.',
+                'aad-sso-wordpress'
+            )
+        ) . '</p>';
+    }
+
+    public function custom_scope_callback(): void
+    {
+        $this->render_text_field('custom_scope');
+        echo '<p class="description">' . wp_kses_post(
+            __(
+                'Add additional OAuth 2.0 scopes beyond the defaults. By default, the plugin requests: '
+                . '<code>openid email profile offline_access</code>. When group-based role mapping is '
+                . 'enabled, it also requests: <code>https://graph.microsoft.com/User.Read</code> and '
+                . '<code>https://graph.microsoft.com/GroupMember.Read.All</code>. Enter additional scopes '
+                . 'separated by spaces (e.g., <code>Calendars.Read User.ReadBasic.All</code>).',
                 'aad-sso-wordpress'
             )
         ) . '</p>';
