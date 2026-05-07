@@ -232,6 +232,29 @@ class AADSSO
             $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
             AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
+            // Validate issuer claim to prevent token substitution attacks
+            // The issuer should match the expected issuer from OpenID configuration
+            $expected_issuer = $this->settings->authorization_endpoint;
+            if (!empty($expected_issuer)) {
+                // Extract base URL (without path) from authorization endpoint
+                $parsed = parse_url($expected_issuer);
+                $expected_issuer_base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+
+                // Check if issuer starts with the expected base URL
+                if (!empty($jwt_iss) && 0 !== strpos($jwt_iss, $expected_issuer_base)) {
+                    AADSSO_Logger::log_error(\sprintf(
+                        'Issuer mismatch: expected base URL "%s", got "%s"',
+                        $expected_issuer_base,
+                        $jwt_iss
+                    ));
+
+                    return new WP_Error(
+                        'invalid_token_issuer',
+                        __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                    );
+                }
+            }
+
             $group_memberships = false;
             if (true === $this->settings->enable_aad_group_to_wp_role) {
                 AADSSO_GraphHelper::$settings = $this->settings;
@@ -340,6 +363,36 @@ class AADSSO
         $unique_name_raw = $jwt->unique_name ?? null;
         $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
+        // Collect all possible email/identifier claims for matching
+        // Priority: email > preferredUsername > mail > upn > unique_name
+        /** @var string|null */
+        $email_claim = null;
+        /** @var mixed */
+        $email_raw = $jwt->email ?? null;
+        if (\is_string($email_raw)) {
+            $email_claim = $email_raw;
+        }
+        /** @var mixed */
+        $preferred_username_raw = $jwt->preferredUsername ?? null;
+        if (null === $email_claim && \is_string($preferred_username_raw)) {
+            $email_claim = $preferred_username_raw;
+        }
+        /** @var mixed */
+        $mail_raw = $jwt->mail ?? null;
+        if (null === $email_claim && \is_string($mail_raw)) {
+            $email_claim = $mail_raw;
+        }
+
+        // Log available claims for debugging
+        AADSSO_Logger::log_debug(\sprintf(
+            'User claims: upn=%s, unique_name=%s, email=%s, preferredUsername=%s, mail=%s',
+            $upn ?? '(null)',
+            $unique_name ?? '(null)',
+            $email_claim ?? '(null)',
+            $jwt->preferredUsername ?? '(null)',
+            $jwt->mail ?? '(null)'
+        ), 10);
+
         if (null === $unique_name) {
             return new WP_Error(
                 'unique_name_not_found',
@@ -350,8 +403,30 @@ class AADSSO
             );
         }
 
-        $user = get_user_by($this->settings->field_to_match_to_upn, $unique_name);
+        // Determine which field to match
+        $match_field = $this->settings->field_to_match_to_upn;
+        $match_value = $unique_name;
 
+        // If matching by email and we have an email claim, prefer that over UPN
+        if ('email' === $match_field && null !== $email_claim) {
+            $match_value = $email_claim;
+        }
+
+        $user = get_user_by($match_field, $match_value);
+
+        // If no match by primary value, try fallback with email claim if different
+        if (!($user instanceof WP_User) && null !== $email_claim && $email_claim !== $match_value) {
+            $user = get_user_by($match_field, $email_claim);
+            if ($user instanceof WP_User) {
+                AADSSO_Logger::log_debug(\sprintf(
+                    'Matched user by email claim (%s) instead of primary value (%s).',
+                    $email_claim,
+                    $match_value
+                ), 10);
+            }
+        }
+
+        // Try UPN alias matching if enabled and still no match
         if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
             $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
             if (!empty($domain_hint)) {
@@ -363,7 +438,27 @@ class AADSSO
             }
         }
 
+        // Final fallback: try matching by any known identifier
+        if (!($user instanceof WP_User) && null !== $email_claim) {
+            // Try with all lowercase (some systems normalize emails)
+            $user = get_user_by($match_field, strtolower($email_claim));
+            if (!($user instanceof WP_User)) {
+                $user = get_user_by($match_field, strtolower($unique_name));
+            }
+        }
+
         if ($user instanceof WP_User) {
+            // Warn if email in WordPress doesn't match Entra ID email claim
+            if (null !== $email_claim && $user->user_email !== $email_claim) {
+                AADSSO_Logger::log_warning(\sprintf(
+                    'Email mismatch for user %d: WordPress has %s, Entra ID has %s. '
+                    . 'Consider updating the user email to ensure consistency.',
+                    $user->ID,
+                    $user->user_email,
+                    $email_claim
+                ), 10);
+            }
+
             AADSSO_Logger::log_debug(\sprintf(
                 'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].',
                 $unique_name,
@@ -396,8 +491,15 @@ class AADSSO
                 $family_name_raw = $jwt->family_name ?? '';
                 $family_name = \is_string($family_name_raw) ? sanitize_text_field($family_name_raw) : '';
 
+                // Use email claim for new user email if available, otherwise use unique_name
+                $user_email = null !== $email_claim ? sanitize_email($email_claim) : sanitize_email($unique_name);
+                // Ensure email is valid before using it
+                if (!is_email($user_email)) {
+                    $user_email = sanitize_email($unique_name);
+                }
+
                 $userdata = [
-                    'user_email' => sanitize_email($unique_name),
+                    'user_email' => $user_email,
                     'user_login' => sanitize_user($unique_name, true),
                     'first_name' => $given_name,
                     'last_name' => $family_name,

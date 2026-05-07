@@ -246,6 +246,33 @@ class AuthorizationHelper
             throw new DomainException(\sprintf('Nonce mismatch. Expecting %s', $antiforgery_id));
         }
 
+        // Validate token expiration (iat, nbf, exp claims)
+        $now = time();
+        $token_iat = isset($jwt->iat) ? (int) $jwt->iat : 0;
+        $token_exp = isset($jwt->exp) ? (int) $jwt->exp : 0;
+        $token_nbf = isset($jwt->nbf) ? (int) $jwt->nbf : 0;
+
+        // Check token is not expired
+        if ($token_exp > 0 && $now > $token_exp) {
+            throw new DomainException('Token has expired');
+        }
+
+        // Check token is not used before it's valid (with 60-second clock skew tolerance)
+        if ($token_nbf > 0 && ($now + 60) < $token_nbf) {
+            throw new DomainException('Token is not yet valid (nbf check failed)');
+        }
+
+        // Check token was not issued too far in the past (optional: 24-hour max age)
+        if ($token_iat > 0) {
+            $max_token_age = 86400; // 24 hours
+            if (($now - $token_iat) > $max_token_age) {
+                AADSSO_Logger::log_warning(\sprintf(
+                    'Token age exceeds recommended maximum (%d seconds)',
+                    $now - $token_iat
+                ), 5);
+            }
+        }
+
         return $jwt;
     }
 }

@@ -37,7 +37,7 @@ class Settings
 
     public bool $enable_full_logout = false;
 
-    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
 
     public string $authorization_endpoint = '';
 
@@ -81,7 +81,7 @@ class Settings
                 'enable_aad_group_to_wp_role' => false,
                 'redirect_uri' => self::safe_wp_login_url(),
                 'logout_redirect_uri' => self::safe_wp_login_url(),
-                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
+                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration',
             ];
         }
 
@@ -165,7 +165,7 @@ class Settings
 
             self::$options_resolver->define('openid_configuration_endpoint')
                 ->allowedTypes('string')
-                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration');
+                ->default('https://login.microsoftonline.com/organizations/.well-known/openid-configuration');
 
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')

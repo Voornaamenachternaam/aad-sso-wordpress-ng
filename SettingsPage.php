@@ -23,6 +23,7 @@ class SettingsPage
         add_action('admin_init', [$this, 'maybe_migrate_settings']);
         add_action('all_admin_notices', [$this, 'notify_if_reset_successful']);
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
+        add_action('all_admin_notices', [$this, 'notify_openid_configuration_warning']);
 
         $default_settings = AADSSO_Settings::get_defaults();
         /** @var array<string, mixed> $defaultSettingsArr */
@@ -35,6 +36,63 @@ class SettingsPage
             if (!isset($this->settings[$key])) {
                 $this->settings[$key] = $default_value;
             }
+        }
+    }
+
+    /**
+     * Display warning if OpenID configuration may not be optimal.
+     */
+    public function notify_openid_configuration_warning(): void
+    {
+        // Only show on our settings page
+        $screen = get_current_screen();
+        if (null === $screen || 'settings_page_aadsso_settings' !== $screen->id) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $openid_endpoint = $this->settings['openid_configuration_endpoint'] ?? '';
+        if (!\is_string($openid_endpoint) || empty($openid_endpoint)) {
+            return;
+        }
+
+        // Warn if using /common/ endpoint (multi-tenant)
+        if (false !== strpos($openid_endpoint, '/common/.well-known/openid-configuration')) {
+            echo '<div class="notice notice-warning">';
+            echo '<p>';
+            echo wp_kses_post(
+                __(
+                    '<strong>Microsoft Entra ID SSO:</strong> You are using the multi-tenant endpoint '
+                    . '(<code>/common/</code>), which allows users from any Microsoft Entra ID organization '
+                    . 'to sign in. For single-tenant deployments (recommended for most organizations), '
+                    . 'use your tenant-specific endpoint: '
+                    . '<code>https://login.microsoftonline.com/{your-tenant-id}/.well-known/openid-configuration</code>.',
+                    'aad-sso-wordpress'
+                )
+            );
+            echo '</p></div>';
+
+            return;
+        }
+
+        // Warn if using /organizations/ (no specific tenant)
+        if (false !== strpos($openid_endpoint, '/organizations/.well-known/openid-configuration')) {
+            echo '<div class="notice notice-info">';
+            echo '<p>';
+            echo wp_kses_post(
+                __(
+                    '<strong>Microsoft Entra ID SSO:</strong> You are using the organizations endpoint '
+                    . '(<code>/organizations/</code>), which works for any work or school account. '
+                    . 'For tighter security and tenant-specific policies, consider using your '
+                    . 'tenant-specific endpoint: '
+                    . '<code>https://login.microsoftonline.com/{your-tenant-id}/.well-known/openid-configuration</code>.',
+                    'aad-sso-wordpress'
+                )
+            );
+            echo '</p></div>';
         }
     }
 
@@ -452,8 +510,8 @@ class SettingsPage
         $valid_roles = array_keys($this->get_editable_roles());
         $sanitized['default_wp_role'] = \in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
-        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
-        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
 
         $auth_endpoint_raw = $input['authorization_endpoint'] ?? '';
         $sanitized['authorization_endpoint'] = \is_string($auth_endpoint_raw) ? esc_url_raw($auth_endpoint_raw) : '';
@@ -737,17 +795,19 @@ class SettingsPage
     {
         $this->render_text_field('openid_configuration_endpoint');
         $default_endpoint = AADSSO_Settings::get_defaults('openid_configuration_endpoint');
-        $default_url = \is_string($default_endpoint) ? $default_endpoint : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+        $default_url = \is_string($default_endpoint) ? $default_endpoint : 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
             . esc_url($default_url)
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';
         echo '<p class="description">' . wp_kses_post(
             __(
-                'The OpenID Connect configuration endpoint to use. To support Microsoft '
-                . 'Accounts and external users (users invited in from other Microsoft Entra ID '
-                . 'directories, known sometimes as "B2B users") you must use: '
+                'The OpenID Connect configuration endpoint for Microsoft Entra ID. '
+                . 'For single-tenant deployments (recommended for most organizations), use: '
                 . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
-                . 'where <code>{tenant-id}</code> is the tenant ID or a verified domain name of your directory.',
+                . 'where <code>{tenant-id}</code> is your tenant ID or verified domain. '
+                . 'For multi-tenant applications supporting users from any organization, use: '
+                . '<code>https://login.microsoftonline.com/common/.well-known/openid-configuration</code>. '
+                . 'The default <code>/organizations/</code> endpoint supports work and school accounts.',
                 'aad-sso-wordpress'
             )
         ) . '</p>';
