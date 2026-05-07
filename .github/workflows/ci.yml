@@ -255,3 +255,4 @@ jobs:
         uses: WordPress/plugin-check-action@v1.1.5
         with:
           build-dir: .
+          slug: aad-sso-wordpress
