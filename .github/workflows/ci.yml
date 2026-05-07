@@ -159,6 +159,9 @@ jobs:
     name: Auto-Fix Coding Standards
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout
