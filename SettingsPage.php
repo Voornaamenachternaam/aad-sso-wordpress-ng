@@ -372,7 +372,9 @@ class AADSSO_Settings_Page
     public function sanitize_settings(mixed $input): array
     {
         if (!\is_array($input)) {
-            return [];
+            // Return current settings to prevent data loss
+            $current = get_option('aadsso_settings', []);
+            return \is_array($current) ? $current : [];
         }
         /** @var array<string, mixed> $input */
         $sanitized = [];
