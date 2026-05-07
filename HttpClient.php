@@ -251,7 +251,9 @@ class AADSSO_HttpClient implements ClientInterface
                 }
                 $normalized_headers[$name] = $stringValues;
             } else {
-                $normalized_headers[$name] = [\is_string($values) ? $values : (string) ((scalar) $values)];
+                $normalized_headers[$name] = [
+                    \is_string($values) ? $values : (\is_scalar($values) ? (string) $values : ''),
+                ];
             }
         }
 
