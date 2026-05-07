@@ -241,7 +241,7 @@ class AADSSO
                 $expected_issuer_base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
 
                 // Check if issuer starts with the expected base URL
-                if (!empty($jwt_iss) && 0 !== strpos($jwt_iss, $expected_issuer_base)) {
+                if (!empty($jwt_iss) && !str_starts_with($jwt_iss, $expected_issuer_base)) {
                     AADSSO_Logger::log_error(\sprintf(
                         'Issuer mismatch: expected base URL "%s", got "%s"',
                         $expected_issuer_base,
@@ -365,7 +365,7 @@ class AADSSO
 
         // Collect all possible email/identifier claims for matching
         // Priority: email > preferredUsername > mail > upn > unique_name
-        /** @var string|null */
+        /** @var null|string */
         $email_claim = null;
         /** @var mixed */
         $email_raw = $jwt->email ?? null;
@@ -441,9 +441,9 @@ class AADSSO
         // Final fallback: try matching by any known identifier
         if (!($user instanceof WP_User) && null !== $email_claim) {
             // Try with all lowercase (some systems normalize emails)
-            $user = get_user_by($match_field, strtolower($email_claim));
+            $user = get_user_by($match_field, mb_strtolower($email_claim));
             if (!($user instanceof WP_User)) {
-                $user = get_user_by($match_field, strtolower($unique_name));
+                $user = get_user_by($match_field, mb_strtolower($unique_name));
             }
         }
 

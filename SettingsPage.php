@@ -60,7 +60,7 @@ class SettingsPage
         }
 
         // Warn if using /common/ endpoint (multi-tenant)
-        if (false !== strpos($openid_endpoint, '/common/.well-known/openid-configuration')) {
+        if (str_contains($openid_endpoint, '/common/.well-known/openid-configuration')) {
             echo '<div class="notice notice-warning">';
             echo '<p>';
             echo wp_kses_post(
@@ -79,7 +79,7 @@ class SettingsPage
         }
 
         // Warn if using /organizations/ (no specific tenant)
-        if (false !== strpos($openid_endpoint, '/organizations/.well-known/openid-configuration')) {
+        if (str_contains($openid_endpoint, '/organizations/.well-known/openid-configuration')) {
             echo '<div class="notice notice-info">';
             echo '<p>';
             echo wp_kses_post(
