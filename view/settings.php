@@ -55,9 +55,9 @@ if ('' !== $settings_path && file_exists($settings_path)) {
     <p><?php esc_html_e('Resetting the plugin will completely remove all settings.', 'aad-sso-wordpress'); ?></p>
     <p>
         <a href="<?php echo esc_url(add_query_arg([
-        'page' => 'aadsso_settings',
-        'aadsso_nonce' => wp_create_nonce('aadsso_reset_settings'),
-    ], admin_url('options-general.php'))); ?>" class="button" onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings? This cannot be undone.', 'aad-sso-wordpress'); ?>')">
+            'page' => 'aadsso_settings',
+            'aadsso_nonce' => wp_create_nonce('aadsso_reset_settings'),
+        ], admin_url('options-general.php'))); ?>" class="button" onclick="return confirm('<?php esc_attr_e('Are you sure you want to reset all settings? This cannot be undone.', 'aad-sso-wordpress'); ?>')">
             <?php esc_html_e('Reset Settings', 'aad-sso-wordpress'); ?>
         </a>
     </p>

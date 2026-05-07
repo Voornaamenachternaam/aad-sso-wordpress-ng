@@ -404,7 +404,7 @@ class SettingsPage
     {
         if (!\is_array($input)) {
             // Return current settings to prevent data loss
-            /** @var array<string, mixed> */
+            // @var array<string, mixed>
             return get_option('aadsso_settings', []);
         }
         /** @var array<string, mixed> $input */
