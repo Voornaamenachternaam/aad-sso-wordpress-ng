@@ -5,6 +5,7 @@ declare(strict_types=1);
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -12,6 +13,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 if (!\defined('ABSPATH')) {
@@ -57,18 +59,22 @@ class AADSSO_HttpClient implements ClientInterface
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
-        $response = $this->http_client->request($request->getMethod(), (string) $request->getUri(), [
-            'headers' => $this->getFlattenedHeaders($request),
-            'body' => (string) $request->getBody(),
-        ]);
+        try {
+            $response = $this->http_client->request($request->getMethod(), (string) $request->getUri(), [
+                'headers' => $this->getFlattenedHeaders($request),
+                'body' => (string) $request->getBody(),
+            ]);
 
-        $statusCode = $response->getStatusCode();
-        $responseHeaders = [];
-        foreach ($response->getHeaders(false) as $name => $values) {
-            $responseHeaders[$name] = $values;
+            $statusCode = $response->getStatusCode();
+            $responseHeaders = [];
+            foreach ($response->getHeaders(false) as $name => $values) {
+                $responseHeaders[$name] = $values;
+            }
+
+            return new GuzzleResponse($statusCode, $responseHeaders, $response->getContent(false));
+        } catch (TransportExceptionInterface $e) {
+            throw new AADSSO_HttpClientNetworkException($e->getMessage(), $request, $e);
         }
-
-        return new GuzzleResponse($statusCode, $responseHeaders, $response->getContent(false));
     }
 
     /**
@@ -241,5 +247,31 @@ class AADSSO_HttpClient implements ClientInterface
         }
 
         return new GuzzleResponse($status, $normalized_headers, $body);
+    }
+}
+
+/**
+ * @implements NetworkExceptionInterface
+ */
+class AADSSO_HttpClientNetworkException extends \RuntimeException implements NetworkExceptionInterface
+{
+    private RequestInterface $request;
+    private \Throwable $previous;
+
+    public function __construct(string $message, RequestInterface $request, \Throwable $previous)
+    {
+        parent::__construct($message, 0, $previous);
+        $this->request = $request;
+        $this->previous = $previous;
+    }
+
+    public function getRequest(): RequestInterface
+    {
+        return $this->request;
+    }
+
+    public function getPrevious(): \Throwable
+    {
+        return $this->previous;
     }
 }
