@@ -189,7 +189,7 @@ class AADSSO_Settings_Page
             'aadsso_settings',
             array($this, 'render_admin_page')
         );
-        $this->options_page_id = (string) $page_id;
+        $this->options_page_id = $page_id;
     }
 
     public function render_admin_page(): void
