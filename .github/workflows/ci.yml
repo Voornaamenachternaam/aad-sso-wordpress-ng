@@ -161,7 +161,6 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
       - name: Checkout
@@ -181,26 +180,23 @@ jobs:
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
           composer install --no-interaction --prefer-dist
 
-      - name: Run PHP-CS-Fixer and create PR with fixes
+      - name: Run PHP-CS-Fixer
         id: cs-fixer
         run: |
           vendor/bin/php-cs-fixer fix --using-cache=no
+        continue-on-error: true
 
-      - name: Create Pull Request with coding standard fixes
-        uses: peter-evans/create-pull-request@v8.1.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "style: apply PHP-CS-Fixer auto-fixes"
-          title: "Style: Auto-fix coding standards"
-          body: |
-            This PR applies auto-fixes from PHP-CS-Fixer.
-
-            Review the changes and merge if acceptable.
-          branch: php-cs-fixer/auto-fix
-          delete-branch: true
-          labels: |
-            automated
-            php-cs-fixer
+      - name: Commit and push auto-fixes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "style: apply PHP-CS-Fixer auto-fixes"
+            git push
+          else
+            echo "No changes to commit"
+          fi
 
   security-audit:
     name: Security Audit
