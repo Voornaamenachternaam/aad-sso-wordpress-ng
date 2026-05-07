@@ -265,11 +265,12 @@ class AuthorizationHelper
         // Check token was not issued too far in the past (optional: 24-hour max age)
         if ($token_iat > 0) {
             $max_token_age = 86400; // 24 hours
-            if (($now - $token_iat) > $max_token_age) {
-                AADSSO_Logger::log_warning(\sprintf(
-                    'Token age exceeds recommended maximum (%d seconds)',
-                    $now - $token_iat
-                ), 5);
+            $token_age = $now - $token_iat;
+            if ($token_age > $max_token_age) {
+                AADSSO_Logger::log_warning(
+                    'Token age exceeds recommended maximum',
+                    ['token_age_seconds' => $token_age, 'max_age_seconds' => $max_token_age]
+                );
             }
         }
 
