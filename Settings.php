@@ -435,3 +435,5 @@ class Settings
         };
     }
 }
+
+class_alias(Settings::class, 'AADSSO_Settings');
