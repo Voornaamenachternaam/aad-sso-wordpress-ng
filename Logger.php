@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
+use Monolog\Logger as MonologLogger;
 use Monolog\Processor\PsrLogMessageProcessor;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -59,7 +60,7 @@ class Logger
                 Level::Debug
             );
 
-            self::$logger = new self(
+            self::$logger = new MonologLogger(
                 'aad-sso',
                 [$handler],
                 [new PsrLogMessageProcessor()]
