@@ -30,6 +30,7 @@ parameters:
         - '#invalid type AADSSO_Logger#'
         - '#invalid type AADSSO_AuthorizationHelper#'
         - '#invalid type AADSSO_GraphHelper#'
+        - '#Instantiated class AADSSO_Settings_Page#'
         # WordPress dynamic property access
         - '#Property WP_Roles::\$roles#'
         - '#Constant AADSSO_SETTINGS_PATH not found#'

@@ -817,3 +817,5 @@ class SettingsPage
         return \is_array($roles) ? $roles : [];
     }
 }
+
+class_alias(SettingsPage::class, 'AADSSO_Settings_Page');
