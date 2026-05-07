@@ -8,16 +8,6 @@ use Psr\Http\Message\ResponseInterface;
 class AuthorizationHelper
 {
     /**
-     * @var null|AADSSO_HttpClient
-     */
-    private static ?AADSSO_HttpClient $http_client = null;
-
-    /**
-     * @var array<int, string>
-     */
-    private static array $allowed_algorithms = ['RS256'];
-
-    /**
      * Base scopes required for OpenID Connect authentication.
      */
     private const BASE_SCOPES = ['openid', 'email', 'profile'];
@@ -29,6 +19,16 @@ class AuthorizationHelper
         'User.Read',
         'GroupMember.Read.All',
     ];
+
+    /**
+     * @var null|AADSSO_HttpClient
+     */
+    private static ?AADSSO_HttpClient $http_client = null;
+
+    /**
+     * @var array<int, string>
+     */
+    private static array $allowed_algorithms = ['RS256'];
 
     /**
      * Builds the OAuth scope string for the authorization request.
