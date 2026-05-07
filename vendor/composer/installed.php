@@ -3,7 +3,7 @@
         'name' => 'voornaamenachternaamt/aad-sso-wordpress-ng',
         'pretty_version' => 'dev-master',
         'version' => 'dev-master',
-        'reference' => '4e22f5c492d34fe2d80b8dba8b456cca0e0d057f',
+        'reference' => '9fa1dcfad691cecf7008dcb06596ed22a297e0ab',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -833,7 +833,7 @@
         'voornaamenachternaamt/aad-sso-wordpress-ng' => array(
             'pretty_version' => 'dev-master',
             'version' => 'dev-master',
-            'reference' => '4e22f5c492d34fe2d80b8dba8b456cca0e0d057f',
+            'reference' => '9fa1dcfad691cecf7008dcb06596ed22a297e0ab',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
