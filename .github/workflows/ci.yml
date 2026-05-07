@@ -251,14 +251,7 @@ jobs:
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
           composer install --no-interaction --prefer-dist
 
-      - name: Get WordPress
-        run: |
-          curl -sLO https://wordpress.org/wordpress-6.9.4.tar.gz
-          tar -xzf wordpress-6.9.4.tar.gz
-          mv wordpress /tmp/wordpress
-
       - name: Run WordPress Plugin Check
         uses: WordPress/plugin-check-action@v1.1.5
         with:
-          path: .
-          wordpress-directory: /tmp/wordpress
+          build-dir: .
