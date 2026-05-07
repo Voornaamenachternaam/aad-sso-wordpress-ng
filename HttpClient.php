@@ -185,8 +185,9 @@ class AADSSO_HttpClient implements ClientInterface
             public function getBody(): StreamInterface
             {
                 return new class($this->body) implements StreamInterface {
+                    use AADSSO_HttpClientStreamTrait;
+
                     private string $content;
-                    private int $position = 0;
 
                     public function __construct(string $content)
                     {
@@ -198,98 +199,9 @@ class AADSSO_HttpClient implements ClientInterface
                         return $this->content;
                     }
 
-                    public function close(): void
+                    protected function getContent(): string
                     {
-                        $this->position = 0;
-                    }
-
-                    public function detach(): mixed
-                    {
-                        return null;
-                    }
-
-                    public function getSize(): int
-                    {
-                        return \strlen($this->content);
-                    }
-
-                    public function tell(): int
-                    {
-                        return $this->position;
-                    }
-
-                    public function eof(): bool
-                    {
-                        return $this->position >= \strlen($this->content);
-                    }
-
-                    public function isSeekable(): bool
-                    {
-                        return true;
-                    }
-
-                    public function seek(int $offset, int $whence = SEEK_SET): void
-                    {
-                        switch ($whence) {
-                            case SEEK_SET:
-                                $this->position = $offset;
-                                break;
-                            case SEEK_CUR:
-                                $this->position += $offset;
-                                break;
-                            case SEEK_END:
-                                $this->position = \strlen($this->content) + $offset;
-                                break;
-                        }
-                    }
-
-                    public function rewind(): void
-                    {
-                        $this->position = 0;
-                    }
-
-                    public function isWritable(): bool
-                    {
-                        return false;
-                    }
-
-                    public function write(string $string): int
-                    {
-                        return 0;
-                    }
-
-                    public function isReadable(): bool
-                    {
-                        return true;
-                    }
-
-                    public function read(int $length): string
-                    {
-                        $result = substr($this->content, $this->position, $length);
-                        $this->position += \strlen($result);
-                        return $result;
-                    }
-
-                    public function getContents(): string
-                    {
-                        return substr($this->content, $this->position);
-                    }
-
-                    /**
-                     * @return array<string, mixed>|mixed
-                     */
-                    public function getMetadata(?string $key = null): mixed
-                    {
-                        $metadata = [
-                            'seekable' => true,
-                            'eof' => $this->eof(),
-                        ];
-
-                        if (null === $key) {
-                            return $metadata;
-                        }
-
-                        return $metadata[$key] ?? null;
+                        return $this->content;
                     }
                 };
             }
@@ -297,7 +209,7 @@ class AADSSO_HttpClient implements ClientInterface
             public function withBody(StreamInterface $body): self
             {
                 $clone = clone $this;
-                $clone->body = $body->getContents();
+                $clone->body = (string) $body;
                 return $clone;
             }
         };
@@ -570,8 +482,9 @@ class AADSSO_HttpClient implements ClientInterface
             public function getBody(): StreamInterface
             {
                 return new class($this->body) implements StreamInterface {
+                    use AADSSO_HttpClientStreamTrait;
+
                     private string $content;
-                    private int $position = 0;
 
                     public function __construct(string $content)
                     {
@@ -583,98 +496,9 @@ class AADSSO_HttpClient implements ClientInterface
                         return $this->content;
                     }
 
-                    public function close(): void
+                    protected function getContent(): string
                     {
-                        $this->position = 0;
-                    }
-
-                    public function detach(): mixed
-                    {
-                        return null;
-                    }
-
-                    public function getSize(): int
-                    {
-                        return \strlen($this->content);
-                    }
-
-                    public function tell(): int
-                    {
-                        return $this->position;
-                    }
-
-                    public function eof(): bool
-                    {
-                        return $this->position >= \strlen($this->content);
-                    }
-
-                    public function isSeekable(): bool
-                    {
-                        return true;
-                    }
-
-                    public function seek(int $offset, int $whence = SEEK_SET): void
-                    {
-                        switch ($whence) {
-                            case SEEK_SET:
-                                $this->position = $offset;
-                                break;
-                            case SEEK_CUR:
-                                $this->position += $offset;
-                                break;
-                            case SEEK_END:
-                                $this->position = \strlen($this->content) + $offset;
-                                break;
-                        }
-                    }
-
-                    public function rewind(): void
-                    {
-                        $this->position = 0;
-                    }
-
-                    public function isWritable(): bool
-                    {
-                        return false;
-                    }
-
-                    public function write(string $string): int
-                    {
-                        return 0;
-                    }
-
-                    public function isReadable(): bool
-                    {
-                        return true;
-                    }
-
-                    public function read(int $length): string
-                    {
-                        $result = substr($this->content, $this->position, $length);
-                        $this->position += \strlen($result);
-                        return $result;
-                    }
-
-                    public function getContents(): string
-                    {
-                        return substr($this->content, $this->position);
-                    }
-
-                    /**
-                     * @return array<string, mixed>|mixed
-                     */
-                    public function getMetadata(?string $key = null): mixed
-                    {
-                        $metadata = [
-                            'seekable' => true,
-                            'eof' => $this->eof(),
-                        ];
-
-                        if (null === $key) {
-                            return $metadata;
-                        }
-
-                        return $metadata[$key] ?? null;
+                        return $this->content;
                     }
                 };
             }
@@ -682,9 +506,113 @@ class AADSSO_HttpClient implements ClientInterface
             public function withBody(StreamInterface $body): self
             {
                 $clone = clone $this;
-                $clone->body = $body->getContents();
+                $clone->body = (string) $body;
                 return $clone;
             }
         };
+    }
+}
+
+/**
+ * Shared trait for StreamInterface implementations in HttpClient.
+ */
+trait AADSSO_HttpClientStreamTrait
+{
+    private int $position = 0;
+
+    abstract protected function getContent(): string;
+
+    public function close(): void
+    {
+        $this->position = 0;
+    }
+
+    public function detach(): mixed
+    {
+        return null;
+    }
+
+    public function getSize(): int
+    {
+        return \strlen($this->getContent());
+    }
+
+    public function tell(): int
+    {
+        return $this->position;
+    }
+
+    public function eof(): bool
+    {
+        return $this->position >= \strlen($this->getContent());
+    }
+
+    public function isSeekable(): bool
+    {
+        return true;
+    }
+
+    public function seek(int $offset, int $whence = SEEK_SET): void
+    {
+        switch ($whence) {
+            case SEEK_SET:
+                $this->position = $offset;
+                break;
+            case SEEK_CUR:
+                $this->position += $offset;
+                break;
+            case SEEK_END:
+                $this->position = \strlen($this->getContent()) + $offset;
+                break;
+        }
+    }
+
+    public function rewind(): void
+    {
+        $this->position = 0;
+    }
+
+    public function isWritable(): bool
+    {
+        return false;
+    }
+
+    public function write(string $string): int
+    {
+        return 0;
+    }
+
+    public function isReadable(): bool
+    {
+        return true;
+    }
+
+    public function read(int $length): string
+    {
+        $result = substr($this->getContent(), $this->position, $length);
+        $this->position += \strlen($result);
+        return $result;
+    }
+
+    public function getContents(): string
+    {
+        return substr($this->getContent(), $this->position);
+    }
+
+    /**
+     * @return array<string, mixed>|mixed
+     */
+    public function getMetadata(?string $key = null): mixed
+    {
+        $metadata = [
+            'seekable' => true,
+            'eof' => $this->eof(),
+        ];
+
+        if (null === $key) {
+            return $metadata;
+        }
+
+        return $metadata[$key] ?? null;
     }
 }
