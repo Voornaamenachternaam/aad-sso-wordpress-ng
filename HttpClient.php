@@ -64,7 +64,7 @@ class AADSSO_HttpClient implements ClientInterface
 
         $statusCode = $response->getStatusCode();
         $responseHeaders = [];
-        foreach ($response->getHeaders() as $name => $values) {
+        foreach ($response->getHeaders(false) as $name => $values) {
             $responseHeaders[$name] = $values;
         }
 
