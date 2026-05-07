@@ -205,7 +205,7 @@ class AADSSO
                     $this->settings,
                     $antiforgery_id
                 );
-            } catch (DomainException $e) {
+            } catch (\Throwable $e) {
                 AADSSO_Logger::log_error('ID token validation failed: ' . $e->getMessage());
                 return new WP_Error(
                     'id_token_validation_failed',
