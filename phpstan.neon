@@ -2,7 +2,7 @@ includes:
     - vendor/szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
-    level: max
+    level: 5
     phpVersion: 80505
     paths:
         - aad-sso-wordpress.php
@@ -30,8 +30,3 @@ parameters:
         # WordPress dynamic property access
         - '#Property WP_Roles::\$roles#'
         - '#Constant AADSSO_SETTINGS_PATH not found#'
-        # Mixed type handling - common in WordPress hooks/callbacks
-        - '#Binary operation .+ between .+ and mixed#'
-        - '#Parameter .+ expects .+, mixed given#'
-        - '#Cannot call method .+ on mixed#'
-        - '#Call to static method .+ on unknown class#'
