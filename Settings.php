@@ -90,30 +90,6 @@ class Settings
         return $defaults[$key] ?? null;
     }
 
-    /**
-     * Safely get blog name, with fallback for when WordPress is not fully initialized.
-     */
-    private static function safe_get_bloginfo_name(): string
-    {
-        if (\function_exists('get_bloginfo')) {
-            return (string) get_bloginfo('name');
-        }
-
-        return '';
-    }
-
-    /**
-     * Safely get WordPress login URL, with fallback for when WordPress is not fully initialized.
-     */
-    private static function safe_wp_login_url(): string
-    {
-        if (\function_exists('wp_login_url')) {
-            return (string) wp_login_url();
-        }
-
-        return '';
-    }
-
     public static function get_instance(): self
     {
         if (null === self::$instance) {
@@ -326,6 +302,30 @@ class Settings
         }
 
         return $this;
+    }
+
+    /**
+     * Safely get blog name, with fallback for when WordPress is not fully initialized.
+     */
+    private static function safe_get_bloginfo_name(): string
+    {
+        if (\function_exists('get_bloginfo')) {
+            return (string) get_bloginfo('name');
+        }
+
+        return '';
+    }
+
+    /**
+     * Safely get WordPress login URL, with fallback for when WordPress is not fully initialized.
+     */
+    private static function safe_wp_login_url(): string
+    {
+        if (\function_exists('wp_login_url')) {
+            return (string) wp_login_url();
+        }
+
+        return '';
     }
 
     /**
