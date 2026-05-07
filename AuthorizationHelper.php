@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-use Firebase\JWT\BeforeValidException;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\JWK;
-use Firebase\JWT\JWT;
-use Firebase\JWT\SignatureInvalidException;
+use Firebase\JWT\{BeforeValidException, ExpiredException, JWK, JWT, SignatureInvalidException};
 use Psr\Http\Message\ResponseInterface;
 
-class AADSSO_AuthorizationHelper
+class AuthorizationHelper
 {
-    /** @var AADSSO_HttpClient|null */
+    /**
+     * @var null|AADSSO_HttpClient
+     */
     private static ?AADSSO_HttpClient $http_client = null;
-    /** @var array<int, string> */
+
+    /**
+     * @var array<int, string>
+     */
     private static array $allowed_algorithms = ['RS256'];
 
     public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
@@ -60,7 +61,7 @@ class AADSSO_AuthorizationHelper
             $response = self::get_http_client()->post($settings->token_endpoint, $options);
 
             return self::process_token_response($response);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error(
                 'Token request error: ' . $e->getMessage()
             );
@@ -81,7 +82,7 @@ class AADSSO_AuthorizationHelper
             $response = self::get_http_client()->get($settings->jwks_uri);
 
             return self::process_jwks_response($response, $id_token, $antiforgery_id);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw new DomainException('Failed to fetch JWKS: ' . $e->getMessage());
         }
     }
@@ -153,7 +154,7 @@ class AADSSO_AuthorizationHelper
         $jwks_keys = $jwks;
         try {
             $keys = JWK::parseKeySet($jwks_keys, 'RS256');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw new DomainException('Failed to parse JWKS: ' . $e->getMessage());
         }
 
@@ -168,12 +169,12 @@ class AADSSO_AuthorizationHelper
             throw new DomainException('Token signature verification failed');
         } catch (BeforeValidException $e) {
             throw new DomainException('Token is not yet valid');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             throw new DomainException('Token validation failed: ' . $e->getMessage());
         }
 
         // Defensive check - though JWT::decode() is declared to return object
-        /** @phpstan-ignore-next-line */
+        // @phpstan-ignore-next-line
         if (!\is_object($jwt)) {
             throw new DomainException('JWT decode returned non-object');
         }

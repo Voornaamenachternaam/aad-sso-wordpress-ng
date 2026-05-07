@@ -4,34 +4,61 @@ declare(strict_types=1);
 
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class AADSSO_Settings
+class Settings
 {
     public string $client_id = '';
+
     public string $client_secret = '';
+
     public string $redirect_uri = '';
+
     public string $logout_redirect_uri = '';
+
     public string $org_display_name = '';
+
     public string $org_domain_hint = '';
+
     public string $field_to_match_to_upn = '';
+
     public bool $match_on_upn_alias = false;
+
     public bool $enable_auto_provisioning = false;
+
     public bool $enable_auto_forward_to_aad = false;
+
     public bool $enable_aad_group_to_wp_role = false;
-    /** @var array<string, string> */
+
+    /**
+     * @var array<string, string>
+     */
     public array $aad_group_to_wp_role_map = [];
+
     public ?string $default_wp_role = null;
+
     public bool $enable_full_logout = false;
+
     public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+
     public string $authorization_endpoint = '';
+
     public string $token_endpoint = '';
+
     public string $jwks_uri = '';
+
     public string $end_session_endpoint = '';
+
     public string $graph_endpoint = 'https://graph.microsoft.com';
+
     public string $graph_version = 'v1.0';
 
-    /** @var self|null */
+    /**
+     * @var null|self
+     */
     private static ?self $instance = null;
-    /** @var OptionsResolver|null */
+
+    /**
+     * @var null|OptionsResolver
+     */
     private static ?OptionsResolver $options_resolver = null;
 
     /**
@@ -173,7 +200,7 @@ class AADSSO_Settings
 
         $plugin_settings = get_option('aadsso_settings');
         if (\is_array($plugin_settings) && !empty($plugin_settings)) {
-            /** @var array<string, mixed> $plugin_settings */
+            // @var array<string, mixed> $plugin_settings
             $instance->load_settings($plugin_settings);
         }
 
@@ -187,104 +214,6 @@ class AADSSO_Settings
         }
 
         return $instance;
-    }
-
-    /**
-     * @param array<string, mixed> $settings
-     * @return array<string, mixed>
-     */
-    private static function filter_to_known_settings(array $settings): array
-    {
-        $resolver = self::get_options_resolver();
-        $defined_options = array_keys($resolver->resolve([]));
-
-        /** @var array<string, mixed> */
-        $filtered = array_filter(
-            $settings,
-            fn($value, string $key): bool => \in_array($key, $defined_options, true),
-            ARRAY_FILTER_USE_BOTH
-        );
-
-        // Ensure the result has string keys
-        /** @var array<string, mixed> */
-        return array_combine(
-            array_map('strval', array_keys($filtered)),
-            array_values($filtered)
-        ) ?: $filtered;
-    }
-
-    /**
-     * @return array<string, mixed>|false
-     */
-    private static function get_cached_openid_configuration(): array|false
-    {
-        $force_reload = isset($_GET['aadsso_reload_openid_config']);
-
-        if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
-            $config = self::fetch_openid_configuration();
-
-            if (\is_array($config) && !empty($config)) {
-                try {
-                    $cache = AADSSO_Logger::get_cache();
-                    $cache->set('aadsso_openid_configuration', $config, 3600);
-                } catch (\Throwable $e) {
-                    AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
-                }
-            }
-
-            return $config;
-        }
-
-        $cache = AADSSO_Logger::get_cache();
-
-        try {
-            $cached = $cache->get('aadsso_openid_configuration');
-            if (\is_array($cached) && !empty($cached)) {
-                /** @var array<string, mixed> */
-                return $cached;
-            }
-        } catch (\Throwable $e) {
-            AADSSO_Logger::log_exception($e, 'Cache read failed for OpenID configuration');
-        }
-
-        $config = self::fetch_openid_configuration();
-
-        if (\is_array($config) && !empty($config)) {
-            try {
-                $cache->set('aadsso_openid_configuration', $config, 3600);
-            } catch (\Throwable $e) {
-                AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
-            }
-        }
-
-        return $config;
-    }
-
-    /**
-     * @return array<string, mixed>|false
-     */
-    private static function fetch_openid_configuration(): array|false
-    {
-        $instance = self::get_instance();
-        $remote_response = self::get_remote_contents(
-            esc_url_raw($instance->openid_configuration_endpoint)
-        );
-
-        if (!empty($remote_response)) {
-            $openid_configuration = json_decode($remote_response, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                AADSSO_Logger::log_error('OpenID configuration JSON decode error: ' . json_last_error_msg());
-                return false;
-            }
-
-            if (\is_array($openid_configuration) && !empty($openid_configuration)) {
-                /** @var array<string, mixed> */
-                return $openid_configuration;
-            }
-        }
-
-        return false;
     }
 
     public static function get_remote_contents(string $url): string
@@ -302,53 +231,18 @@ class AADSSO_Settings
                 AADSSO_Logger::log_error(
                     'Failed to fetch remote contents: HTTP ' . $status_code
                 );
+
                 return '';
             }
 
-            $body = $response->getBody()->getContents();
-
-            return $body;
-        } catch (\Throwable $e) {
+            return $response->getBody()->getContents();
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error(
                 'Failed to fetch remote contents: ' . $e->getMessage()
             );
 
             return '';
         }
-    }
-
-    private static function sanitize_setting(string $key, mixed $value): mixed
-    {
-        $url_fields = [
-            'redirect_uri',
-            'logout_redirect_uri',
-            'authorization_endpoint',
-            'token_endpoint',
-            'jwks_uri',
-            'end_session_endpoint',
-            'openid_configuration_endpoint',
-            'graph_endpoint',
-        ];
-
-        if (\in_array($key, $url_fields, true)) {
-            $url_value = \is_string($value) ? $value : '';
-            return esc_url_raw($url_value);
-        }
-
-        return match ($key) {
-            'client_id' => sanitize_text_field(\is_string($value) ? $value : ''),
-            'client_secret' => \is_string($value) ? $value : '',
-            'org_display_name', 'org_domain_hint',
-            'field_to_match_to_upn', 'default_wp_role',
-            'graph_version' => sanitize_text_field(\is_string($value) ? $value : ''),
-            'match_on_upn_alias',
-            'enable_auto_provisioning',
-            'enable_auto_forward_to_aad',
-            'enable_aad_group_to_wp_role',
-            'enable_full_logout' => (bool) $value,
-            'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
-            default => $value,
-        };
     }
 
     /**
@@ -368,7 +262,7 @@ class AADSSO_Settings
                 }
                 if (\is_array($group_ids_list)) {
                     foreach ($group_ids_list as $group_id) {
-                        $group_id_trimmed = \is_string($group_id) ? trim(sanitize_text_field($group_id)) : '';
+                        $group_id_trimmed = \is_string($group_id) ? mb_trim(sanitize_text_field($group_id)) : '';
                         $role_slug_sanitized = \is_string($role_slug) ? sanitize_text_field($role_slug) : '';
                         if (!empty($group_id_trimmed) && !isset($settings['aad_group_to_wp_role_map'][$group_id_trimmed])) {
                             $settings['aad_group_to_wp_role_map'][$group_id_trimmed] = $role_slug_sanitized;
@@ -378,7 +272,7 @@ class AADSSO_Settings
                     $group_ids = \is_string($group_ids_list) ? explode(',', $group_ids_list) : [];
                     if (!empty($group_ids)) {
                         foreach ($group_ids as $group_id) {
-                            $group_id_trimmed = trim(sanitize_text_field($group_id));
+                            $group_id_trimmed = mb_trim(sanitize_text_field($group_id));
                             $role_slug_sanitized = sanitize_text_field($role_slug);
                             if (!empty($group_id_trimmed)
                                 && !isset($settings['aad_group_to_wp_role_map'][$group_id_trimmed])
@@ -399,10 +293,145 @@ class AADSSO_Settings
                     $this->{$key} = self::sanitize_setting($key, $value);
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_exception($e, 'Failed to resolve settings with OptionsResolver');
         }
 
         return $this;
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     *
+     * @return array<string, mixed>
+     */
+    private static function filter_to_known_settings(array $settings): array
+    {
+        $resolver = self::get_options_resolver();
+        $defined_options = array_keys($resolver->resolve([]));
+
+        /** @var array<string, mixed> */
+        $filtered = array_filter(
+            $settings,
+            static fn ($value, string $key): bool => \in_array($key, $defined_options, true),
+            \ARRAY_FILTER_USE_BOTH
+        );
+
+        // Ensure the result has string keys
+        // @var array<string, mixed>
+        return array_combine(
+            array_map('strval', array_keys($filtered)),
+            array_values($filtered)
+        ) ?: $filtered;
+    }
+
+    /**
+     * @return array<string, mixed>|false
+     */
+    private static function get_cached_openid_configuration(): array|false
+    {
+        $force_reload = isset($_GET['aadsso_reload_openid_config']);
+
+        if ($force_reload && current_user_can('manage_options') && check_admin_referer('aadsso_reload_openid_config')) {
+            $config = self::fetch_openid_configuration();
+
+            if (\is_array($config) && !empty($config)) {
+                try {
+                    $cache = AADSSO_Logger::get_cache();
+                    $cache->set('aadsso_openid_configuration', $config, 3600);
+                } catch (Throwable $e) {
+                    AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
+                }
+            }
+
+            return $config;
+        }
+
+        $cache = AADSSO_Logger::get_cache();
+
+        try {
+            $cached = $cache->get('aadsso_openid_configuration');
+            if (\is_array($cached) && !empty($cached)) {
+                // @var array<string, mixed>
+                return $cached;
+            }
+        } catch (Throwable $e) {
+            AADSSO_Logger::log_exception($e, 'Cache read failed for OpenID configuration');
+        }
+
+        $config = self::fetch_openid_configuration();
+
+        if (\is_array($config) && !empty($config)) {
+            try {
+                $cache->set('aadsso_openid_configuration', $config, 3600);
+            } catch (Throwable $e) {
+                AADSSO_Logger::log_exception($e, 'Cache write failed for OpenID configuration');
+            }
+        }
+
+        return $config;
+    }
+
+    /**
+     * @return array<string, mixed>|false
+     */
+    private static function fetch_openid_configuration(): array|false
+    {
+        $instance = self::get_instance();
+        $remote_response = self::get_remote_contents(
+            esc_url_raw($instance->openid_configuration_endpoint)
+        );
+
+        if (!empty($remote_response)) {
+            $openid_configuration = json_decode($remote_response, true);
+
+            if (\JSON_ERROR_NONE !== json_last_error()) {
+                AADSSO_Logger::log_error('OpenID configuration JSON decode error: ' . json_last_error_msg());
+
+                return false;
+            }
+
+            if (\is_array($openid_configuration) && !empty($openid_configuration)) {
+                // @var array<string, mixed>
+                return $openid_configuration;
+            }
+        }
+
+        return false;
+    }
+
+    private static function sanitize_setting(string $key, mixed $value): mixed
+    {
+        $url_fields = [
+            'redirect_uri',
+            'logout_redirect_uri',
+            'authorization_endpoint',
+            'token_endpoint',
+            'jwks_uri',
+            'end_session_endpoint',
+            'openid_configuration_endpoint',
+            'graph_endpoint',
+        ];
+
+        if (\in_array($key, $url_fields, true)) {
+            $url_value = \is_string($value) ? $value : '';
+
+            return esc_url_raw($url_value);
+        }
+
+        return match ($key) {
+            'client_id' => sanitize_text_field(\is_string($value) ? $value : ''),
+            'client_secret' => \is_string($value) ? $value : '',
+            'org_display_name', 'org_domain_hint',
+            'field_to_match_to_upn', 'default_wp_role',
+            'graph_version' => sanitize_text_field(\is_string($value) ? $value : ''),
+            'match_on_upn_alias',
+            'enable_auto_provisioning',
+            'enable_auto_forward_to_aad',
+            'enable_aad_group_to_wp_role',
+            'enable_full_logout' => (bool) $value,
+            'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
+            default => $value,
+        };
     }
 }

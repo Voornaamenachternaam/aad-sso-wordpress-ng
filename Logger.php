@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use Monolog\Handler\RotatingFileHandler;
-use Monolog\Level;
-use Monolog\Logger;
+use Monolog\{Level, Logger};
 use Monolog\Processor\PsrLogMessageProcessor;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -19,7 +18,7 @@ if (!\defined('AADSSO_PLUGIN_DIR')) {
     \define('AADSSO_PLUGIN_DIR', __DIR__ . '/');
 }
 
-class AADSSO_Logger
+class Logger
 {
     private static ?LoggerInterface $logger = null;
 
@@ -60,7 +59,7 @@ class AADSSO_Logger
                 Level::Debug
             );
 
-            self::$logger = new Logger(
+            self::$logger = new self(
                 'aad-sso',
                 [$handler],
                 [new PsrLogMessageProcessor()]

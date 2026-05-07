@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
-class AADSSO_Settings_Page
+class SettingsPage
 {
-    /** @var array<string, mixed> */
+    /**
+     * @var array<string, mixed>
+     */
     private array $settings = [];
-    /** @var string|false */
+
+    /**
+     * @var false|string
+     */
     private string|false $options_page_id = false;
 
     public function __construct()
@@ -75,8 +80,11 @@ class AADSSO_Settings_Page
         $settings_file_path = AADSSO_SETTINGS_PATH;
         $json_content = file_get_contents($settings_file_path);
         if (false === $json_content) {
-            wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
-                admin_url('options-general.php?page=aadsso_settings')));
+            wp_safe_redirect(add_query_arg(
+                'aadsso_migrate_from_json_status',
+                'invalid_json',
+                admin_url('options-general.php?page=aadsso_settings')
+            ));
             exit;
         }
 
@@ -84,12 +92,15 @@ class AADSSO_Settings_Page
         $json_error = json_last_error();
         if (null === $legacy_settings && \JSON_ERROR_NONE !== $json_error) {
             AADSSO_Logger::log_error('JSON decode error during migration: ' . json_last_error_msg());
-            wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'invalid_json',
-                admin_url('options-general.php?page=aadsso_settings')));
+            wp_safe_redirect(add_query_arg(
+                'aadsso_migrate_from_json_status',
+                'invalid_json',
+                admin_url('options-general.php?page=aadsso_settings')
+            ));
             exit;
         }
 
-        if (\is_array($legacy_settings) && isset($legacy_settings['aad_group_to_wp_role_map']) && is_array($legacy_settings['aad_group_to_wp_role_map'])) {
+        if (\is_array($legacy_settings) && isset($legacy_settings['aad_group_to_wp_role_map']) && \is_array($legacy_settings['aad_group_to_wp_role_map'])) {
             // aad_group_to_wp_role_map[group_id] = role_slug - convert to role_map format for UI compatibility
             $legacy_settings['role_map'] = [];
             foreach ($legacy_settings['aad_group_to_wp_role_map'] as $group_id => $role_slug) {
@@ -114,11 +125,17 @@ class AADSSO_Settings_Page
         $can_delete = is_writable($settings_file_path) && '' !== $dirname && is_writable($dirname);
         if ($can_delete) {
             unlink($settings_file_path);
-            wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'success',
-                admin_url('options-general.php?page=aadsso_settings')));
+            wp_safe_redirect(add_query_arg(
+                'aadsso_migrate_from_json_status',
+                'success',
+                admin_url('options-general.php?page=aadsso_settings')
+            ));
         } else {
-            wp_safe_redirect(add_query_arg('aadsso_migrate_from_json_status', 'manual',
-                admin_url('options-general.php?page=aadsso_settings')));
+            wp_safe_redirect(add_query_arg(
+                'aadsso_migrate_from_json_status',
+                'manual',
+                admin_url('options-general.php?page=aadsso_settings')
+            ));
         }
         exit;
     }
@@ -134,25 +151,38 @@ class AADSSO_Settings_Page
 
         if ('success' === $status) {
             echo '<div id="message" class="notice notice-success"><p>'
-                . esc_html__('Legacy settings have been migrated and the old configuration file has been deleted.',
-                    'aad-sso-wordpress')
-                . ' ' . esc_html__('To finish migration, unset AADSSO_SETTINGS_PATH from wp-config.php.',
-                    'aad-sso-wordpress') . '</p></div>';
+                . esc_html__(
+                    'Legacy settings have been migrated and the old configuration file has been deleted.',
+                    'aad-sso-wordpress'
+                )
+                . ' ' . esc_html__(
+                    'To finish migration, unset AADSSO_SETTINGS_PATH from wp-config.php.',
+                    'aad-sso-wordpress'
+                ) . '</p></div>';
         } elseif ('manual' === $status) {
             $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
             echo '<div id="message" class="notice notice-warning"><p>'
                 . esc_html__('Legacy settings have been migrated successfully.', 'aad-sso-wordpress') . ' '
-                . sprintf(esc_html__('To finish migration, delete the file at the path %s.',
-                    'aad-sso-wordpress'), '<code>' . esc_html($settings_path) . '</code>')
-                . ' ' . sprintf(esc_html__('Then, unset %s from %s.', 'aad-sso-wordpress'),
-                    '<code>AADSSO_SETTINGS_PATH</code>', '<code>wp-config.php</code>') . '</p></div>';
+                . \sprintf(esc_html__(
+                    'To finish migration, delete the file at the path %s.',
+                    'aad-sso-wordpress'
+                ), '<code>' . esc_html($settings_path) . '</code>')
+                . ' ' . \sprintf(
+                    esc_html__('Then, unset %s from %s.', 'aad-sso-wordpress'),
+                    '<code>AADSSO_SETTINGS_PATH</code>',
+                    '<code>wp-config.php</code>'
+                ) . '</p></div>';
         } elseif ('invalid_json' === $status) {
             $settings_path = \defined('AADSSO_SETTINGS_PATH') && \is_string(AADSSO_SETTINGS_PATH) ? AADSSO_SETTINGS_PATH : '';
             echo '<div id="message" class="notice notice-error"><p>'
-                . sprintf(esc_html__('Legacy settings could not be migrated from %s.', 'aad-sso-wordpress'),
-                    '<code>' . esc_html($settings_path) . '</code>')
-                . ' ' . esc_html__('File could not be parsed as JSON. Delete the file, or check its syntax.',
-                    'aad-sso-wordpress') . '</p></div>';
+                . \sprintf(
+                    esc_html__('Legacy settings could not be migrated from %s.', 'aad-sso-wordpress'),
+                    '<code>' . esc_html($settings_path) . '</code>'
+                )
+                . ' ' . esc_html__(
+                    'File could not be parsed as JSON. Delete the file, or check its syntax.',
+                    'aad-sso-wordpress'
+                ) . '</p></div>';
         }
     }
 
@@ -187,7 +217,7 @@ class AADSSO_Settings_Page
             esc_html__('Microsoft Entra ID', 'aad-sso-wordpress'),
             'manage_options',
             'aadsso_settings',
-            array($this, 'render_admin_page')
+            [$this, 'render_admin_page']
         );
         $this->options_page_id = $page_id;
     }
@@ -202,27 +232,27 @@ class AADSSO_Settings_Page
         register_setting(
             'aadsso_settings',
             'aadsso_settings',
-            array($this, 'sanitize_settings')
+            [$this, 'sanitize_settings']
         );
 
         add_settings_section(
             'aadsso_settings_general',
             esc_html__('General', 'aad-sso-wordpress'),
-            array($this, 'settings_general_info'),
+            [$this, 'settings_general_info'],
             'aadsso_settings_page'
         );
 
         add_settings_section(
             'aadsso_settings_advanced',
             esc_html__('Advanced', 'aad-sso-wordpress'),
-            array($this, 'settings_advanced_info'),
+            [$this, 'settings_advanced_info'],
             'aadsso_settings_page'
         );
 
         add_settings_field(
             'org_display_name',
             esc_html__('Display name', 'aad-sso-wordpress'),
-            array($this, 'org_display_name_callback'),
+            [$this, 'org_display_name_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -230,7 +260,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'org_domain_hint',
             esc_html__('Domain hint', 'aad-sso-wordpress'),
-            array($this, 'org_domain_hint_callback'),
+            [$this, 'org_domain_hint_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -238,7 +268,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'client_id',
             esc_html__('Client ID', 'aad-sso-wordpress'),
-            array($this, 'client_id_callback'),
+            [$this, 'client_id_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -246,7 +276,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'client_secret',
             esc_html__('Client secret', 'aad-sso-wordpress'),
-            array($this, 'client_secret_callback'),
+            [$this, 'client_secret_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -254,7 +284,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'redirect_uri',
             esc_html__('Redirect URL', 'aad-sso-wordpress'),
-            array($this, 'redirect_uri_callback'),
+            [$this, 'redirect_uri_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -262,7 +292,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'logout_redirect_uri',
             esc_html__('Logout redirect URL', 'aad-sso-wordpress'),
-            array($this, 'logout_redirect_uri_callback'),
+            [$this, 'logout_redirect_uri_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -270,7 +300,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'enable_full_logout',
             esc_html__('Enable full logout', 'aad-sso-wordpress'),
-            array($this, 'enable_full_logout_callback'),
+            [$this, 'enable_full_logout_callback'],
             'aadsso_settings_page',
             'aadsso_settings_general'
         );
@@ -278,7 +308,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'field_to_match_to_upn',
             esc_html__('Field to match to UPN', 'aad-sso-wordpress'),
-            array($this, 'field_to_match_to_upn_callback'),
+            [$this, 'field_to_match_to_upn_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -286,7 +316,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'match_on_upn_alias',
             esc_html__('Match on alias of the UPN', 'aad-sso-wordpress'),
-            array($this, 'match_on_upn_alias_callback'),
+            [$this, 'match_on_upn_alias_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -294,7 +324,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'enable_auto_provisioning',
             esc_html__('Enable auto-provisioning', 'aad-sso-wordpress'),
-            array($this, 'enable_auto_provisioning_callback'),
+            [$this, 'enable_auto_provisioning_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -302,7 +332,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'enable_auto_forward_to_aad',
             esc_html__('Enable auto-forward to Microsoft Entra ID', 'aad-sso-wordpress'),
-            array($this, 'enable_auto_forward_to_aad_callback'),
+            [$this, 'enable_auto_forward_to_aad_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -310,7 +340,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'enable_aad_group_to_wp_role',
             esc_html__('Enable Microsoft Entra ID group to WordPress role association', 'aad-sso-wordpress'),
-            array($this, 'enable_aad_group_to_wp_role_callback'),
+            [$this, 'enable_aad_group_to_wp_role_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -318,7 +348,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'default_wp_role',
             esc_html__('Default WordPress role if not in Microsoft Entra ID group', 'aad-sso-wordpress'),
-            array($this, 'default_wp_role_callback'),
+            [$this, 'default_wp_role_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -326,7 +356,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'role_map',
             esc_html__('WordPress role to Microsoft Entra ID group map', 'aad-sso-wordpress'),
-            array($this, 'role_map_callback'),
+            [$this, 'role_map_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -334,7 +364,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'openid_configuration_endpoint',
             esc_html__('OpenID Connect configuration endpoint', 'aad-sso-wordpress'),
-            array($this, 'openid_configuration_endpoint_callback'),
+            [$this, 'openid_configuration_endpoint_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -342,7 +372,7 @@ class AADSSO_Settings_Page
         add_settings_field(
             'aadsso_settings_security_info',
             esc_html__('Security Information', 'aad-sso-wordpress'),
-            array($this, 'security_info_callback'),
+            [$this, 'security_info_callback'],
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
@@ -367,6 +397,7 @@ class AADSSO_Settings_Page
 
     /**
      * @param mixed $input
+     *
      * @return array<string, mixed>
      */
     public function sanitize_settings(mixed $input): array
@@ -374,8 +405,7 @@ class AADSSO_Settings_Page
         if (!\is_array($input)) {
             // Return current settings to prevent data loss
             /** @var array<string, mixed> */
-            $current = get_option('aadsso_settings', []);
-            return $current;
+            return get_option('aadsso_settings', []);
         }
         /** @var array<string, mixed> $input */
         $sanitized = [];
@@ -412,7 +442,7 @@ class AADSSO_Settings_Page
         $default_wp_role_raw = $input['default_wp_role'] ?? '';
         $default_wp_role = \is_string($default_wp_role_raw) ? sanitize_text_field($default_wp_role_raw) : '';
         $valid_roles = array_keys($this->get_editable_roles());
-        $sanitized['default_wp_role'] = in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
+        $sanitized['default_wp_role'] = \in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
         $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
         $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
@@ -443,10 +473,10 @@ class AADSSO_Settings_Page
             foreach ($input['role_map'] as $role => $groups) {
                 $role_sanitized = \is_string($role) ? sanitize_text_field($role) : '';
                 $groups = \is_array($groups) ? $groups : (\is_string($groups) ? explode(',', $groups) : []);
-                if (!empty($role_sanitized) && in_array($role_sanitized, $valid_roles, true)) {
+                if (!empty($role_sanitized) && \in_array($role_sanitized, $valid_roles, true)) {
                     $group_ids = [];
                     foreach ($groups as $group_id) {
-                        $group_id_sanitized = \is_string($group_id) ? sanitize_text_field(trim($group_id)) : '';
+                        $group_id_sanitized = \is_string($group_id) ? sanitize_text_field(mb_trim($group_id)) : '';
                         if (!empty($group_id_sanitized)) {
                             $group_ids[] = $group_id_sanitized;
                         }
@@ -464,21 +494,27 @@ class AADSSO_Settings_Page
 
     public function settings_general_info(): void
     {
-        echo '<p>' . esc_html__('Configure the basic settings for Microsoft Entra ID single sign-on.',
-                'aad-sso-wordpress') . '</p>';
+        echo '<p>' . esc_html__(
+            'Configure the basic settings for Microsoft Entra ID single sign-on.',
+            'aad-sso-wordpress'
+        ) . '</p>';
     }
 
     public function settings_advanced_info(): void
     {
-        echo '<p>' . esc_html__('Configure advanced settings for Microsoft Entra ID single sign-on.',
-                'aad-sso-wordpress') . '</p>';
+        echo '<p>' . esc_html__(
+            'Configure advanced settings for Microsoft Entra ID single sign-on.',
+            'aad-sso-wordpress'
+        ) . '</p>';
     }
 
     public function org_display_name_callback(): void
     {
         $this->render_text_field('org_display_name');
-        echo '<p class="description">' . esc_html__('Display Name will be shown on the WordPress login screen.',
-                'aad-sso-wordpress') . '</p>';
+        echo '<p class="description">' . esc_html__(
+            'Display Name will be shown on the WordPress login screen.',
+            'aad-sso-wordpress'
+        ) . '</p>';
     }
 
     public function org_domain_hint_callback(): void
@@ -548,7 +584,7 @@ class AADSSO_Settings_Page
 
     public function field_to_match_to_upn_callback(): void
     {
-        $selected = isset($this->settings['field_to_match_to_upn']) ? $this->settings['field_to_match_to_upn'] : 'email';
+        $selected = $this->settings['field_to_match_to_upn'] ?? 'email';
         ?>
         <select name="aadsso_settings[field_to_match_to_upn]" id="field_to_match_to_upn">
             <option value="email"<?php selected($selected, 'email'); ?>>
@@ -571,7 +607,8 @@ class AADSSO_Settings_Page
         $this->render_checkbox_field(
             'match_on_upn_alias',
             wp_kses_post(
-                __('Match WordPress users based on the alias of their Microsoft Entra ID '
+                __(
+                    'Match WordPress users based on the alias of their Microsoft Entra ID '
                     . 'UserPrincipalName. For example, Microsoft Entra ID username <code>bob@example.com</code> '
                     . 'will match WordPress user <code>bob</code>.',
                     'aad-sso-wordpress'
@@ -694,7 +731,8 @@ class AADSSO_Settings_Page
             . esc_url($default_url)
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';
         echo '<p class="description">' . wp_kses_post(
-            __('The OpenID Connect configuration endpoint to use. To support Microsoft '
+            __(
+                'The OpenID Connect configuration endpoint to use. To support Microsoft '
                 . 'Accounts and external users (users invited in from other Microsoft Entra ID '
                 . 'directories, known sometimes as "B2B users") you must use: '
                 . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
@@ -731,9 +769,10 @@ class AADSSO_Settings_Page
     public function is_on_options_page(): bool
     {
         $screen = get_current_screen();
-        if ($screen === null || $this->options_page_id === false) {
+        if (null === $screen || false === $this->options_page_id) {
             return false;
         }
+
         return $screen->id === (string) $this->options_page_id;
     }
 
@@ -754,7 +793,7 @@ class AADSSO_Settings_Page
 
             // Defensive check - $wp_roles is WP_Roles object in WordPress context
             if (!isset($wp_roles) || !\is_object($wp_roles)) {
-                /** @var array<string, array<string, mixed>> */
+                // @var array<string, array<string, mixed>>
                 return [];
             }
 
@@ -768,7 +807,7 @@ class AADSSO_Settings_Page
 
         // Defensive check - wp_roles() returns WP_Roles object
         if (!\is_object($roles_obj)) {
-            /** @var array<string, array<string, mixed>> */
+            // @var array<string, array<string, mixed>>
             return [];
         }
 

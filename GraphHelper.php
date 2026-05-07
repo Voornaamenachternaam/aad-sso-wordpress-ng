@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 use Psr\Http\Message\ResponseInterface;
 
-class AADSSO_GraphHelper
+class GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';
 
     public static ?AADSSO_Settings $settings = null;
+
     private static ?AADSSO_HttpClient $http_client = null;
 
     public static function get_base_url(): string
@@ -62,7 +63,7 @@ class AADSSO_GraphHelper
             $response = self::get_http_client()->get($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error('Graph API GET request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());
@@ -93,7 +94,7 @@ class AADSSO_GraphHelper
             $response = self::get_http_client()->post($url, $options);
 
             return self::parse_and_log_response($response);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             AADSSO_Logger::log_error('Graph API POST request failed: ' . $e->getMessage());
 
             return new WP_Error('http_request_failed', $e->getMessage());

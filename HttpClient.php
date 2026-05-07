@@ -2,16 +2,9 @@
 
 declare(strict_types=1);
 
-use GuzzleHttp\Psr7\HttpFactory;
-use GuzzleHttp\Psr7\Response as GuzzleResponse;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Client\NetworkExceptionInterface;
-use Psr\Http\Message\RequestFactoryInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamFactoryInterface;
-use Psr\Http\Message\StreamInterface;
-use Psr\Http\Message\UriInterface;
+use GuzzleHttp\Psr7\{HttpFactory, Response as GuzzleResponse};
+use Psr\Http\Client\{ClientInterface, NetworkExceptionInterface};
+use Psr\Http\Message\{RequestFactoryInterface, RequestInterface, ResponseInterface, StreamFactoryInterface};
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -22,13 +15,24 @@ if (!\defined('ABSPATH')) {
 
 class AADSSO_HttpClient implements ClientInterface
 {
-    /** @var HttpClientInterface */
+    /**
+     * @var HttpClientInterface
+     */
     private HttpClientInterface $http_client;
-    /** @var RequestFactoryInterface */
+
+    /**
+     * @var RequestFactoryInterface
+     */
     private RequestFactoryInterface $request_factory;
-    /** @var StreamFactoryInterface */
+
+    /**
+     * @var StreamFactoryInterface
+     */
     private StreamFactoryInterface $stream_factory;
-    /** @var self|null */
+
+    /**
+     * @var null|self
+     */
     private static ?self $instance = null;
 
     public function __construct(?HttpClientInterface $http_client = null)
@@ -78,26 +82,12 @@ class AADSSO_HttpClient implements ClientInterface
     }
 
     /**
-     * @return array<string, string>
-     */
-    private function getFlattenedHeaders(RequestInterface $request): array
-    {
-        $flattened = [];
-        foreach ($request->getHeaders() as $name => $values) {
-            $headerValue = implode(', ', $values);
-            /** @var string $headerValue */
-            $flattened[$name] = $headerValue;
-        }
-        /** @var array<string, string> */
-        return $flattened;
-    }
-
-    /**
      * @param array<string, mixed> $options
      */
     public function get(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('GET', $url, $options);
+
         return $this->sendRequest($request);
     }
 
@@ -107,6 +97,7 @@ class AADSSO_HttpClient implements ClientInterface
     public function post(string $url, array $options = []): ResponseInterface
     {
         $request = $this->createRequest('POST', $url, $options);
+
         return $this->sendRequest($request);
     }
 
@@ -116,12 +107,12 @@ class AADSSO_HttpClient implements ClientInterface
     public function createRequest(string $method, string $url, array $options = []): RequestInterface
     {
         if (!empty($options['query'])) {
-            $separator = (strpos($url, '?') !== false) ? '&' : '?';
+            $separator = (str_contains($url, '?')) ? '&' : '?';
             $url .= $separator . self::buildQueryString(self::normalizeQueryParams($options['query']));
             unset($options['query']);
         }
 
-        /** @var array<string, string|array<string>> $headers */
+        /** @var array<string, array<string>|string> $headers */
         $headers = $options['headers'] ?? [];
         $body = $options['body'] ?? '';
 
@@ -148,6 +139,62 @@ class AADSSO_HttpClient implements ClientInterface
         return $request;
     }
 
+    public function get_http_client(): HttpClientInterface
+    {
+        return $this->http_client;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function create_response(array $data): ResponseInterface
+    {
+        $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
+        $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
+        $body_raw = $data['body'] ?? '';
+        /** @var string */
+        $body = \is_string($body_raw) ? $body_raw : (json_encode($body_raw) ?: '');
+
+        // Normalize headers to array<string, array<string>>
+        /** @var array<string, array<string>> $normalized_headers */
+        $normalized_headers = [];
+        foreach ($headers as $name => $values) {
+            // @var string $name
+            if (\is_array($values)) {
+                /** @var list<scalar> $flattenValues */
+                $flattenValues = array_values($values);
+                /** @var list<string> $stringValues */
+                $stringValues = [];
+                foreach ($flattenValues as $fv) {
+                    $stringValues[] = (string) $fv;
+                }
+                $normalized_headers[$name] = $stringValues;
+            } else {
+                $normalized_headers[$name] = [
+                    \is_string($values) ? $values : (\is_scalar($values) ? (string) $values : ''),
+                ];
+            }
+        }
+
+        return new GuzzleResponse($status, $normalized_headers, $body);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getFlattenedHeaders(RequestInterface $request): array
+    {
+        $flattened = [];
+        foreach ($request->getHeaders() as $name => $values) {
+            $headerValue = implode(', ', $values);
+            // @var string $headerValue
+            $flattened[$name] = $headerValue;
+        }
+
+        // @var array<string, string>
+        return $flattened;
+    }
+
     /**
      * @param array<string, array<int, string>|string> $params
      */
@@ -155,13 +202,13 @@ class AADSSO_HttpClient implements ClientInterface
     {
         $parts = [];
         foreach ($params as $key => $value) {
-            $encodedKey = \rawurlencode((string) $key);
+            $encodedKey = rawurlencode((string) $key);
             if (\is_array($value)) {
                 foreach ($value as $item) {
-                    $parts[] = $encodedKey . '=' . \rawurlencode(self::scalarToString($item));
+                    $parts[] = $encodedKey . '=' . rawurlencode(self::scalarToString($item));
                 }
             } else {
-                $parts[] = $encodedKey . '=' . \rawurlencode(self::scalarToString($value));
+                $parts[] = $encodedKey . '=' . rawurlencode(self::scalarToString($value));
             }
         }
 
@@ -182,6 +229,7 @@ class AADSSO_HttpClient implements ClientInterface
 
     /**
      * @param mixed $query
+     *
      * @return array<string, array<int, string>|string>
      */
     private static function normalizeQueryParams(mixed $query): array
@@ -207,65 +255,25 @@ class AADSSO_HttpClient implements ClientInterface
                 }
                 // Only add if we have values after filtering
                 if (!empty($values)) {
-                    /** @var string $key */
+                    // @var string $key
                     $result[$key] = $values;
                 }
             } elseif (\is_scalar($value)) {
-                /** @var string $key */
+                // @var string $key
                 $result[$key] = self::scalarToString($value);
             }
         }
 
-        /** @var array<string, array<int, string>|string> */
+        // @var array<string, array<int, string>|string>
         return $result;
-    }
-
-    public function get_http_client(): HttpClientInterface
-    {
-        return $this->http_client;
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    public static function create_response(array $data): ResponseInterface
-    {
-        $status = isset($data['status']) && \is_int($data['status']) ? $data['status'] : 200;
-        $headers = isset($data['headers']) && \is_array($data['headers']) ? $data['headers'] : [];
-        $body_raw = $data['body'] ?? '';
-        /** @var string */
-        $body = \is_string($body_raw) ? $body_raw : (json_encode($body_raw) ?: '');
-
-        // Normalize headers to array<string, array<string>>
-        /** @var array<string, array<string>> $normalized_headers */
-        $normalized_headers = [];
-        foreach ($headers as $name => $values) {
-            /** @var string $name */
-            if (\is_array($values)) {
-                /** @var list<scalar> $flattenValues */
-                $flattenValues = array_values($values);
-                /** @var list<string> $stringValues */
-                $stringValues = [];
-                foreach ($flattenValues as $fv) {
-                    $stringValues[] = (string) $fv;
-                }
-                $normalized_headers[$name] = $stringValues;
-            } else {
-                $normalized_headers[$name] = [
-                    \is_string($values) ? $values : (\is_scalar($values) ? (string) $values : ''),
-                ];
-            }
-        }
-
-        return new GuzzleResponse($status, $normalized_headers, $body);
     }
 }
 
-class AADSSO_HttpClientNetworkException extends \RuntimeException implements NetworkExceptionInterface
+class AADSSO_HttpClientNetworkException extends RuntimeException implements NetworkExceptionInterface
 {
     private RequestInterface $request;
 
-    public function __construct(string $message, RequestInterface $request, \Throwable $previous)
+    public function __construct(string $message, RequestInterface $request, Throwable $previous)
     {
         parent::__construct($message, 0, $previous);
         $this->request = $request;

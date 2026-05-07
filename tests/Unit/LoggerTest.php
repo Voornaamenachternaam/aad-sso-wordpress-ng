@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Logger unit tests.
+ *
+ * @internal
  */
 class LoggerTest extends TestCase
 {
@@ -31,7 +33,7 @@ class LoggerTest extends TestCase
     /**
      * Test logger class exists.
      */
-    public function test_logger_can_be_instantiated(): void
+    public function testLoggerCanBeInstantiated(): void
     {
         $this->assertTrue(class_exists('AADSSO_Logger'));
     }
@@ -39,7 +41,7 @@ class LoggerTest extends TestCase
     /**
      * Test get_logger returns logger instance.
      */
-    public function test_get_logger_returns_logger_instance(): void
+    public function testGetLoggerReturnsLoggerInstance(): void
     {
         $logger = \AADSSO_Logger::get_logger();
         $this->assertNotNull($logger);
@@ -49,7 +51,7 @@ class LoggerTest extends TestCase
     /**
      * Test get_cache returns cache instance.
      */
-    public function test_get_cache_returns_cache_instance(): void
+    public function testGetCacheReturnsCacheInstance(): void
     {
         $cache = \AADSSO_Logger::get_cache();
         $this->assertNotNull($cache);
@@ -59,7 +61,7 @@ class LoggerTest extends TestCase
     /**
      * Test log_debug does not throw.
      */
-    public function test_log_debug_does_not_throw(): void
+    public function testLogDebugDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         \AADSSO_Logger::log_debug('Test debug message', 10);
@@ -68,7 +70,7 @@ class LoggerTest extends TestCase
     /**
      * Test log_info does not throw.
      */
-    public function test_log_info_does_not_throw(): void
+    public function testLogInfoDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         \AADSSO_Logger::log_info('Test info message');
@@ -77,7 +79,7 @@ class LoggerTest extends TestCase
     /**
      * Test log_warning does not throw.
      */
-    public function test_log_warning_does_not_throw(): void
+    public function testLogWarningDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         \AADSSO_Logger::log_warning('Test warning message');
@@ -86,7 +88,7 @@ class LoggerTest extends TestCase
     /**
      * Test log_error does not throw.
      */
-    public function test_log_error_does_not_throw(): void
+    public function testLogErrorDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         \AADSSO_Logger::log_error('Test error message');
@@ -95,7 +97,7 @@ class LoggerTest extends TestCase
     /**
      * Test log_exception does not throw.
      */
-    public function test_log_exception_does_not_throw(): void
+    public function testLogExceptionDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
         $exception = new \Exception('Test exception');
@@ -105,7 +107,7 @@ class LoggerTest extends TestCase
     /**
      * Test logger is singleton.
      */
-    public function test_logger_is_singleton(): void
+    public function testLoggerIsSingleton(): void
     {
         $logger1 = \AADSSO_Logger::get_logger();
         $logger2 = \AADSSO_Logger::get_logger();
@@ -115,7 +117,7 @@ class LoggerTest extends TestCase
     /**
      * Test cache is singleton.
      */
-    public function test_cache_is_singleton(): void
+    public function testCacheIsSingleton(): void
     {
         $cache1 = \AADSSO_Logger::get_cache();
         $cache2 = \AADSSO_Logger::get_cache();
