@@ -250,9 +250,6 @@ class AADSSO_HttpClient implements ClientInterface
     }
 }
 
-/**
- * @implements NetworkExceptionInterface
- */
 class AADSSO_HttpClientNetworkException extends \RuntimeException implements NetworkExceptionInterface
 {
     private RequestInterface $request;
