@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use Monolog\Handler\RotatingFileHandler;
-use Monolog\Level;
-use Monolog\Logger as MonologLogger;
+use Monolog\{Level, Logger as MonologLogger};
 use Monolog\Processor\PsrLogMessageProcessor;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
