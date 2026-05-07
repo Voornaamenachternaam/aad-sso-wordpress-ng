@@ -45,6 +45,8 @@ class Settings
 
     public string $jwks_uri = '';
 
+    public string $issuer = '';
+
     public string $end_session_endpoint = '';
 
     public string $graph_endpoint = 'https://graph.microsoft.com';
@@ -176,6 +178,10 @@ class Settings
                 ->default('');
 
             self::$options_resolver->define('jwks_uri')
+                ->allowedTypes('string')
+                ->default('');
+
+            self::$options_resolver->define('issuer')
                 ->allowedTypes('string')
                 ->default('');
 
@@ -442,6 +448,7 @@ class Settings
             'authorization_endpoint',
             'token_endpoint',
             'jwks_uri',
+            'issuer',
             'end_session_endpoint',
             'openid_configuration_endpoint',
             'graph_endpoint',

@@ -233,18 +233,16 @@ class AADSSO
             AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
             // Validate issuer claim to prevent token substitution attacks
-            // The issuer should match the expected issuer from OpenID configuration
-            $expected_issuer = $this->settings->authorization_endpoint;
+            // The issuer must exactly match the expected issuer from OpenID configuration
+            // or follow the correct pattern for the configured tenant
+            $expected_issuer = $this->settings->issuer;
             if (!empty($expected_issuer)) {
-                // Extract base URL (without path) from authorization endpoint
-                $parsed = parse_url($expected_issuer);
-                $expected_issuer_base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-
-                // Check if issuer starts with the expected base URL
-                if (!empty($jwt_iss) && !str_starts_with($jwt_iss, $expected_issuer_base)) {
+                // For single-tenant deployments: exact match required
+                // The issuer should be exactly: https://login.microsoftonline.com/{tenant-id}/v2.0
+                if ($jwt_iss !== $expected_issuer) {
                     AADSSO_Logger::log_error(\sprintf(
-                        'Issuer mismatch: expected base URL "%s", got "%s"',
-                        $expected_issuer_base,
+                        'Issuer mismatch: expected "%s", got "%s"',
+                        $expected_issuer,
                         $jwt_iss
                     ));
 
@@ -252,6 +250,31 @@ class AADSSO
                         'invalid_token_issuer',
                         __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
                     );
+                }
+            } else {
+                // Fallback validation if issuer not configured yet
+                // Check that issuer follows Microsoft Entra ID v2.0 pattern
+                // Valid patterns:
+                // - https://login.microsoftonline.com/{tenant-id}/v2.0 (single tenant)
+                // - https://login.microsoftonline.com/{domain}/v2.0 (domain-based tenant)
+                // - https://login.microsoftonline.com/common/v2.0 (multi-tenant with /common)
+                // - https://login.microsoftonline.com/organizations/v2.0 (multi-tenant with /organizations)
+                if (!empty($jwt_iss)) {
+                    $issuer_valid = preg_match(
+                        '#^https://login\.microsoftonline\.com/[^/]+/v2\.0$#',
+                        $jwt_iss
+                    );
+                    if (!$issuer_valid) {
+                        AADSSO_Logger::log_error(\sprintf(
+                            'Invalid issuer format: "%s". Expected Microsoft Entra ID v2.0 issuer pattern.',
+                            $jwt_iss
+                        ));
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer has invalid format. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
                 }
             }
 
