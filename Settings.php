@@ -66,18 +66,22 @@ class Settings
      */
     public static function get_defaults(?string $key = null): mixed
     {
-        $defaults = [
-            'org_display_name' => get_bloginfo('name'),
-            'field_to_match_to_upn' => 'email',
-            'default_wp_role' => null,
-            'enable_auto_provisioning' => false,
-            'match_on_upn_alias' => false,
-            'enable_auto_forward_to_aad' => false,
-            'enable_aad_group_to_wp_role' => false,
-            'redirect_uri' => wp_login_url(),
-            'logout_redirect_uri' => wp_login_url(),
-            'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
-        ];
+        static $defaults = null;
+
+        if (null === $defaults) {
+            $defaults = [
+                'org_display_name' => self::safe_get_bloginfo_name(),
+                'field_to_match_to_upn' => 'email',
+                'default_wp_role' => null,
+                'enable_auto_provisioning' => false,
+                'match_on_upn_alias' => false,
+                'enable_auto_forward_to_aad' => false,
+                'enable_aad_group_to_wp_role' => false,
+                'redirect_uri' => self::safe_wp_login_url(),
+                'logout_redirect_uri' => self::safe_wp_login_url(),
+                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
+            ];
+        }
 
         if (null === $key) {
             return $defaults;
@@ -114,11 +118,11 @@ class Settings
 
             self::$options_resolver->define('logout_redirect_uri')
                 ->allowedTypes('string')
-                ->default(wp_login_url());
+                ->default(self::safe_wp_login_url());
 
             self::$options_resolver->define('org_display_name')
                 ->allowedTypes('string')
-                ->default(get_bloginfo('name'));
+                ->default(self::safe_get_bloginfo_name());
 
             self::$options_resolver->define('org_domain_hint')
                 ->allowedTypes('string')
@@ -298,6 +302,30 @@ class Settings
         }
 
         return $this;
+    }
+
+    /**
+     * Safely get blog name, with fallback for when WordPress is not fully initialized.
+     */
+    private static function safe_get_bloginfo_name(): string
+    {
+        if (\function_exists('get_bloginfo')) {
+            return (string) get_bloginfo('name');
+        }
+
+        return '';
+    }
+
+    /**
+     * Safely get WordPress login URL, with fallback for when WordPress is not fully initialized.
+     */
+    private static function safe_wp_login_url(): string
+    {
+        if (\function_exists('wp_login_url')) {
+            return (string) wp_login_url();
+        }
+
+        return '';
     }
 
     /**
