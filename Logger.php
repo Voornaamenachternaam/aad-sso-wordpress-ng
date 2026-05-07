@@ -160,3 +160,5 @@ class Logger
         self::get_logger()->error($log_message, $context);
     }
 }
+
+class_alias(Logger::class, 'AADSSO_Logger');
