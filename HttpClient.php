@@ -84,9 +84,13 @@ class AADSSO_HttpClient implements ClientInterface
             {
                 $this->statusCode = $statusCode;
                 $this->reasonPhrase = $reasonPhrase;
-                $this->headers = $headers;
                 $this->body = $body;
                 $this->protocolVersion = '1.1';
+                // Normalize headers to lowercase keys (PSR-7 compliance)
+                $this->headers = [];
+                foreach ($headers as $name => $values) {
+                    $this->headers[\strtolower($name)] = $values;
+                }
             }
 
             public function getStatusCode(): int
@@ -129,7 +133,7 @@ class AADSSO_HttpClient implements ClientInterface
 
             public function hasHeader(string $name): bool
             {
-                return isset($this->headers[$name]);
+                return isset($this->headers[\strtolower($name)]);
             }
 
             /**
@@ -137,7 +141,7 @@ class AADSSO_HttpClient implements ClientInterface
              */
             public function getHeader(string $name): array
             {
-                return $this->headers[$name] ?? [];
+                return $this->headers[\strtolower($name)] ?? [];
             }
 
             public function getHeaderLine(string $name): string
@@ -148,10 +152,11 @@ class AADSSO_HttpClient implements ClientInterface
             public function withHeader(string $name, $value): self
             {
                 $clone = clone $this;
+                $key = \strtolower($name);
                 if (\is_array($value)) {
-                    $clone->headers[$name] = $value;
+                    $clone->headers[$key] = $value;
                 } else {
-                    $clone->headers[$name] = [$value];
+                    $clone->headers[$key] = [$value];
                 }
                 return $clone;
             }
@@ -159,18 +164,19 @@ class AADSSO_HttpClient implements ClientInterface
             public function withAddedHeader(string $name, $value): self
             {
                 $clone = clone $this;
+                $key = \strtolower($name);
                 if (\is_array($value)) {
-                    if (!isset($clone->headers[$name])) {
-                        $clone->headers[$name] = [];
+                    if (!isset($clone->headers[$key])) {
+                        $clone->headers[$key] = [];
                     }
                     foreach ($value as $v) {
-                        $clone->headers[$name][] = $v;
+                        $clone->headers[$key][] = $v;
                     }
                 } else {
-                    if (!isset($clone->headers[$name])) {
-                        $clone->headers[$name] = [];
+                    if (!isset($clone->headers[$key])) {
+                        $clone->headers[$key] = [];
                     }
-                    $clone->headers[$name][] = $value;
+                    $clone->headers[$key][] = $value;
                 }
                 return $clone;
             }
@@ -178,7 +184,7 @@ class AADSSO_HttpClient implements ClientInterface
             public function withoutHeader(string $name): self
             {
                 $clone = clone $this;
-                unset($clone->headers[$name]);
+                unset($clone->headers[\strtolower($name)]);
                 return $clone;
             }
 
@@ -381,9 +387,13 @@ class AADSSO_HttpClient implements ClientInterface
             {
                 $this->statusCode = $status;
                 $this->reasonPhrase = $reasonPhrase;
-                $this->headers = $headers;
                 $this->body = $body;
                 $this->protocolVersion = '1.1';
+                // Normalize headers to lowercase keys (PSR-7 compliance)
+                $this->headers = [];
+                foreach ($headers as $name => $values) {
+                    $this->headers[\strtolower($name)] = $values;
+                }
             }
 
             public function getStatusCode(): int
@@ -426,7 +436,7 @@ class AADSSO_HttpClient implements ClientInterface
 
             public function hasHeader(string $name): bool
             {
-                return isset($this->headers[$name]);
+                return isset($this->headers[\strtolower($name)]);
             }
 
             /**
@@ -434,7 +444,7 @@ class AADSSO_HttpClient implements ClientInterface
              */
             public function getHeader(string $name): array
             {
-                return $this->headers[$name] ?? [];
+                return $this->headers[\strtolower($name)] ?? [];
             }
 
             public function getHeaderLine(string $name): string
@@ -445,10 +455,11 @@ class AADSSO_HttpClient implements ClientInterface
             public function withHeader(string $name, $value): self
             {
                 $clone = clone $this;
+                $key = \strtolower($name);
                 if (\is_array($value)) {
-                    $clone->headers[$name] = $value;
+                    $clone->headers[$key] = $value;
                 } else {
-                    $clone->headers[$name] = [$value];
+                    $clone->headers[$key] = [$value];
                 }
                 return $clone;
             }
@@ -456,18 +467,19 @@ class AADSSO_HttpClient implements ClientInterface
             public function withAddedHeader(string $name, $value): self
             {
                 $clone = clone $this;
+                $key = \strtolower($name);
                 if (\is_array($value)) {
-                    if (!isset($clone->headers[$name])) {
-                        $clone->headers[$name] = [];
+                    if (!isset($clone->headers[$key])) {
+                        $clone->headers[$key] = [];
                     }
                     foreach ($value as $v) {
-                        $clone->headers[$name][] = $v;
+                        $clone->headers[$key][] = $v;
                     }
                 } else {
-                    if (!isset($clone->headers[$name])) {
-                        $clone->headers[$name] = [];
+                    if (!isset($clone->headers[$key])) {
+                        $clone->headers[$key] = [];
                     }
-                    $clone->headers[$name][] = $value;
+                    $clone->headers[$key][] = $value;
                 }
                 return $clone;
             }
@@ -475,7 +487,7 @@ class AADSSO_HttpClient implements ClientInterface
             public function withoutHeader(string $name): self
             {
                 $clone = clone $this;
-                unset($clone->headers[$name]);
+                unset($clone->headers[\strtolower($name)]);
                 return $clone;
             }
 
