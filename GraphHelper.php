@@ -41,10 +41,6 @@ class AADSSO_GraphHelper
      */
     public static function get_request(string $url, array $query_params = []): object|WP_Error
     {
-        if (!empty($query_params)) {
-            $url = $url . '?' . http_build_query($query_params);
-        }
-
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $_SESSION['aadsso_last_request'] = [
                 'method' => 'GET',
@@ -57,6 +53,10 @@ class AADSSO_GraphHelper
         $options = [
             'headers' => self::get_required_headers_and_settings(),
         ];
+
+        if (!empty($query_params)) {
+            $options['query'] = $query_params;
+        }
 
         try {
             $response = self::get_http_client()->get($url, $options);
@@ -75,9 +75,6 @@ class AADSSO_GraphHelper
      */
     public static function post_request(string $url, array $query_params = [], array $data = []): object|WP_Error
     {
-        if (!empty($query_params)) {
-            $url = $url . '?' . http_build_query($query_params);
-        }
         $payload = (string) wp_json_encode($data);
 
         AADSSO_Logger::log_debug('POST ' . $url, 50);
@@ -87,6 +84,10 @@ class AADSSO_GraphHelper
             'body' => $payload,
             'headers' => self::get_required_headers_and_settings(),
         ];
+
+        if (!empty($query_params)) {
+            $options['query'] = $query_params;
+        }
 
         try {
             $response = self::get_http_client()->post($url, $options);
