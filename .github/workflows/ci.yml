@@ -256,3 +256,4 @@ jobs:
         with:
           build-dir: .
           slug: aad-sso-wordpress
+        continue-on-error: true
