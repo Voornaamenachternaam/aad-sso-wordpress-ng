@@ -72,21 +72,6 @@ class AADSSO_HttpClient implements ClientInterface
     }
 
     /**
-     * @param array<string, mixed> $options
-     * @return array{url: string, options: array<string, mixed>}
-     */
-    private function createRequestOptions(string $method, string $url, array $options): array
-    {
-        if (!empty($options['query'])) {
-            $separator = (strpos($url, '?') !== false) ? '&' : '?';
-            $url .= $separator . self::buildQueryString(self::normalizeQueryParams($options['query']));
-            unset($options['query']);
-        }
-
-        return ['url' => $url, 'options' => $options];
-    }
-
-    /**
      * @return array<string, string>
      */
     private function getFlattenedHeaders(RequestInterface $request): array
@@ -106,8 +91,7 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function get(string $url, array $options = []): ResponseInterface
     {
-        $result = $this->createRequestOptions('GET', $url, $options);
-        $request = $this->createRequest('GET', $result['url'], $result['options']);
+        $request = $this->createRequest('GET', $url, $options);
         return $this->sendRequest($request);
     }
 
@@ -116,8 +100,7 @@ class AADSSO_HttpClient implements ClientInterface
      */
     public function post(string $url, array $options = []): ResponseInterface
     {
-        $result = $this->createRequestOptions('POST', $url, $options);
-        $request = $this->createRequest('POST', $result['url'], $result['options']);
+        $request = $this->createRequest('POST', $url, $options);
         return $this->sendRequest($request);
     }
 
