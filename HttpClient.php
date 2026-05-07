@@ -79,7 +79,7 @@ class AADSSO_HttpClient implements ClientInterface
     {
         if (!empty($options['query'])) {
             $separator = (strpos($url, '?') !== false) ? '&' : '?';
-            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
+            $url .= $separator . self::buildQueryString(self::normalizeQueryParams($options['query']));
             unset($options['query']);
         }
 
@@ -128,7 +128,7 @@ class AADSSO_HttpClient implements ClientInterface
     {
         if (!empty($options['query'])) {
             $separator = (strpos($url, '?') !== false) ? '&' : '?';
-            $url .= $separator . http_build_query(self::normalizeQueryParams($options['query']));
+            $url .= $separator . self::buildQueryString(self::normalizeQueryParams($options['query']));
             unset($options['query']);
         }
 
@@ -157,6 +157,26 @@ class AADSSO_HttpClient implements ClientInterface
         }
 
         return $request;
+    }
+
+    /**
+     * @param array<string, array<int, string>|string> $params
+     */
+    private static function buildQueryString(array $params): string
+    {
+        $parts = [];
+        foreach ($params as $key => $value) {
+            $encodedKey = \rawurlencode((string) $key);
+            if (\is_array($value)) {
+                foreach ($value as $item) {
+                    $parts[] = $encodedKey . '=' . \rawurlencode($item);
+                }
+            } else {
+                $parts[] = $encodedKey . '=' . \rawurlencode($value);
+            }
+        }
+
+        return implode('&', $parts);
     }
 
     /**
