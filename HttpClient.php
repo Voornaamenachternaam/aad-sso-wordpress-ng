@@ -58,7 +58,7 @@ class AADSSO_HttpClient implements ClientInterface
     {
         $response = $this->http_client->request($request->getMethod(), (string) $request->getUri(), [
             'headers' => $this->getFlattenedHeaders($request),
-            'body' => $request->getBody()->getContents(),
+            'body' => (string) $request->getBody(),
         ]);
 
         $statusCode = $response->getStatusCode();
