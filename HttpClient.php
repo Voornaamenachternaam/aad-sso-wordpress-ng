@@ -327,24 +327,28 @@ class AADSSO_HttpClient implements ClientInterface
             if (\is_array($value)) {
                 // Flatten arrays into repeated keys (e.g., key=val1&key=val2)
                 // instead of bracketed notation (e.g., key[0]=val1&key[1]=val2)
-                /** @var array<int, string> $result[$key] */
-                $result[$key] = [];
+                /** @var array<int, string> $values */
+                $values = [];
                 foreach ($value as $item) {
                     if (\is_scalar($item)) {
-                        $result[$key][] = (string) $item;
+                        $values[] = (string) $item;
                     }
                 }
-                // If array was empty after filtering, remove the key
-                if (empty($result[$key])) {
-                    unset($result[$key]);
+                // Only add if we have values after filtering
+                if (!empty($values)) {
+                    /** @var string $key */
+                    $result[$key] = $values;
                 }
             } elseif (\is_string($value)) {
+                /** @var string $key */
                 $result[$key] = $value;
             } elseif (\is_scalar($value)) {
+                /** @var string $key */
                 $result[$key] = (string) $value;
             }
         }
 
+        /** @var array<string, array<int, string>|string> */
         return $result;
     }
 
