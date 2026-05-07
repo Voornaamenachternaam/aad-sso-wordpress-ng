@@ -231,3 +231,34 @@ jobs:
           if [ -f vendor/bin/phpstan ]; then
             vendor/bin/phpstan analyse --level=max --no-progress --configuration=phpstan.neon 2>/dev/null || true
           fi
+
+  wordpress-plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2.37.0
+        with:
+          php-version: '8.5'
+          extensions: mbstring, json, openssl, curl, zip, gd, imagick
+
+      - name: Install Composer dependencies
+        run: |
+          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer install --no-interaction --prefer-dist
+
+      - name: Get WordPress
+        run: |
+          curl -sLO https://wordpress.org/wordpress-6.9.4.tar.gz
+          tar -xzf wordpress-6.9.4.tar.gz
+          mv wordpress /tmp/wordpress
+
+      - name: Run WordPress Plugin Check
+        uses: WordPress/plugin-check-action@v1.1.5
+        with:
+          path: .
+          wordpress-directory: /tmp/wordpress
