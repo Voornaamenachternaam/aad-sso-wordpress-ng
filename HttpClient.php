@@ -311,7 +311,7 @@ class AADSSO_HttpClient implements ClientInterface
 
     /**
      * @param mixed $query
-     * @return array<string, mixed>
+     * @return array<string, array<int, string>|string>
      */
     private static function normalizeQueryParams(mixed $query): array
     {
@@ -321,15 +321,22 @@ class AADSSO_HttpClient implements ClientInterface
 
         /** @var array<string, mixed> $queryArray */
         $queryArray = $query;
+        /** @var array<string, array<int, string>|string> $result */
         $result = [];
         foreach ($queryArray as $key => $value) {
             if (\is_array($value)) {
                 // Flatten arrays into repeated keys (e.g., key=val1&key=val2)
                 // instead of bracketed notation (e.g., key[0]=val1&key[1]=val2)
+                /** @var array<int, string> $result[$key] */
+                $result[$key] = [];
                 foreach ($value as $item) {
                     if (\is_scalar($item)) {
                         $result[$key][] = (string) $item;
                     }
+                }
+                // If array was empty after filtering, remove the key
+                if (empty($result[$key])) {
+                    unset($result[$key]);
                 }
             } elseif (\is_string($value)) {
                 $result[$key] = $value;
@@ -338,7 +345,6 @@ class AADSSO_HttpClient implements ClientInterface
             }
         }
 
-        /** @var array<string, array<mixed>|string> */
         return $result;
     }
 
