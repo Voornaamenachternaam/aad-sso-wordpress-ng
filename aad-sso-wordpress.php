@@ -2,14 +2,14 @@
 
 /**
  * Plugin Name: Single Sign-on with Microsoft Entra ID
- * Plugin URI:  https://github.com/psignoret/aad-sso-wordpress
+ * Plugin URI:  https://github.com/Voornaamenachternaam/aad-sso-wordpress-ng
  * Description: Allows organizations to use their Microsoft Entra ID (formerly Azure AD) user accounts to sign in to WordPress.
  * Version:     0.9.0
- * Author:      Philippe Signoret
- * Author URI:  https://github.com/psignoret
+ * Author:      Voornaamenachternaam
+ * Author URI:  https://github.com/Voornaamenachternaam
  * License:     MIT
- * License URI: https://github.com/psignoret/aad-sso-wordpress/blob/master/LICENSE.md
- * Text Domain: aad-sso-wordpress
+ * License URI: https://github.com/Voornaamenachternaam/aad-sso-wordpress-ng/blob/master/LICENSE.md
+ * Text Domain: aad-sso-wordpress-ng
  * Domain Path: /languages
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
