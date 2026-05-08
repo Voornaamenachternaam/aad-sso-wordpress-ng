@@ -238,16 +238,6 @@ class AuthorizationHelper
                     throw new DomainException('Tenant restriction is enabled but no allowed tenant IDs are configured. Please configure allowed tenant IDs in the plugin settings.');
                 }
 
-                // Validate all allowed tenant IDs are in GUID format
-                foreach ($allowed as $tenant_id) {
-                    if (!self::is_valid_guid($tenant_id)) {
-                        AADSSO_Logger::log_error(
-                            'One or more configured allowed tenant IDs is not a valid GUID: ' . $tenant_id
-                        );
-                        throw new DomainException('One or more configured allowed tenant IDs is not a valid GUID format.');
-                    }
-                }
-
                 // Case-insensitive comparison for GUIDs
                 $found = false;
                 foreach ($allowed as $allowed_tid) {
