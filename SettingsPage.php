@@ -21,8 +21,17 @@ class SettingsPage
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_init', [$this, 'maybe_reset_settings']);
         add_action('admin_init', [$this, 'maybe_migrate_settings']);
+        add_action('admin_init', [$this, 'check_version_and_setup_migration']);
+        add_action('admin_init', [$this, 'notify_upgrade_migration']);
         add_action('all_admin_notices', [$this, 'notify_if_reset_successful']);
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
+        add_action('all_admin_notices', [$this, 'notify_openid_configuration_warning']);
+        add_action('all_admin_notices', [$this, 'notify_upgrade_migration']);
+
+        // Register AJAX handler for dismissing the migration notice
+        // Must be registered here (not in notify_upgrade_migration) because all_admin_notices
+        // hook is not executed during AJAX requests to admin-ajax.php
+        add_action('wp_ajax_aadsso_dismiss_migration_notice', [$this, 'ajax_dismiss_migration_notice']);
 
         $default_settings = AADSSO_Settings::get_defaults();
         /** @var array<string, mixed> $defaultSettingsArr */
@@ -36,6 +45,170 @@ class SettingsPage
                 $this->settings[$key] = $default_value;
             }
         }
+    }
+
+    /**
+     * Display warning if OpenID configuration may not be optimal.
+     */
+    public function notify_openid_configuration_warning(): void
+    {
+        // Only show on our settings page
+        $screen = get_current_screen();
+        if (null === $screen || 'settings_page_aadsso_settings' !== $screen->id) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $openid_endpoint = $this->settings['openid_configuration_endpoint'] ?? '';
+        if (!\is_string($openid_endpoint) || empty($openid_endpoint)) {
+            return;
+        }
+
+        // Warn if using /common/ endpoint (multi-tenant)
+        if (str_contains($openid_endpoint, '/common/.well-known/openid-configuration')) {
+            echo '<div class="notice notice-warning">';
+            echo '<p>';
+            echo wp_kses_post(
+                __(
+                    '<strong>Microsoft Entra ID SSO:</strong> You are using the multi-tenant endpoint '
+                    . '(<code>/common/</code>), which allows users from any Microsoft Entra ID organization '
+                    . 'to sign in. For single-tenant deployments (recommended for most organizations), '
+                    . 'use your tenant-specific endpoint: '
+                    . '<code>https://login.microsoftonline.com/{your-tenant-id}/.well-known/openid-configuration</code>.',
+                    'aad-sso-wordpress'
+                )
+            );
+            echo '</p></div>';
+        }
+    }
+
+    /**
+     * Check plugin version and set up migration flags.
+     * This runs on every admin_init to handle upgrades where activate() is not triggered.
+     * Sets aadsso_version and aadsso_previous_openid_endpoint if not already set,
+     * ensuring the migration notice displays for existing users.
+     */
+    public function check_version_and_setup_migration(): void
+    {
+        $stored_version = get_option('aadsso_version', null);
+
+        // Set version if not already stored (handles plugin upgrades without activate() trigger)
+        // Use empty string to indicate "old install with unknown previous version"
+        if (null === $stored_version) {
+            update_option('aadsso_version', '');
+
+            // Store current endpoint as previous if not already set
+            // This preserves the endpoint from before the upgrade for migration notice logic
+            $previous_endpoint = get_option('aadsso_previous_openid_endpoint', '');
+            if ('' === $previous_endpoint) {
+                $openid_endpoint = $this->settings['openid_configuration_endpoint'] ?? '';
+                if (\is_string($openid_endpoint) && '' !== $openid_endpoint) {
+                    update_option('aadsso_previous_openid_endpoint', $openid_endpoint);
+                }
+            }
+
+            AADSSO_Logger::log_info('Migration flags initialized for existing install');
+        }
+    }
+
+    /**
+     * Display migration notice for users upgrading from older versions.
+     * Specifically for the /common/ → /organizations/ endpoint change.
+     *
+     * @see https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration
+     *      accepts personal Microsoft accounts (MSA)
+     * @see https://login.microsoftonline.com/organizations/v2.0/.well-known/openid-configuration
+     *      only accepts work/school accounts (no MSA)
+     */
+    public function notify_upgrade_migration(): void
+    {
+        // Only show on our settings page
+        $screen = get_current_screen();
+        if (null === $screen || 'settings_page_aadsso_settings' !== $screen->id) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        // Only show once (dismissed via user meta)
+        $dismissed = get_user_meta(get_current_user_id(), 'aadsso_migration_notice_dismissed', true);
+        if ($dismissed) {
+            return;
+        }
+
+        // Check if this appears to be an existing install (not using default endpoint)
+        // or if they explicitly set /common/ before
+        $openid_endpoint = $this->settings['openid_configuration_endpoint'] ?? '';
+        if (!\is_string($openid_endpoint)) {
+            return;
+        }
+
+        // Only show for /organizations/ users who might need MSA support
+        if (!str_contains($openid_endpoint, '/organizations/.well-known/openid-configuration')) {
+            return;
+        }
+
+        // Check if they had /common/ before (stored in migration flag option)
+        $previous_endpoint = get_option('aadsso_previous_openid_endpoint', '');
+        $is_upgrade_from_common = (
+            '' !== $previous_endpoint
+            && str_contains($previous_endpoint, '/common/.well-known/openid-configuration')
+        );
+
+        // Also show for sites that were active before this change (no stored version = old install)
+        // Note: version may be null (never set) or empty string (set by check_version_and_setup_migration for old installs)
+        $stored_version = get_option('aadsso_version', null);
+        $no_version_stored = (null === $stored_version || '' === $stored_version);
+
+        if (!$is_upgrade_from_common && !$no_version_stored) {
+            return;
+        }
+
+        echo '<div class="notice notice-warning is-dismissible" id="aadsso-migration-notice">';
+        echo '<p>';
+        echo wp_kses_post(
+            __(
+                '<strong>Microsoft Entra ID SSO - Important Update:</strong> This plugin now defaults to the '
+                . '<code>/organizations/</code> endpoint, which only accepts work or school accounts (Microsoft Entra ID). '
+                . 'If you need to support personal Microsoft accounts (consumer MSA), change the OpenID endpoint to: '
+                . '<code>https://login.microsoftonline.com/common/.well-known/openid-configuration</code>',
+                'aad-sso-wordpress'
+            )
+        );
+        echo '</p>';
+        echo '<p>';
+        echo '<button type="button" class="button" onclick="'
+            . "jQuery.post(ajaxurl, {action: 'aadsso_dismiss_migration_notice', nonce: '" . wp_create_nonce('aadsso_dismiss_migration') . "'}, function() { jQuery('#aadsso-migration-notice').fadeOut(); });"
+            . '">' . esc_html__('Dismiss', 'aad-sso-wordpress') . '</button>';
+        echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
+            . esc_url(AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT)
+            . '\'); jQuery(\'#submit\').click(); return false;">' . esc_html__('Keep current endpoint', 'aad-sso-wordpress') . '</a>';
+        echo ' <a href="#" class="button button-primary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\'https://login.microsoftonline.com/common/.well-known/openid-configuration\'); jQuery(\'#submit\').click(); return false;">' . esc_html__('Switch to /common/ (supports MSA)', 'aad-sso-wordpress') . '</a>';
+        echo '</p></div>';
+    }
+
+    /**
+     * AJAX handler to dismiss the upgrade migration notice.
+     */
+    public function ajax_dismiss_migration_notice(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized', '', ['response' => 403]);
+        }
+
+        check_ajax_referer('aadsso_dismiss_migration', 'nonce');
+
+        update_user_meta(get_current_user_id(), 'aadsso_migration_notice_dismissed', true);
+
+        // Store that we've shown this notice so it doesn't reappear
+        update_option('aadsso_migration_notice_shown', true);
+
+        wp_die('OK');
     }
 
     public function maybe_reset_settings(): void
@@ -452,8 +625,8 @@ class SettingsPage
         $valid_roles = array_keys($this->get_editable_roles());
         $sanitized['default_wp_role'] = \in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
-        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
-        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
+        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
 
         $auth_endpoint_raw = $input['authorization_endpoint'] ?? '';
         $sanitized['authorization_endpoint'] = \is_string($auth_endpoint_raw) ? esc_url_raw($auth_endpoint_raw) : '';
@@ -737,17 +910,19 @@ class SettingsPage
     {
         $this->render_text_field('openid_configuration_endpoint');
         $default_endpoint = AADSSO_Settings::get_defaults('openid_configuration_endpoint');
-        $default_url = \is_string($default_endpoint) ? $default_endpoint : 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+        $default_url = \is_string($default_endpoint) ? $default_endpoint : AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
             . esc_url($default_url)
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';
         echo '<p class="description">' . wp_kses_post(
             __(
-                'The OpenID Connect configuration endpoint to use. To support Microsoft '
-                . 'Accounts and external users (users invited in from other Microsoft Entra ID '
-                . 'directories, known sometimes as "B2B users") you must use: '
+                'The OpenID Connect configuration endpoint for Microsoft Entra ID. '
+                . 'For single-tenant deployments (recommended for most organizations), use: '
                 . '<code>https://login.microsoftonline.com/{tenant-id}/.well-known/openid-configuration</code>, '
-                . 'where <code>{tenant-id}</code> is the tenant ID or a verified domain name of your directory.',
+                . 'where <code>{tenant-id}</code> is your tenant ID or verified domain. '
+                . 'For multi-tenant applications supporting users from any organization, use: '
+                . '<code>https://login.microsoftonline.com/common/.well-known/openid-configuration</code>. '
+                . 'The default <code>/organizations/</code> endpoint supports work and school accounts.',
                 'aad-sso-wordpress'
             )
         ) . '</p>';

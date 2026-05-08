@@ -28,6 +28,7 @@ if (file_exists($autoloader)) {
 \define('AADSSO', 'aad-sso-wordpress');
 \define('AADSSO_PLUGIN_URL', plugin_dir_url(__FILE__));
 \define('AADSSO_PLUGIN_DIR', plugin_dir_path(__FILE__));
+\define('AADSSO_VERSION', '0.9.0');
 
 \defined('AADSSO_DEBUG') || \define('AADSSO_DEBUG', false);
 \defined('AADSSO_DEBUG_LEVEL') || \define('AADSSO_DEBUG_LEVEL', 0);
@@ -76,9 +77,33 @@ class AADSSO
 
     public static function activate(): void
     {
+        $previous_version = get_option('aadsso_version', null);
+
+        // Store previous endpoint before any cache invalidation
+        $previous_endpoint = get_option('aadsso_settings', []);
+        if (\is_array($previous_endpoint) && isset($previous_endpoint['openid_configuration_endpoint'])) {
+            update_option('aadsso_previous_openid_endpoint', $previous_endpoint['openid_configuration_endpoint']);
+        }
+
+        // Invalidate OpenID configuration cache on every activation/upgrade
+        // This ensures the new endpoint (if changed) is used immediately
+        AADSSO_Settings::invalidate_openid_configuration_cache();
+
         $stored_settings = get_option('aadsso_settings', null);
         if (null === $stored_settings) {
             update_option('aadsso_settings', AADSSO_Settings::get_defaults());
+        }
+
+        // Store version for future upgrade migrations
+        update_option('aadsso_version', AADSSO_VERSION);
+
+        // If this is an upgrade (not fresh install), log migration notice
+        if (null !== $previous_version && AADSSO_VERSION !== $previous_version) {
+            AADSSO_Logger::log_info(\sprintf(
+                'Plugin upgraded from %s to %s. OpenID configuration cache invalidated.',
+                $previous_version,
+                AADSSO_VERSION
+            ));
         }
     }
 
@@ -232,6 +257,91 @@ class AADSSO
             $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
             AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
+            // Validate issuer claim to prevent token substitution attacks
+            // Microsoft Entra ID v2.0 issuer patterns:
+            // - Single tenant: https://login.microsoftonline.com/{tenant-id}/v2.0
+            // - /common/ or /organizations/: templated as https://login.microsoftonline.com/{tenantid}/v2.0
+            //   in metadata, but JWT contains concrete tenant ID
+            $expected_issuer = $this->settings->issuer;
+            if (!empty($expected_issuer)) {
+                // Check if expected issuer is templated (contains {tenantid} placeholder)
+                if (str_contains($expected_issuer, '{tenantid}')) {
+                    // For /common/ or /organizations/ endpoints, validate JWT issuer matches the pattern
+                    // but with a concrete tenant ID instead of {tenantid}
+                    // Empty issuer must be rejected to prevent bypass
+                    if (empty($jwt_iss)) {
+                        AADSSO_Logger::log_error('JWT issuer claim is empty');
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer is missing. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
+
+                    // Convert templated issuer to regex pattern
+                    // Template: https://login.microsoftonline.com/{tenantid}/v2.0
+                    // Pattern: https://login\.microsoftonline\.com/[^/]+/v2\.0
+                    $base = preg_quote('https://login.microsoftonline.com/', '#');
+                    $pattern = '#^' . $base . '[^/]+/v2\.0$#';
+
+                    if (!preg_match($pattern, $jwt_iss)) {
+                        AADSSO_Logger::log_error(\sprintf(
+                            'Issuer mismatch: expected pattern "%s", got "%s"',
+                            $expected_issuer,
+                            $jwt_iss
+                        ));
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
+                } else {
+                    // For single-tenant deployments with concrete issuer: exact match required
+                    if ($jwt_iss !== $expected_issuer) {
+                        AADSSO_Logger::log_error(\sprintf(
+                            'Issuer mismatch: expected "%s", got "%s"',
+                            $expected_issuer,
+                            $jwt_iss
+                        ));
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
+                }
+            } else {
+                // Fallback validation if issuer not configured yet
+                // Check that issuer follows Microsoft Entra ID v2.0 pattern
+                // Allow optional trailing slash for flexibility
+                // Empty issuer must be rejected to prevent bypass
+                if (empty($jwt_iss)) {
+                    AADSSO_Logger::log_error('JWT issuer claim is empty');
+
+                    return new WP_Error(
+                        'invalid_token_issuer',
+                        __('ERROR: Token issuer is missing. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                    );
+                }
+
+                $issuer_valid = preg_match(
+                    '#^https://login\.microsoftonline\.com/[^/]+/v2\.0/?$#',
+                    $jwt_iss
+                );
+                if (!$issuer_valid) {
+                    AADSSO_Logger::log_error(\sprintf(
+                        'Invalid issuer format: "%s". Expected Microsoft Entra ID v2.0 issuer pattern.',
+                        $jwt_iss
+                    ));
+
+                    return new WP_Error(
+                        'invalid_token_issuer',
+                        __('ERROR: Token issuer has invalid format. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                    );
+                }
+            }
+
             $group_memberships = false;
             if (true === $this->settings->enable_aad_group_to_wp_role) {
                 AADSSO_GraphHelper::$settings = $this->settings;
@@ -340,6 +450,39 @@ class AADSSO
         $unique_name_raw = $jwt->unique_name ?? null;
         $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
+        // Collect all possible email/identifier claims for matching
+        // Priority: email > preferred_username > upn > unique_name
+        // Note: 'mail' is not a standard ID token claim - it's a Graph API attribute
+        /** @var null|string */
+        $email_claim = null;
+        /** @var mixed */
+        $email_raw = $jwt->email ?? null;
+        if (\is_string($email_raw)) {
+            $email_claim = $email_raw;
+        }
+        // Note: preferred_username is snake_case (OpenID Connect standard)
+        /** @var mixed */
+        $preferred_username_raw = $jwt->preferred_username ?? null;
+        if (null === $email_claim && \is_string($preferred_username_raw)) {
+            // For guest users, preferred_username often contains their actual email
+            // (while upn contains the #EXT# format)
+            $email_claim = $preferred_username_raw;
+        }
+
+        // Log available claims for debugging
+        /** @var mixed */
+        $log_preferred_username = $jwt->preferred_username ?? '(null)';
+        /** @var mixed */
+        $log_mail = $jwt->mail ?? '(null)';
+        AADSSO_Logger::log_debug(\sprintf(
+            'User claims: upn=%s, unique_name=%s, email=%s, preferred_username=%s, mail=%s',
+            $upn ?? '(null)',
+            $unique_name ?? '(null)',
+            $email_claim ?? '(null)',
+            \is_string($log_preferred_username) ? $log_preferred_username : '(non-string)',
+            \is_string($log_mail) ? $log_mail : '(non-string)'
+        ), 10);
+
         if (null === $unique_name) {
             return new WP_Error(
                 'unique_name_not_found',
@@ -350,20 +493,86 @@ class AADSSO
             );
         }
 
-        $user = get_user_by($this->settings->field_to_match_to_upn, $unique_name);
+        // Determine which field to match
+        $match_field = $this->settings->field_to_match_to_upn;
+        $match_value = $unique_name;
 
+        // If matching by email and we have an email claim, prefer that over UPN
+        if ('email' === $match_field && null !== $email_claim) {
+            $match_value = $email_claim;
+        }
+
+        $user = get_user_by($match_field, $match_value);
+
+        // If no match by primary value, try fallback with email claim
+        // Only applies when matching by email - doesn't make sense for other fields
+        if (!($user instanceof WP_User)
+            && 'email' === $match_field
+            && null !== $email_claim
+            && $email_claim !== $match_value
+        ) {
+            $user = get_user_by('email', $email_claim);
+            if ($user instanceof WP_User) {
+                AADSSO_Logger::log_debug(\sprintf(
+                    'Matched user by email claim (%s) instead of primary value (%s).',
+                    $email_claim,
+                    $match_value
+                ), 10);
+            }
+        }
+
+        // Try UPN alias matching if enabled and still no match
         if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
             $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
             if (!empty($domain_hint)) {
-                $parts = explode('@' . $domain_hint, $unique_name);
-                if (2 === \count($parts)) {
-                    $username = mb_trim($parts[0]);
-                    $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                // Match the domain hint at the end of the string
+                $suffix = '@' . $domain_hint;
+                if (str_ends_with($unique_name, $suffix)) {
+                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
+                    if ('' !== $username) {
+                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                        // Try lowercase for email matching (case-insensitive)
+                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
+                            $user = get_user_by('email', mb_strtolower($username));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Final fallback: try matching by any known identifier
+        // Only lowercase for case-insensitive match fields (like email)
+        if (!($user instanceof WP_User) && null !== $email_claim) {
+            $lowercased_email = mb_strtolower($email_claim);
+            $lowercased_unique = mb_strtolower($unique_name);
+
+            if ('email' === $match_field) {
+                // For email matching, try lowercase normalization
+                $user = get_user_by($match_field, $lowercased_email);
+                if (!($user instanceof WP_User)) {
+                    $user = get_user_by($match_field, $lowercased_unique);
+                }
+            } else {
+                // For case-sensitive fields (login, ID, etc.), try exact match first
+                $user = get_user_by($match_field, $email_claim);
+                if (!($user instanceof WP_User)) {
+                    $user = get_user_by($match_field, $unique_name);
                 }
             }
         }
 
         if ($user instanceof WP_User) {
+            // Warn if email in WordPress doesn't match Entra ID email claim
+            if (null !== $email_claim && $user->user_email !== $email_claim) {
+                AADSSO_Logger::log_warning(\sprintf(
+                    'Email mismatch for user %d: WordPress has %s, Entra ID has %s. '
+                    . 'Consider updating the user email to ensure consistency.',
+                    $user->ID,
+                    $user->user_email,
+                    $email_claim
+                ), 10);
+            }
+
             AADSSO_Logger::log_debug(\sprintf(
                 'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].',
                 $unique_name,
@@ -396,8 +605,15 @@ class AADSSO
                 $family_name_raw = $jwt->family_name ?? '';
                 $family_name = \is_string($family_name_raw) ? sanitize_text_field($family_name_raw) : '';
 
+                // Use email claim for new user email if available, otherwise use unique_name
+                $user_email = null !== $email_claim ? sanitize_email($email_claim) : sanitize_email($unique_name);
+                // Ensure email is valid before using it
+                if (!is_email($user_email)) {
+                    $user_email = sanitize_email($unique_name);
+                }
+
                 $userdata = [
-                    'user_email' => sanitize_email($unique_name),
+                    'user_email' => $user_email,
                     'user_login' => sanitize_user($unique_name, true),
                     'first_name' => $given_name,
                     'last_name' => $family_name,

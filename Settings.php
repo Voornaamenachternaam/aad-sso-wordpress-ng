@@ -6,6 +6,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class Settings
 {
+    public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+
     public string $client_id = '';
 
     public string $client_secret = '';
@@ -37,13 +39,15 @@ class Settings
 
     public bool $enable_full_logout = false;
 
-    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+    public string $openid_configuration_endpoint = self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
 
     public string $authorization_endpoint = '';
 
     public string $token_endpoint = '';
 
     public string $jwks_uri = '';
+
+    public string $issuer = '';
 
     public string $end_session_endpoint = '';
 
@@ -81,7 +85,7 @@ class Settings
                 'enable_aad_group_to_wp_role' => false,
                 'redirect_uri' => self::safe_wp_login_url(),
                 'logout_redirect_uri' => self::safe_wp_login_url(),
-                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
+                'openid_configuration_endpoint' => self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT,
             ];
         }
 
@@ -165,7 +169,7 @@ class Settings
 
             self::$options_resolver->define('openid_configuration_endpoint')
                 ->allowedTypes('string')
-                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration');
+                ->default(self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT);
 
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
@@ -176,6 +180,10 @@ class Settings
                 ->default('');
 
             self::$options_resolver->define('jwks_uri')
+                ->allowedTypes('string')
+                ->default('');
+
+            self::$options_resolver->define('issuer')
                 ->allowedTypes('string')
                 ->default('');
 
@@ -311,6 +319,21 @@ class Settings
     }
 
     /**
+     * Invalidate the cached OpenID configuration.
+     * Should be called on plugin activation/upgrade to ensure fresh discovery.
+     */
+    public static function invalidate_openid_configuration_cache(): void
+    {
+        try {
+            $cache = self::get_cache();
+            $cache->delete('aadsso_openid_configuration');
+            AADSSO_Logger::log_info('OpenID configuration cache invalidated');
+        } catch (Throwable $e) {
+            AADSSO_Logger::log_exception($e, 'Failed to invalidate OpenID configuration cache');
+        }
+    }
+
+    /**
      * Safely get blog name, with fallback for when WordPress is not fully initialized.
      */
     private static function safe_get_bloginfo_name(): string
@@ -442,6 +465,7 @@ class Settings
             'authorization_endpoint',
             'token_endpoint',
             'jwks_uri',
+            'issuer',
             'end_session_endpoint',
             'openid_configuration_endpoint',
             'graph_endpoint',
