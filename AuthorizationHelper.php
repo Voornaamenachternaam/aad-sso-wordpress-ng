@@ -160,10 +160,10 @@ class AuthorizationHelper
      * @see https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
      * @see https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
      *
-     * @param object          $jwt      The decoded JWT token object
-     * @param AADSSO_Settings $settings The plugin settings containing tenant restriction config
+     * @param object $jwt     The decoded JWT token object
+     * @param object $settings The plugin settings containing tenant restriction config
      */
-    public static function validate_tenant_id(object $jwt, AADSSO_Settings $settings): void
+    public static function validate_tenant_id(object $jwt, object $settings): void
     {
         // Get tenant restriction mode: 'none', 'single', or 'multi'
         $mode = $settings->tenantRestrictionMode ?? 'none';
