@@ -87,11 +87,11 @@ class AADSSO
 
         // Invalidate OpenID configuration cache on every activation/upgrade
         // This ensures the new endpoint (if changed) is used immediately
-        self::invalidate_openid_configuration_cache();
+        AADSSO_Settings::invalidate_openid_configuration_cache();
 
         $stored_settings = get_option('aadsso_settings', null);
         if (null === $stored_settings) {
-            update_option('aadsso_settings', self::get_defaults());
+            update_option('aadsso_settings', AADSSO_Settings::get_defaults());
         }
 
         // Store version for future upgrade migrations
