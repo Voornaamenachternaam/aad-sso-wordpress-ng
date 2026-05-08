@@ -983,19 +983,19 @@ class SettingsPage
 
             // Add inline script for migration notice dismissal (CSP-friendly)
             $inline_script = <<<'JS'
-(function($) {
-    $(document).on('click', '.aadsso-dismiss-notice', function() {
-        var $notice = $(this).closest('#aadsso-migration-notice');
-        var nonce = $notice.data('nonce');
-        $.post(ajaxurl, {
-            action: 'aadsso_dismiss_migration_notice',
-            nonce: nonce
-        }, function() {
-            $notice.fadeOut();
-        });
-    });
-})(jQuery);
-JS;
+                (function($) {
+                    $(document).on('click', '.aadsso-dismiss-notice', function() {
+                        var $notice = $(this).closest('#aadsso-migration-notice');
+                        var nonce = $notice.data('nonce');
+                        $.post(ajaxurl, {
+                            action: 'aadsso_dismiss_migration_notice',
+                            nonce: nonce
+                        }, function() {
+                            $notice.fadeOut();
+                        });
+                    });
+                })(jQuery);
+                JS;
             wp_add_inline_script('jquery', $inline_script);
         }
     }
