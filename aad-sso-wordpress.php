@@ -489,7 +489,7 @@ class AADSSO
                 // Match the domain hint at the end of the string
                 $suffix = '@' . $domain_hint;
                 if (str_ends_with($unique_name, $suffix)) {
-                    $username = trim(substr($unique_name, 0, -strlen($suffix)));
+                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
                     if ('' !== $username) {
                         $user = get_user_by($this->settings->field_to_match_to_upn, $username);
                         // Try lowercase for email matching (case-insensitive)
