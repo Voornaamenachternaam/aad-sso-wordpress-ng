@@ -486,10 +486,17 @@ class AADSSO
         if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
             $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
             if (!empty($domain_hint)) {
-                $parts = explode('@' . $domain_hint, $unique_name);
-                if (2 === \count($parts)) {
-                    $username = mb_trim($parts[0]);
-                    $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                // Match the domain hint at the end of the string
+                $suffix = '@' . $domain_hint;
+                if (str_ends_with($unique_name, $suffix)) {
+                    $username = trim(substr($unique_name, 0, -strlen($suffix)));
+                    if ('' !== $username) {
+                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                        // Try lowercase for email matching (case-insensitive)
+                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
+                            $user = get_user_by('email', mb_strtolower($username));
+                        }
+                    }
                 }
             }
         }
