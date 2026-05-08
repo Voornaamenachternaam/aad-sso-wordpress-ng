@@ -137,13 +137,15 @@ class AuthorizationHelper
         AADSSO_Settings $settings,
         string $antiforgery_id
     ): object {
+        $response = null;
+
         try {
             $response = self::get_http_client()->get($settings->jwks_uri);
-
-            return self::process_jwks_response($response, $id_token, $antiforgery_id);
         } catch (Throwable $e) {
             throw new DomainException('Failed to fetch JWKS: ' . $e->getMessage());
         }
+
+        return self::process_jwks_response($response, $id_token, $antiforgery_id, $settings->client_id);
     }
 
     private static function get_http_client(): AADSSO_HttpClient
@@ -191,7 +193,8 @@ class AuthorizationHelper
     private static function process_jwks_response(
         ResponseInterface $response,
         string $id_token,
-        string $antiforgery_id
+        string $antiforgery_id,
+        string $client_id
     ): object {
         $status_code = $response->getStatusCode();
 
@@ -238,6 +241,70 @@ class AuthorizationHelper
             throw new DomainException('JWT decode returned non-object');
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // ID Token audience (aud) validation
+        //
+        // Per Microsoft identity platform guidance (as of May 2026):
+        // - v2.0 tokens: `aud` must equal the client application ID (GUID)
+        // - v1.0 tokens: `aud` must equal the App ID URI (api://{clientId})
+        //
+        // This plugin uses v2.0 endpoints exclusively. The `aud` claim may be
+        // a string or array of strings. When present, `azp` (authorized party)
+        // should match the client_id for confidential-client scenarios.
+        //
+        // References:
+        // - https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
+        // - https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
+        // - https://openid.net/specs/openid-connect-core-1_0-final.html (Section 3.1.3.7)
+        //
+        // Note: v1.0 endpoints are deprecated; v2.0 is the only supported path.
+        // ─────────────────────────────────────────────────────────────────────
+
+        $aud_claim = $jwt->aud ?? null;
+        if (null === $aud_claim) {
+            throw new DomainException('ID token is missing required `aud` (audience) claim');
+        }
+
+        // Handle aud as string or array
+        $aud_values = [];
+        if (\is_string($aud_claim)) {
+            $aud_values = [$aud_claim];
+        } elseif (\is_array($aud_claim)) {
+            $aud_values = array_filter($aud_claim, 'is_string');
+        }
+
+        if (empty($aud_values)) {
+            throw new DomainException('ID token `aud` claim has invalid format');
+        }
+
+        // Validate that the configured client_id is in the audience list
+        if (!\in_array($client_id, $aud_values, true)) {
+            throw new DomainException(\sprintf('ID token audience validation failed. Expected `%s`, got `%s`', $client_id, implode(', ', $aud_values)));
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Authorized Party (azp) validation
+        //
+        // Per OIDC Core 1.0 Section 3.1.3.7 and Microsoft guidance:
+        // - `azp` is present when the token has a single audience and the
+        //   authorized party differs from the audience
+        // - For confidential clients (which this WordPress plugin represents),
+        //   the `azp` should match the client_id if present
+        //
+        // Note: v1.0 endpoints are deprecated; v2.0 is the only supported path.
+        //
+        // References:
+        // - https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
+        // - https://openid.net/specs/openid-connect-core-1_0-final.html
+        // ─────────────────────────────────────────────────────────────────────
+
+        $azp_claim = $jwt->azp ?? null;
+        if (null !== $azp_claim && \is_string($azp_claim) && $azp_claim !== $client_id) {
+            // azp is present and does not match expected client_id
+            // This may indicate the token was issued for a different application
+            throw new DomainException(\sprintf('ID token authorized party (azp) mismatch. Expected `%s`, got `%s`', $client_id, $azp_claim));
+        }
+
         $token_nonce = $jwt->nonce ?? '';
         /** @var mixed $nonce_val */
         $nonce_val = $token_nonce;
@@ -266,3 +333,5 @@ class AuthorizationHelper
         return $jwt;
     }
 }
+
+class_alias(AuthorizationHelper::class, 'AADSSO_AuthorizationHelper');
