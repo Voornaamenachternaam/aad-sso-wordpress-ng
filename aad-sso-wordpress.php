@@ -258,32 +258,54 @@ class AADSSO
             AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
             // Validate issuer claim to prevent token substitution attacks
-            // The issuer must exactly match the expected issuer from OpenID configuration
-            // or follow the correct pattern for the configured tenant
+            // Microsoft Entra ID v2.0 issuer patterns:
+            // - Single tenant: https://login.microsoftonline.com/{tenant-id}/v2.0
+            // - /common/ or /organizations/: templated as https://login.microsoftonline.com/{tenantid}/v2.0
+            //   in metadata, but JWT contains concrete tenant ID
             $expected_issuer = $this->settings->issuer;
             if (!empty($expected_issuer)) {
-                // For single-tenant deployments: exact match required
-                // The issuer should be exactly: https://login.microsoftonline.com/{tenant-id}/v2.0
-                if ($jwt_iss !== $expected_issuer) {
-                    AADSSO_Logger::log_error(\sprintf(
-                        'Issuer mismatch: expected "%s", got "%s"',
-                        $expected_issuer,
-                        $jwt_iss
-                    ));
+                // Check if expected issuer is templated (contains {tenantid} placeholder)
+                if (str_contains($expected_issuer, '{tenantid}')) {
+                    // For /common/ or /organizations/ endpoints, validate JWT issuer matches the pattern
+                    // but with a concrete tenant ID instead of {tenantid}
+                    if (!empty($jwt_iss)) {
+                        // Convert templated issuer to regex pattern
+                        // Template: https://login.microsoftonline.com/{tenantid}/v2.0
+                        // Pattern: https://login\.microsoftonline\.com/[^/]+/v2\.0
+                        $base = preg_quote('https://login.microsoftonline.com/', '#');
+                        $pattern = '#^' . $base . '[^/]+/v2\.0$#';
 
-                    return new WP_Error(
-                        'invalid_token_issuer',
-                        __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
-                    );
+                        if (!preg_match($pattern, $jwt_iss)) {
+                            AADSSO_Logger::log_error(\sprintf(
+                                'Issuer mismatch: expected pattern "%s", got "%s"',
+                                $expected_issuer,
+                                $jwt_iss
+                            ));
+
+                            return new WP_Error(
+                                'invalid_token_issuer',
+                                __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                            );
+                        }
+                    }
+                } else {
+                    // For single-tenant deployments with concrete issuer: exact match required
+                    if ($jwt_iss !== $expected_issuer) {
+                        AADSSO_Logger::log_error(\sprintf(
+                            'Issuer mismatch: expected "%s", got "%s"',
+                            $expected_issuer,
+                            $jwt_iss
+                        ));
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
                 }
             } else {
                 // Fallback validation if issuer not configured yet
                 // Check that issuer follows Microsoft Entra ID v2.0 pattern
-                // Valid patterns:
-                // - https://login.microsoftonline.com/{tenant-id}/v2.0 (single tenant)
-                // - https://login.microsoftonline.com/{domain}/v2.0 (domain-based tenant)
-                // - https://login.microsoftonline.com/common/v2.0 (multi-tenant with /common)
-                // - https://login.microsoftonline.com/organizations/v2.0 (multi-tenant with /organizations)
                 if (!empty($jwt_iss)) {
                     $issuer_valid = preg_match(
                         '#^https://login\.microsoftonline\.com/[^/]+/v2\.0$#',
