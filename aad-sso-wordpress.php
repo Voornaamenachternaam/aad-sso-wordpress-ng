@@ -490,11 +490,23 @@ class AADSSO
         }
 
         // Final fallback: try matching by any known identifier
+        // Only lowercase for case-insensitive match fields (like email)
         if (!($user instanceof WP_User) && null !== $email_claim) {
-            // Try with all lowercase (some systems normalize emails)
-            $user = get_user_by($match_field, mb_strtolower($email_claim));
-            if (!($user instanceof WP_User)) {
-                $user = get_user_by($match_field, mb_strtolower($unique_name));
+            $lowercased_email = mb_strtolower($email_claim);
+            $lowercased_unique = mb_strtolower($unique_name);
+
+            if ('email' === $match_field) {
+                // For email matching, try lowercase normalization
+                $user = get_user_by($match_field, $lowercased_email);
+                if (!($user instanceof WP_User)) {
+                    $user = get_user_by($match_field, $lowercased_unique);
+                }
+            } else {
+                // For case-sensitive fields (login, ID, etc.), try exact match first
+                $user = get_user_by($match_field, $email_claim);
+                if (!($user instanceof WP_User)) {
+                    $user = get_user_by($match_field, $unique_name);
+                }
             }
         }
 
