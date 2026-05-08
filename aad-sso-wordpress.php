@@ -268,25 +268,33 @@ class AADSSO
                 if (str_contains($expected_issuer, '{tenantid}')) {
                     // For /common/ or /organizations/ endpoints, validate JWT issuer matches the pattern
                     // but with a concrete tenant ID instead of {tenantid}
-                    if (!empty($jwt_iss)) {
-                        // Convert templated issuer to regex pattern
-                        // Template: https://login.microsoftonline.com/{tenantid}/v2.0
-                        // Pattern: https://login\.microsoftonline\.com/[^/]+/v2\.0
-                        $base = preg_quote('https://login.microsoftonline.com/', '#');
-                        $pattern = '#^' . $base . '[^/]+/v2\.0$#';
+                    // Empty issuer must be rejected to prevent bypass
+                    if (empty($jwt_iss)) {
+                        AADSSO_Logger::log_error('JWT issuer claim is empty');
 
-                        if (!preg_match($pattern, $jwt_iss)) {
-                            AADSSO_Logger::log_error(\sprintf(
-                                'Issuer mismatch: expected pattern "%s", got "%s"',
-                                $expected_issuer,
-                                $jwt_iss
-                            ));
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer is missing. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
+                    }
 
-                            return new WP_Error(
-                                'invalid_token_issuer',
-                                __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
-                            );
-                        }
+                    // Convert templated issuer to regex pattern
+                    // Template: https://login.microsoftonline.com/{tenantid}/v2.0
+                    // Pattern: https://login\.microsoftonline\.com/[^/]+/v2\.0
+                    $base = preg_quote('https://login.microsoftonline.com/', '#');
+                    $pattern = '#^' . $base . '[^/]+/v2\.0$#';
+
+                    if (!preg_match($pattern, $jwt_iss)) {
+                        AADSSO_Logger::log_error(\sprintf(
+                            'Issuer mismatch: expected pattern "%s", got "%s"',
+                            $expected_issuer,
+                            $jwt_iss
+                        ));
+
+                        return new WP_Error(
+                            'invalid_token_issuer',
+                            __('ERROR: Token issuer validation failed. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                        );
                     }
                 } else {
                     // For single-tenant deployments with concrete issuer: exact match required
@@ -307,22 +315,30 @@ class AADSSO
                 // Fallback validation if issuer not configured yet
                 // Check that issuer follows Microsoft Entra ID v2.0 pattern
                 // Allow optional trailing slash for flexibility
-                if (!empty($jwt_iss)) {
-                    $issuer_valid = preg_match(
-                        '#^https://login\.microsoftonline\.com/[^/]+/v2\.0/?$#',
-                        $jwt_iss
-                    );
-                    if (!$issuer_valid) {
-                        AADSSO_Logger::log_error(\sprintf(
-                            'Invalid issuer format: "%s". Expected Microsoft Entra ID v2.0 issuer pattern.',
-                            $jwt_iss
-                        ));
+                // Empty issuer must be rejected to prevent bypass
+                if (empty($jwt_iss)) {
+                    AADSSO_Logger::log_error('JWT issuer claim is empty');
 
-                        return new WP_Error(
-                            'invalid_token_issuer',
-                            __('ERROR: Token issuer has invalid format. This may indicate a token substitution attack.', 'aad-sso-wordpress')
-                        );
-                    }
+                    return new WP_Error(
+                        'invalid_token_issuer',
+                        __('ERROR: Token issuer is missing. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                    );
+                }
+
+                $issuer_valid = preg_match(
+                    '#^https://login\.microsoftonline\.com/[^/]+/v2\.0/?$#',
+                    $jwt_iss
+                );
+                if (!$issuer_valid) {
+                    AADSSO_Logger::log_error(\sprintf(
+                        'Invalid issuer format: "%s". Expected Microsoft Entra ID v2.0 issuer pattern.',
+                        $jwt_iss
+                    ));
+
+                    return new WP_Error(
+                        'invalid_token_issuer',
+                        __('ERROR: Token issuer has invalid format. This may indicate a token substitution attack.', 'aad-sso-wordpress')
+                    );
                 }
             }
 
