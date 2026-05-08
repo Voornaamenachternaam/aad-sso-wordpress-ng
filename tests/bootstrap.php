@@ -41,6 +41,9 @@ require_once AADSSO_PLUGIN_DIR . 'Logger.php';
 // Load the Settings class for tests
 require_once AADSSO_PLUGIN_DIR . 'Settings.php';
 
+// Load the AuthorizationHelper class for tests
+require_once AADSSO_PLUGIN_DIR . 'AuthorizationHelper.php';
+
 if (!\function_exists('get_bloginfo')) {
     function get_bloginfo($show = '', $filter = 'raw')
     {
