@@ -510,8 +510,8 @@ class SettingsPage
         $valid_roles = array_keys($this->get_editable_roles());
         $sanitized['default_wp_role'] = \in_array($default_wp_role, $valid_roles, true) ? $default_wp_role : '';
 
-        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
-        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+        $openid_endpoint_raw = $input['openid_configuration_endpoint'] ?? AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
+        $sanitized['openid_configuration_endpoint'] = \is_string($openid_endpoint_raw) ? esc_url_raw($openid_endpoint_raw) : AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
 
         $auth_endpoint_raw = $input['authorization_endpoint'] ?? '';
         $sanitized['authorization_endpoint'] = \is_string($auth_endpoint_raw) ? esc_url_raw($auth_endpoint_raw) : '';
@@ -795,7 +795,7 @@ class SettingsPage
     {
         $this->render_text_field('openid_configuration_endpoint');
         $default_endpoint = AADSSO_Settings::get_defaults('openid_configuration_endpoint');
-        $default_url = \is_string($default_endpoint) ? $default_endpoint : 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+        $default_url = \is_string($default_endpoint) ? $default_endpoint : AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
             . esc_url($default_url)
             . '\'); return false;">' . esc_html__('Set default', 'aad-sso-wordpress') . '</a>';

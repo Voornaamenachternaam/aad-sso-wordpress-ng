@@ -6,6 +6,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class Settings
 {
+    public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+
     public string $client_id = '';
 
     public string $client_secret = '';
@@ -37,7 +39,7 @@ class Settings
 
     public bool $enable_full_logout = false;
 
-    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+    public string $openid_configuration_endpoint = self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
 
     public string $authorization_endpoint = '';
 
@@ -83,7 +85,7 @@ class Settings
                 'enable_aad_group_to_wp_role' => false,
                 'redirect_uri' => self::safe_wp_login_url(),
                 'logout_redirect_uri' => self::safe_wp_login_url(),
-                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration',
+                'openid_configuration_endpoint' => self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT,
             ];
         }
 
@@ -167,7 +169,7 @@ class Settings
 
             self::$options_resolver->define('openid_configuration_endpoint')
                 ->allowedTypes('string')
-                ->default('https://login.microsoftonline.com/organizations/.well-known/openid-configuration');
+                ->default(self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT);
 
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
