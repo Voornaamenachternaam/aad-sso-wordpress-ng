@@ -540,30 +540,27 @@ class AADSSO
             }
         }
 
-        // Final fallback: try matching by any known identifier
+        // Final fallback: try matching by any known identifier (email matching only)
         // Only lowercase for case-insensitive match fields (like email)
-        if (!($user instanceof WP_User) && null !== $email_claim) {
+        if (!($user instanceof WP_User) && 'email' === $match_field && null !== $email_claim) {
             $lowercased_email = mb_strtolower($email_claim);
             $lowercased_unique = mb_strtolower($unique_name);
 
-            if ('email' === $match_field) {
-                // For email matching, try lowercase normalization
-                $user = get_user_by($match_field, $lowercased_email);
-                if (!($user instanceof WP_User)) {
-                    $user = get_user_by($match_field, $lowercased_unique);
-                }
-            } else {
-                // For case-sensitive fields (login, ID, etc.), try exact match first
-                $user = get_user_by($match_field, $email_claim);
-                if (!($user instanceof WP_User)) {
-                    $user = get_user_by($match_field, $unique_name);
-                }
+            // For email matching, try lowercase normalization
+            $user = get_user_by($match_field, $lowercased_email);
+            if (!($user instanceof WP_User)) {
+                $user = get_user_by($match_field, $lowercased_unique);
             }
         }
+        // Note: For non-email match fields (e.g., 'login'), no fallback is attempted
+        // as matching by email would be semantically incorrect and could match wrong users
 
         if ($user instanceof WP_User) {
-            // Warn if email in WordPress doesn't match Entra ID email claim
-            if (null !== $email_claim && $user->user_email !== $email_claim) {
+            // Warn if email in WordPress doesn't match Entra ID email claim (case-insensitive comparison)
+            if (
+                null !== $email_claim
+                && mb_strtolower($user->user_email) !== mb_strtolower($email_claim)
+            ) {
                 AADSSO_Logger::log_warning(\sprintf(
                     'Email mismatch for user %d: WordPress has %s, Entra ID has %s. '
                     . 'Consider updating the user email to ensure consistency.',

@@ -22,7 +22,6 @@ class SettingsPage
         add_action('admin_init', [$this, 'maybe_reset_settings']);
         add_action('admin_init', [$this, 'maybe_migrate_settings']);
         add_action('admin_init', [$this, 'check_version_and_setup_migration']);
-        add_action('admin_init', [$this, 'notify_upgrade_migration']);
         add_action('all_admin_notices', [$this, 'notify_if_reset_successful']);
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
         add_action('all_admin_notices', [$this, 'notify_openid_configuration_warning']);
