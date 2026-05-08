@@ -286,13 +286,7 @@ class AuthorizationHelper
         }
 
         if (!$audience_valid) {
-            throw new DomainException(
-                \sprintf(
-                    'ID token audience validation failed. Expected `%s`, got `%s`',
-                    $client_id,
-                    implode(', ', $aud_values)
-                )
-            );
+            throw new DomainException(\sprintf('ID token audience validation failed. Expected `%s`, got `%s`', $client_id, implode(', ', $aud_values)));
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -315,13 +309,7 @@ class AuthorizationHelper
         if (null !== $azp_claim && \is_string($azp_claim) && $azp_claim !== $client_id) {
             // azp is present and does not match expected client_id
             // This may indicate the token was issued for a different application
-            throw new DomainException(
-                \sprintf(
-                    'ID token authorized party (azp) mismatch. Expected `%s`, got `%s`',
-                    $client_id,
-                    $azp_claim
-                )
-            );
+            throw new DomainException(\sprintf('ID token authorized party (azp) mismatch. Expected `%s`, got `%s`', $client_id, $azp_claim));
         }
 
         $token_nonce = $jwt->nonce ?? '';

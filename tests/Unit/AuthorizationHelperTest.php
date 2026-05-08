@@ -6,8 +6,7 @@ namespace AADSSO\Tests\Unit;
 
 use Firebase\JWT\JWT;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\{ResponseInterface, StreamInterface};
 
 /**
  * AuthorizationHelper unit tests for ID token validation.
@@ -41,11 +40,11 @@ class AuthorizationHelperTest extends TestCase
         // Generate RSA key pair for testing
         $config = [
             'private_key_bits' => 2048,
-            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+            'private_key_type' => \OPENSSL_KEYTYPE_RSA,
         ];
 
         $res = openssl_pkey_new($config);
-        if ($res === false) {
+        if (false === $res) {
             throw new \RuntimeException('Failed to generate RSA key pair');
         }
 
@@ -56,68 +55,6 @@ class AuthorizationHelperTest extends TestCase
             'private_key' => $privateKey,
             'public_key' => $details['key'],
         ];
-    }
-
-    /**
-     * Generate a valid JWT token for testing.
-     *
-     * @param array<string, mixed> $claims Additional claims to merge
-     *
-     * @return string The encoded JWT token
-     */
-    private function generateTestToken(array $claims = []): string
-    {
-        $now = time();
-
-        $payload = array_merge([
-            'iss' => self::TEST_ISSUER,
-            'iat' => $now,
-            'exp' => $now + 3600,
-            'aud' => self::TEST_CLIENT_ID,
-            'nonce' => 'test-nonce-123',
-            'oid' => 'user-object-id-123',
-            'preferred_username' => 'testuser@example.com',
-        ], $claims);
-
-        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256');
-    }
-
-    /**
-     * Create a mock HTTP response with given body and status code.
-     */
-    private function createMockResponse(string $body, int $statusCode = 200): ResponseInterface
-    {
-        $stream = $this->createMock(StreamInterface::class);
-        $stream->method('getContents')->willReturn($body);
-
-        $response = $this->createMock(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn($statusCode);
-        $response->method('getBody')->willReturn($stream);
-
-        return $response;
-    }
-
-    /**
-     * Create a mock JWKS response with the test public key.
-     */
-    private function createMockJwksResponse(): ResponseInterface
-    {
-        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_public(self::$rsaKeyPair['public_key']));
-
-        $jwks = [
-            'keys' => [
-                [
-                    'kty' => 'RSA',
-                    'use' => 'sig',
-                    'kid' => 'test-key-id',
-                    'alg' => 'RS256',
-                    'n' => rtrim(strtr(base64_encode($keyDetails['rsa']['n']), '+/', '-_'), '='),
-                    'e' => rtrim(strtr(base64_encode($keyDetails['rsa']['e']), '+/', '-_'), '='),
-                ],
-            ],
-        ];
-
-        return $this->createMockResponse(json_encode($jwks));
     }
 
     /**
@@ -392,5 +329,67 @@ class AuthorizationHelperTest extends TestCase
         $this->expectExceptionMessage('Token has expired');
 
         $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+    }
+
+    /**
+     * Generate a valid JWT token for testing.
+     *
+     * @param array<string, mixed> $claims Additional claims to merge
+     *
+     * @return string The encoded JWT token
+     */
+    private function generateTestToken(array $claims = []): string
+    {
+        $now = time();
+
+        $payload = array_merge([
+            'iss' => self::TEST_ISSUER,
+            'iat' => $now,
+            'exp' => $now + 3600,
+            'aud' => self::TEST_CLIENT_ID,
+            'nonce' => 'test-nonce-123',
+            'oid' => 'user-object-id-123',
+            'preferred_username' => 'testuser@example.com',
+        ], $claims);
+
+        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256');
+    }
+
+    /**
+     * Create a mock HTTP response with given body and status code.
+     */
+    private function createMockResponse(string $body, int $statusCode = 200): ResponseInterface
+    {
+        $stream = $this->createMock(StreamInterface::class);
+        $stream->method('getContents')->willReturn($body);
+
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($statusCode);
+        $response->method('getBody')->willReturn($stream);
+
+        return $response;
+    }
+
+    /**
+     * Create a mock JWKS response with the test public key.
+     */
+    private function createMockJwksResponse(): ResponseInterface
+    {
+        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_public(self::$rsaKeyPair['public_key']));
+
+        $jwks = [
+            'keys' => [
+                [
+                    'kty' => 'RSA',
+                    'use' => 'sig',
+                    'kid' => 'test-key-id',
+                    'alg' => 'RS256',
+                    'n' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['n']), '+/', '-_'), '='),
+                    'e' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['e']), '+/', '-_'), '='),
+                ],
+            ],
+        ];
+
+        return $this->createMockResponse(json_encode($jwks));
     }
 }
