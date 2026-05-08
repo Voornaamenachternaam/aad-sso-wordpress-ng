@@ -210,7 +210,7 @@ class AuthorizationHelper
 
                 // Case-insensitive comparison for GUIDs
                 if (!strcasecmp($token_tid, $expected)) {
-                    AADSSO_Logger::log_debug(
+                    AADSSO_Logger::log_info(
                         'Tenant ID validated: token tid matches expected tenant',
                         ['tid' => $token_tid]
                     );
@@ -259,7 +259,7 @@ class AuthorizationHelper
                 }
 
                 if ($found) {
-                    AADSSO_Logger::log_debug(
+                    AADSSO_Logger::log_info(
                         'Tenant ID validated: token tid is in allowed tenants list',
                         ['tid' => $token_tid]
                     );
