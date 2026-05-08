@@ -21,6 +21,8 @@ class SettingsPage
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_init', [$this, 'maybe_reset_settings']);
         add_action('admin_init', [$this, 'maybe_migrate_settings']);
+        add_action('admin_init', [$this, 'check_version_and_setup_migration']);
+        add_action('admin_init', [$this, 'notify_upgrade_migration']);
         add_action('all_admin_notices', [$this, 'notify_if_reset_successful']);
         add_action('all_admin_notices', [$this, 'notify_json_migrate_status']);
         add_action('all_admin_notices', [$this, 'notify_openid_configuration_warning']);
@@ -84,6 +86,35 @@ class SettingsPage
     }
 
     /**
+     * Check plugin version and set up migration flags.
+     * This runs on every admin_init to handle upgrades where activate() is not triggered.
+     * Sets aadsso_version and aadsso_previous_openid_endpoint if not already set,
+     * ensuring the migration notice displays for existing users.
+     */
+    public function check_version_and_setup_migration(): void
+    {
+        $stored_version = get_option('aadsso_version', null);
+
+        // Set version if not already stored (handles plugin upgrades without activate() trigger)
+        // Use empty string to indicate "old install with unknown previous version"
+        if (null === $stored_version) {
+            update_option('aadsso_version', '');
+
+            // Store current endpoint as previous if not already set
+            // This preserves the endpoint from before the upgrade for migration notice logic
+            $previous_endpoint = get_option('aadsso_previous_openid_endpoint', '');
+            if ('' === $previous_endpoint) {
+                $openid_endpoint = $this->settings['openid_configuration_endpoint'] ?? '';
+                if (\is_string($openid_endpoint) && '' !== $openid_endpoint) {
+                    update_option('aadsso_previous_openid_endpoint', $openid_endpoint);
+                }
+            }
+
+            AADSSO_Logger::log_info('Migration flags initialized for existing install');
+        }
+    }
+
+    /**
      * Display migration notice for users upgrading from older versions.
      * Specifically for the /common/ → /organizations/ endpoint change.
      *
@@ -130,8 +161,9 @@ class SettingsPage
         );
 
         // Also show for sites that were active before this change (no stored version = old install)
+        // Note: version may be null (never set) or empty string (set by check_version_and_setup_migration for old installs)
         $stored_version = get_option('aadsso_version', null);
-        $no_version_stored = (null === $stored_version);
+        $no_version_stored = (null === $stored_version || '' === $stored_version);
 
         if (!$is_upgrade_from_common && !$no_version_stored) {
             return;
