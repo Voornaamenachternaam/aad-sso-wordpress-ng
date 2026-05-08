@@ -473,7 +473,6 @@ class Settings
             'authorization_endpoint',
             'token_endpoint',
             'jwks_uri',
-            'issuer',
             'end_session_endpoint',
             'openid_configuration_endpoint',
             'graph_endpoint',
@@ -488,6 +487,7 @@ class Settings
         return match ($key) {
             'client_id' => sanitize_text_field(\is_string($value) ? $value : ''),
             'client_secret' => \is_string($value) ? $value : '',
+            'issuer' => sanitize_text_field(\is_string($value) ? $value : ''),
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
             'graph_version', 'custom_scope' => sanitize_text_field(\is_string($value) ? $value : ''),
