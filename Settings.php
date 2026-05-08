@@ -6,6 +6,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class Settings
 {
+    public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
+
     public string $client_id = '';
 
     public string $client_secret = '';
@@ -37,13 +39,15 @@ class Settings
 
     public bool $enable_full_logout = false;
 
-    public string $openid_configuration_endpoint = 'https://login.microsoftonline.com/common/.well-known/openid-configuration';
+    public string $openid_configuration_endpoint = self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
 
     public string $authorization_endpoint = '';
 
     public string $token_endpoint = '';
 
     public string $jwks_uri = '';
+
+    public string $issuer = '';
 
     public string $end_session_endpoint = '';
 
@@ -81,7 +85,7 @@ class Settings
                 'enable_aad_group_to_wp_role' => false,
                 'redirect_uri' => self::safe_wp_login_url(),
                 'logout_redirect_uri' => self::safe_wp_login_url(),
-                'openid_configuration_endpoint' => 'https://login.microsoftonline.com/common/.well-known/openid-configuration',
+                'openid_configuration_endpoint' => self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT,
             ];
         }
 
@@ -165,7 +169,7 @@ class Settings
 
             self::$options_resolver->define('openid_configuration_endpoint')
                 ->allowedTypes('string')
-                ->default('https://login.microsoftonline.com/common/.well-known/openid-configuration');
+                ->default(self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT);
 
             self::$options_resolver->define('authorization_endpoint')
                 ->allowedTypes('string')
@@ -176,6 +180,10 @@ class Settings
                 ->default('');
 
             self::$options_resolver->define('jwks_uri')
+                ->allowedTypes('string')
+                ->default('');
+
+            self::$options_resolver->define('issuer')
                 ->allowedTypes('string')
                 ->default('');
 
@@ -308,6 +316,29 @@ class Settings
         }
 
         return $this;
+    }
+
+    /**
+     * Invalidate the cached OpenID configuration.
+     * Should be called on plugin activation/upgrade to ensure fresh discovery.
+     * Uses WordPress transients for activation-hook compatibility.
+     */
+    public static function invalidate_openid_configuration_cache(): void
+    {
+        $cache_key = 'aadsso_openid_configuration';
+
+        // Use WordPress transient as primary (works during activation hooks)
+        if (\function_exists('delete_transient')) {
+            delete_transient($cache_key);
+        }
+
+        // Also attempt PSR-16 cache cleanup if available
+        try {
+            $cache = AADSSO_Logger::get_cache();
+            $cache->delete($cache_key);
+        } catch (Throwable) {
+            // Silently fail - transient deletion above is primary
+        }
     }
 
     /**
@@ -456,6 +487,7 @@ class Settings
         return match ($key) {
             'client_id' => sanitize_text_field(\is_string($value) ? $value : ''),
             'client_secret' => \is_string($value) ? $value : '',
+            'issuer' => sanitize_text_field(\is_string($value) ? $value : ''),
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
             'graph_version', 'custom_scope' => sanitize_text_field(\is_string($value) ? $value : ''),

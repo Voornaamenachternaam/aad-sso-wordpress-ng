@@ -246,6 +246,23 @@ class AuthorizationHelper
             throw new DomainException(\sprintf('Nonce mismatch. Expecting %s', $antiforgery_id));
         }
 
+        // Note: JWT::decode() (called above) already validates exp and nbf claims
+        // via ExpiredException and BeforeValidException respectively.
+
+        // Check token was not issued too far in the past (optional: 24-hour max age)
+        $now = time();
+        $token_iat = isset($jwt->iat) ? (int) $jwt->iat : 0;
+        if ($token_iat > 0) {
+            $max_token_age = 86400; // 24 hours
+            $token_age = $now - $token_iat;
+            if ($token_age > $max_token_age) {
+                AADSSO_Logger::log_warning(
+                    'Token age exceeds recommended maximum',
+                    ['token_age_seconds' => $token_age, 'max_age_seconds' => $max_token_age]
+                );
+            }
+        }
+
         return $jwt;
     }
 }
