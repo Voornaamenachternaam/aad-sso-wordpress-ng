@@ -539,7 +539,7 @@ class Settings
             return [];
         }
 
-        /** @var list<string> $sanitized */
+        // @var list<string> $sanitized
         return array_filter(
             array_map(
                 static function (mixed $id): string {
