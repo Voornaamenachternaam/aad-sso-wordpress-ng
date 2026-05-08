@@ -387,7 +387,8 @@ class AADSSO
         $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
         // Collect all possible email/identifier claims for matching
-        // Priority: email > preferredUsername > mail > upn > unique_name
+        // Priority: email > preferred_username > upn > unique_name
+        // Note: 'mail' is not a standard ID token claim - it's a Graph API attribute
         /** @var null|string */
         $email_claim = null;
         /** @var mixed */
@@ -395,25 +396,27 @@ class AADSSO
         if (\is_string($email_raw)) {
             $email_claim = $email_raw;
         }
+        // Note: preferred_username is snake_case (OpenID Connect standard)
         /** @var mixed */
-        $preferred_username_raw = $jwt->preferredUsername ?? null;
+        $preferred_username_raw = $jwt->preferred_username ?? null;
         if (null === $email_claim && \is_string($preferred_username_raw)) {
+            // For guest users, preferred_username often contains their actual email
+            // (while upn contains the #EXT# format)
             $email_claim = $preferred_username_raw;
-        }
-        /** @var mixed */
-        $mail_raw = $jwt->mail ?? null;
-        if (null === $email_claim && \is_string($mail_raw)) {
-            $email_claim = $mail_raw;
         }
 
         // Log available claims for debugging
+        /** @var mixed */
+        $log_preferred_username = $jwt->preferred_username ?? '(null)';
+        /** @var mixed */
+        $log_mail = $jwt->mail ?? '(null)';
         AADSSO_Logger::log_debug(\sprintf(
-            'User claims: upn=%s, unique_name=%s, email=%s, preferredUsername=%s, mail=%s',
+            'User claims: upn=%s, unique_name=%s, email=%s, preferred_username=%s, mail=%s',
             $upn ?? '(null)',
             $unique_name ?? '(null)',
             $email_claim ?? '(null)',
-            $jwt->preferredUsername ?? '(null)',
-            $jwt->mail ?? '(null)'
+            \is_string($log_preferred_username) ? $log_preferred_username : '(non-string)',
+            \is_string($log_mail) ? $log_mail : '(non-string)'
         ), 10);
 
         if (null === $unique_name) {
