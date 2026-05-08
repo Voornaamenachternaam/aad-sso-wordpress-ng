@@ -514,7 +514,7 @@ class Settings
             'field_to_match_to_upn', 'default_wp_role',
             'graph_version', 'custom_scope' => sanitize_text_field(\is_string($value) ? $value : ''),
             'tenantRestrictionMode' => \is_string($value) && \in_array($value, ['none', 'single', 'multi'], true) ? $value : 'none',
-            'expected_tenant_id' => \is_string($value) ? $value : '',
+            'expected_tenant_id' => self::sanitize_tenant_id($value),
             'allowed_tenant_ids' => self::sanitize_tenant_ids($value),
             'match_on_upn_alias',
             'enable_auto_provisioning',
@@ -524,6 +524,34 @@ class Settings
             'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
             default => $value,
         };
+    }
+
+    /**
+     * Sanitize and validate a single tenant ID.
+     *
+     * @param mixed $value
+     *
+     * @return string
+     */
+    private static function sanitize_tenant_id(mixed $value): string
+    {
+        if (!\is_string($value)) {
+            return '';
+        }
+
+        $trimmed = mb_trim($value);
+
+        // Empty string is valid (allows clearing the setting)
+        if ('' === $trimmed) {
+            return '';
+        }
+
+        // Validate GUID format: 8-4-4-4-12 hex characters
+        if (1 !== preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
+            return '';
+        }
+
+        return $trimmed;
     }
 
     /**
