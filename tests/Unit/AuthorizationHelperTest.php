@@ -126,7 +126,7 @@ class AuthorizationHelperTest extends TestCase
             'nonce' => 'test-nonce-123',
             'oid' => 'user-object-id-123',
         ];
-        $token = JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', ['kid' => self::$rsaKeyPair['kid']]);
+        $token = JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
 
         $httpClientProperty = $reflection->getProperty('http_client');
         $httpClientProperty->setAccessible(true);
@@ -268,7 +268,7 @@ class AuthorizationHelperTest extends TestCase
             'oid' => 'user-object-id-123',
             'preferred_username' => 'testuser@example.com',
         ];
-        $token = JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', ['kid' => self::$rsaKeyPair['kid']]);
+        $token = JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
 
         $httpClientProperty = $reflection->getProperty('http_client');
         $httpClientProperty->setAccessible(true);
@@ -353,10 +353,8 @@ class AuthorizationHelperTest extends TestCase
             'preferred_username' => 'testuser@example.com',
         ], $claims);
 
-        // Include kid in header for key matching
-        $headers = ['kid' => self::$rsaKeyPair['kid']];
-
-        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', $headers);
+        // Include kid in header for key matching (5th parameter)
+        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
     }
 
     /**
