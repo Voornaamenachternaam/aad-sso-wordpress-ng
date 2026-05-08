@@ -465,9 +465,14 @@ class AADSSO
 
         $user = get_user_by($match_field, $match_value);
 
-        // If no match by primary value, try fallback with email claim if different
-        if (!($user instanceof WP_User) && null !== $email_claim && $email_claim !== $match_value) {
-            $user = get_user_by($match_field, $email_claim);
+        // If no match by primary value, try fallback with email claim
+        // Only applies when matching by email - doesn't make sense for other fields
+        if (!($user instanceof WP_User)
+            && 'email' === $match_field
+            && null !== $email_claim
+            && $email_claim !== $match_value
+        ) {
+            $user = get_user_by('email', $email_claim);
             if ($user instanceof WP_User) {
                 AADSSO_Logger::log_debug(\sprintf(
                     'Matched user by email claim (%s) instead of primary value (%s).',
