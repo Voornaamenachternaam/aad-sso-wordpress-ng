@@ -168,7 +168,8 @@ class SettingsPage
             return;
         }
 
-        echo '<div class="notice notice-warning is-dismissible" id="aadsso-migration-notice">';
+        echo '<div class="notice notice-warning is-dismissible" id="aadsso-migration-notice" data-nonce="'
+            . wp_create_nonce('aadsso_dismiss_migration') . '">';
         echo '<p>';
         echo wp_kses_post(
             __(
@@ -181,9 +182,8 @@ class SettingsPage
         );
         echo '</p>';
         echo '<p>';
-        echo '<button type="button" class="button" onclick="'
-            . "jQuery.post(ajaxurl, {action: 'aadsso_dismiss_migration_notice', nonce: '" . wp_create_nonce('aadsso_dismiss_migration') . "'}, function() { jQuery('#aadsso-migration-notice').fadeOut(); });"
-            . '">' . esc_html__('Dismiss', 'aad-sso-wordpress') . '</button>';
+        echo '<button type="button" class="button aadsso-dismiss-notice">'
+            . esc_html__('Dismiss', 'aad-sso-wordpress') . '</button>';
         echo ' <a href="#" class="button button-secondary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\''
             . esc_url(AADSSO_Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT)
             . '\'); jQuery(\'#submit\').click(); return false;">' . esc_html__('Keep current endpoint', 'aad-sso-wordpress') . '</a>';
@@ -980,6 +980,23 @@ class SettingsPage
     {
         if ($this->is_on_options_page()) {
             wp_enqueue_script('jquery');
+
+            // Add inline script for migration notice dismissal (CSP-friendly)
+            $inline_script = <<<'JS'
+(function($) {
+    $(document).on('click', '.aadsso-dismiss-notice', function() {
+        var $notice = $(this).closest('#aadsso-migration-notice');
+        var nonce = $notice.data('nonce');
+        $.post(ajaxurl, {
+            action: 'aadsso_dismiss_migration_notice',
+            nonce: nonce
+        }, function() {
+            $notice.fadeOut();
+        });
+    });
+})(jQuery);
+JS;
+            wp_add_inline_script('jquery', $inline_script);
         }
     }
 
