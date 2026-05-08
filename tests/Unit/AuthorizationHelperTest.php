@@ -644,18 +644,21 @@ class AuthorizationHelperTest extends TestCase
     }
 
     /**
-     * Create a mock settings object for testing.
+     * Create a mock settings object for testing tenant validation.
      *
      * @return object
      */
     private function createMockSettings(): object
     {
         return new class() {
-            public string $tenantRestrictionMode = 'none';
+            /** @var string */
+            public $tenantRestrictionMode = 'none';
 
-            public string $expected_tenant_id = '';
+            /** @var string */
+            public $expected_tenant_id = '';
 
-            public array $allowed_tenant_ids = [];
+            /** @var list<string> */
+            public $allowed_tenant_ids = [];
         };
     }
 }
