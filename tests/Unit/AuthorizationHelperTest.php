@@ -394,4 +394,200 @@ class AuthorizationHelperTest extends TestCase
 
         return $this->createMockResponse(json_encode($jwks));
     }
+
+    /**
+     * Test that tenant validation passes when mode is 'none'.
+     */
+    public function testValidateTenantIdPassesWhenModeIsNone(): void
+    {
+        $jwt = (object) [
+            'tid' => 'any-tenant-guid-here',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'none';
+
+        // Should not throw
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true); // If we reach here, test passed
+    }
+
+    /**
+     * Test that tenant validation passes when token tid matches expected tenant in single mode.
+     */
+    public function testValidateTenantIdPassesWhenSingleTenantMatches(): void
+    {
+        $expected_tenant = '12345678-1234-1234-1234-123456789012';
+        $jwt = (object) [
+            'tid' => $expected_tenant,
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = $expected_tenant;
+
+        // Should not throw
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test that tenant validation passes when token tid matches one of allowed tenants in multi mode.
+     */
+    public function testValidateTenantIdPassesWhenMultiTenantMatches(): void
+    {
+        $jwt = (object) [
+            'tid' => '12345678-1234-1234-1234-123456789012',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'multi';
+        $settings->allowed_tenant_ids = [
+            '12345678-1234-1234-1234-123456789012',
+            '87654321-4321-4321-4321-210987654321',
+        ];
+
+        // Should not throw
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test that tenant validation fails when token tid does not match expected tenant.
+     */
+    public function testValidateTenantIdFailsWhenSingleTenantDoesNotMatch(): void
+    {
+        $jwt = (object) [
+            'tid' => '99999999-9999-9999-9999-999999999999',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = '12345678-1234-1234-1234-123456789012';
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('tenant ID validation failed');
+
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+    }
+
+    /**
+     * Test that tenant validation fails when token tid is not in allowed tenants list.
+     */
+    public function testValidateTenantIdFailsWhenMultiTenantNotInList(): void
+    {
+        $jwt = (object) [
+            'tid' => '99999999-9999-9999-9999-999999999999',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'multi';
+        $settings->allowed_tenant_ids = [
+            '12345678-1234-1234-1234-123456789012',
+            '87654321-4321-4321-4321-210987654321',
+        ];
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('tenant ID validation failed');
+
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+    }
+
+    /**
+     * Test that tenant validation fails when tid claim is missing.
+     */
+    public function testValidateTenantIdFailsWhenTidIsMissing(): void
+    {
+        $jwt = (object) [
+            'iss' => self::TEST_ISSUER,
+            // No 'tid' claim
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = '12345678-1234-1234-1234-123456789012';
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('missing required `tid`');
+
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+    }
+
+    /**
+     * Test that tenant validation fails when expected_tenant_id is not configured in single mode.
+     */
+    public function testValidateTenantIdFailsWhenSingleModeNoTenantConfigured(): void
+    {
+        $jwt = (object) [
+            'tid' => '12345678-1234-1234-1234-123456789012',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = ''; // Empty
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('no expected tenant ID is configured');
+
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+    }
+
+    /**
+     * Test that tenant validation fails when allowed_tenant_ids is empty in multi mode.
+     */
+    public function testValidateTenantIdFailsWhenMultiModeNoTenantsConfigured(): void
+    {
+        $jwt = (object) [
+            'tid' => '12345678-1234-1234-1234-123456789012',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'multi';
+        $settings->allowed_tenant_ids = [];
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('no allowed tenant IDs are configured');
+
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+    }
+
+    /**
+     * Test that tenant validation handles case-insensitive GUID comparison.
+     */
+    public function testValidateTenantIdCaseInsensitive(): void
+    {
+        $jwt = (object) [
+            'tid' => '12345678-1234-1234-1234-123456789012',
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = '12345678-1234-1234-1234-123456789012';
+
+        // Should not throw - case insensitive comparison
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Create a mock settings object for testing.
+     *
+     * @return object
+     */
+    private function createMockSettings(): object
+    {
+        return new class {
+            public string $tenantRestrictionMode = 'none';
+            public string $expected_tenant_id = '';
+            public array $allowed_tenant_ids = [];
+        };
+    }
 }

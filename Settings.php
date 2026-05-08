@@ -57,6 +57,15 @@ class Settings
 
     public string $custom_scope = '';
 
+    public string $tenantRestrictionMode = 'none';
+
+    public string $expected_tenant_id = '';
+
+    /**
+     * @var list<string>
+     */
+    public array $allowed_tenant_ids = [];
+
     /**
      * @var null|self
      */
@@ -205,6 +214,19 @@ class Settings
                 ->default('');
 
             self::$options_resolver->define('role_map')
+                ->allowedTypes('array')
+                ->default([]);
+
+            self::$options_resolver->define('tenantRestrictionMode')
+                ->allowedTypes('string')
+                ->default('none')
+                ->allowedValues('none', 'single', 'multi');
+
+            self::$options_resolver->define('expected_tenant_id')
+                ->allowedTypes('string')
+                ->default('');
+
+            self::$options_resolver->define('allowed_tenant_ids')
                 ->allowedTypes('array')
                 ->default([]);
         }
@@ -491,6 +513,9 @@ class Settings
             'org_display_name', 'org_domain_hint',
             'field_to_match_to_upn', 'default_wp_role',
             'graph_version', 'custom_scope' => sanitize_text_field(\is_string($value) ? $value : ''),
+            'tenantRestrictionMode' => \is_string($value) && \in_array($value, ['none', 'single', 'multi'], true) ? $value : 'none',
+            'expected_tenant_id' => \is_string($value) ? $value : '',
+            'allowed_tenant_ids' => self::sanitize_tenant_ids($value),
             'match_on_upn_alias',
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
@@ -499,6 +524,42 @@ class Settings
             'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
             default => $value,
         };
+    }
+
+    /**
+     * Sanitize and validate tenant IDs.
+     *
+     * @param mixed $value
+     *
+     * @return list<string>
+     */
+    private static function sanitize_tenant_ids(mixed $value): array
+    {
+        if (!\is_array($value)) {
+            return [];
+        }
+
+        /** @var list<string> $sanitized */
+        $sanitized = array_filter(
+            array_map(
+                static function (mixed $id): string {
+                    if (!\is_string($id)) {
+                        return '';
+                    }
+                    // Validate GUID format (tenant ID should be a GUID)
+                    $trimmed = mb_trim($id);
+                    // GUID format: 8-4-4-4-12 hex characters
+                    if (preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
+                        return $trimmed;
+                    }
+
+                    return '';
+                },
+                $value
+            )
+        );
+
+        return $sanitized;
     }
 }
 

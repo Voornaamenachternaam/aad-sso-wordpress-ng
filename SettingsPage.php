@@ -421,6 +421,13 @@ class SettingsPage
             'aadsso_settings_page'
         );
 
+        add_settings_section(
+            'aadsso_settings_security',
+            esc_html__('Security & Access Control', 'aad-sso-wordpress'),
+            [$this, 'settings_security_info'],
+            'aadsso_settings_page'
+        );
+
         add_settings_field(
             'org_display_name',
             esc_html__('Display name', 'aad-sso-wordpress'),
@@ -550,6 +557,30 @@ class SettingsPage
         );
 
         add_settings_field(
+            'tenantRestrictionMode',
+            esc_html__('Tenant restriction mode', 'aad-sso-wordpress'),
+            [$this, 'tenant_restriction_mode_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
+            'expected_tenant_id',
+            esc_html__('Expected tenant ID (single-tenant mode)', 'aad-sso-wordpress'),
+            [$this, 'expected_tenant_id_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
+            'allowed_tenant_ids',
+            esc_html__('Allowed tenant IDs (multi-tenant mode)', 'aad-sso-wordpress'),
+            [$this, 'allowed_tenant_ids_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
             'aadsso_settings_security_info',
             esc_html__('Security Information', 'aad-sso-wordpress'),
             [$this, 'security_info_callback'],
@@ -672,6 +703,45 @@ class SettingsPage
             $sanitized['role_map'] = $sanitized_role_map;
         }
 
+        // Sanitize tenant restriction settings
+        $tenant_mode_raw = $input['tenantRestrictionMode'] ?? 'none';
+        $sanitized['tenantRestrictionMode'] = \in_array($tenant_mode_raw, ['none', 'single', 'multi'], true)
+            ? $tenant_mode_raw
+            : 'none';
+
+        $expected_tenant_id_raw = $input['expected_tenant_id'] ?? '';
+        $expected_tenant_id_trimmed = \is_string($expected_tenant_id_raw) ? mb_trim(sanitize_text_field($expected_tenant_id_raw)) : '';
+        // Only save if it's a valid GUID or empty
+        if ('' === $expected_tenant_id_trimmed || 1 === preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $expected_tenant_id_trimmed)) {
+            $sanitized['expected_tenant_id'] = $expected_tenant_id_trimmed;
+        } else {
+            $sanitized['expected_tenant_id'] = '';
+        }
+
+        // Parse allowed_tenant_ids from textarea (one per line)
+        $allowed_tenant_ids_raw = $input['allowed_tenant_ids'] ?? '';
+        $sanitized_allowed_tenants = [];
+        if (\is_string($allowed_tenant_ids_raw)) {
+            $lines = array_filter(
+                array_map('trim', explode("\n", $allowed_tenant_ids_raw))
+            );
+            foreach ($lines as $line) {
+                $line = sanitize_text_field($line);
+                // Validate GUID format
+                if ('' !== $line && 1 === preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $line)) {
+                    $sanitized_allowed_tenants[] = $line;
+                }
+            }
+        } elseif (\is_array($allowed_tenant_ids_raw)) {
+            foreach ($allowed_tenant_ids_raw as $tenant_id) {
+                $tenant_id_trimmed = \is_string($tenant_id) ? mb_trim(sanitize_text_field($tenant_id)) : '';
+                if ('' !== $tenant_id_trimmed && 1 === preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $tenant_id_trimmed)) {
+                    $sanitized_allowed_tenants[] = $tenant_id_trimmed;
+                }
+            }
+        }
+        $sanitized['allowed_tenant_ids'] = $sanitized_allowed_tenants;
+
         return $sanitized;
     }
 
@@ -688,6 +758,83 @@ class SettingsPage
         echo '<p>' . esc_html__(
             'Configure advanced settings for Microsoft Entra ID single sign-on.',
             'aad-sso-wordpress'
+        ) . '</p>';
+    }
+
+    public function settings_security_info(): void
+    {
+        echo '<p>' . esc_html__(
+            'Configure tenant restriction settings to control which Microsoft Entra ID tenants '
+            . 'are allowed to authenticate. These settings help prevent unauthorized access from '
+            . 'other organizations when using multi-tenant endpoints like /organizations/ or /common/.',
+            'aad-sso-wordpress'
+        ) . '</p>';
+    }
+
+    public function tenant_restriction_mode_callback(): void
+    {
+        $current_mode = $this->settings['tenantRestrictionMode'] ?? 'none';
+        ?>
+        <select id="tenantRestrictionMode" name="aadsso_settings[tenantRestrictionMode]">
+            <option value="none" <?php selected($current_mode, 'none', true); ?>>
+                <?php esc_html_e('Disabled (no tenant restriction)', 'aad-sso-wordpress'); ?>
+            </option>
+            <option value="single" <?php selected($current_mode, 'single', true); ?>>
+                <?php esc_html_e('Single-tenant (allow only one specific tenant)', 'aad-sso-wordpress'); ?>
+            </option>
+            <option value="multi" <?php selected($current_mode, 'multi', true); ?>>
+                <?php esc_html_e('Multi-tenant controlled (allow multiple specific tenants)', 'aad-sso-wordpress'); ?>
+            </option>
+        </select>
+        <p class="description"><?php echo wp_kses_post(
+            __('Controls whether authentication is restricted to specific Microsoft Entra ID tenants. '
+                . 'When using the <code>/organizations/</code> or <code>/common/</code> endpoints, '
+                . 'enabling tenant restriction is strongly recommended for production environments.',
+                'aad-sso-wordpress')
+        ); ?></p>
+        <?php
+    }
+
+    public function expected_tenant_id_callback(): void
+    {
+        $value = isset($this->settings['expected_tenant_id']) && \is_string($this->settings['expected_tenant_id'])
+            ? esc_attr($this->settings['expected_tenant_id'])
+            : '';
+        printf(
+            '<input class="regular-text" type="text" '
+            . 'name="aadsso_settings[expected_tenant_id]" id="expected_tenant_id" value="%s" '
+            . 'placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />',
+            $value
+        );
+        echo '<p class="description">' . wp_kses_post(
+            __('The tenant ID (GUID) that is allowed to authenticate. '
+                . 'This is used when <strong>single-tenant mode</strong> is selected above. '
+                . 'Find your tenant ID in the Azure portal under Microsoft Entra ID &rarr; Overview &rarr; '
+                . '<a href="https://entra.microsoft.com" target="_blank" rel="noopener">Tenant ID</a>. '
+                . 'Example: <code>12345678-1234-1234-1234-123456789012</code>',
+                'aad-sso-wordpress')
+        ) . '</p>';
+    }
+
+    public function allowed_tenant_ids_callback(): void
+    {
+        $tenant_ids = isset($this->settings['allowed_tenant_ids']) && \is_array($this->settings['allowed_tenant_ids'])
+            ? $this->settings['allowed_tenant_ids']
+            : [];
+
+        echo '<textarea id="allowed_tenant_ids" name="aadsso_settings[allowed_tenant_ids]" '
+            . 'class="regular-text" rows="4" '
+            . 'placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (one per line)">';
+        foreach ($tenant_ids as $id) {
+            echo esc_textarea($id) . "\n";
+        }
+        echo '</textarea>';
+        echo '<p class="description">' . wp_kses_post(
+            __('Enter allowed tenant IDs (one per line) when using <strong>multi-tenant controlled mode</strong>. '
+                . 'Each tenant ID must be a valid GUID. Users from any tenant not in this list will be denied access. '
+                . 'Example:<br /><code>12345678-1234-1234-1234-123456789012</code><br />'
+                . '<code>87654321-4321-4321-4321-210987654321</code>',
+                'aad-sso-wordpress')
         ) . '</p>';
     }
 

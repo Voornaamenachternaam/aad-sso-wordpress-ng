@@ -257,6 +257,34 @@ class AADSSO
             $jwt_oid = isset($jwt->oid) && \is_string($jwt->oid) ? $jwt->oid : '';
             AADSSO_Logger::log_debug("ID Token: iss: '" . $jwt_iss . "', oid: '" . $jwt_oid . "'", 10);
 
+            // ─────────────────────────────────────────────────────────────────
+            // Tenant ID (tid) validation - F-02 remediation
+            //
+            // Per Microsoft identity platform guidance (as of May 2026):
+            // "Always check that the tid in a token matches the tenant ID used
+            // to store data with the application. When information is stored
+            // for an application in the context of a tenant, it should only be
+            // accessed again later in the same tenant. Never allow data in one
+            // tenant to be accessed from another tenant."
+            //
+            // References:
+            // - https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
+            // - https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
+            // ─────────────────────────────────────────────────────────────────
+            try {
+                AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $this->settings);
+            } catch (Throwable $e) {
+                AADSSO_Logger::log_error('Tenant ID validation failed: ' . $e->getMessage());
+
+                return new WP_Error(
+                    'tenant_validation_failed',
+                    \sprintf(
+                        __('ERROR: Tenant ID validation failed. %s', 'aad-sso-wordpress'),
+                        esc_html($e->getMessage())
+                    )
+                );
+            }
+
             // Validate issuer claim to prevent token substitution attacks
             // Microsoft Entra ID v2.0 issuer patterns:
             // - Single tenant: https://login.microsoftonline.com/{tenant-id}/v2.0
