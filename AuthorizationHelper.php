@@ -160,7 +160,7 @@ class AuthorizationHelper
      * @see https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
      * @see https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
      *
-     * @param object $jwt     The decoded JWT token object
+     * @param object $jwt      The decoded JWT token object
      * @param object $settings The plugin settings containing tenant restriction config
      */
     public static function validate_tenant_id(object $jwt, object $settings): void
