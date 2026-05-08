@@ -306,9 +306,10 @@ class AADSSO
             } else {
                 // Fallback validation if issuer not configured yet
                 // Check that issuer follows Microsoft Entra ID v2.0 pattern
+                // Allow optional trailing slash for flexibility
                 if (!empty($jwt_iss)) {
                     $issuer_valid = preg_match(
-                        '#^https://login\.microsoftonline\.com/[^/]+/v2\.0$#',
+                        '#^https://login\.microsoftonline\.com/[^/]+/v2\.0/?$#',
                         $jwt_iss
                     );
                     if (!$issuer_valid) {
