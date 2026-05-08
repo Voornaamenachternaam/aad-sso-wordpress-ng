@@ -26,6 +26,11 @@ class SettingsPage
         add_action('all_admin_notices', [$this, 'notify_openid_configuration_warning']);
         add_action('all_admin_notices', [$this, 'notify_upgrade_migration']);
 
+        // Register AJAX handler for dismissing the migration notice
+        // Must be registered here (not in notify_upgrade_migration) because all_admin_notices
+        // hook is not executed during AJAX requests to admin-ajax.php
+        add_action('wp_ajax_aadsso_dismiss_migration_notice', [$this, 'ajax_dismiss_migration_notice']);
+
         $default_settings = AADSSO_Settings::get_defaults();
         /** @var array<string, mixed> $defaultSettingsArr */
         $defaultSettingsArr = \is_array($default_settings) ? $default_settings : [];
@@ -153,9 +158,6 @@ class SettingsPage
             . '\'); jQuery(\'#submit\').click(); return false;">' . esc_html__('Keep current endpoint', 'aad-sso-wordpress') . '</a>';
         echo ' <a href="#" class="button button-primary" onclick="jQuery(\'#openid_configuration_endpoint\').val(\'https://login.microsoftonline.com/common/.well-known/openid-configuration\'); jQuery(\'#submit\').click(); return false;">' . esc_html__('Switch to /common/ (supports MSA)', 'aad-sso-wordpress') . '</a>';
         echo '</p></div>';
-
-        // Register AJAX handler for dismissing the notice
-        add_action('wp_ajax_aadsso_dismiss_migration_notice', [$this, 'ajax_dismiss_migration_notice']);
     }
 
     /**
