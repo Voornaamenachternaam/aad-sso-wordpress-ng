@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'voornaamenachternaamt/aad-sso-wordpress-ng',
-        'pretty_version' => 'dev-master',
-        'version' => 'dev-master',
-        'reference' => 'd24ae9cb2ed38ed21c24b8ede4088bca4ee0e435',
+        'pretty_version' => '1.x-dev',
+        'version' => '1.9999999.9999999.9999999-dev',
+        'reference' => '23c655e70ba193ee809f9ada774d52b2a27f6e01',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -831,9 +831,9 @@
             'dev_requirement' => true,
         ),
         'voornaamenachternaamt/aad-sso-wordpress-ng' => array(
-            'pretty_version' => 'dev-master',
-            'version' => 'dev-master',
-            'reference' => 'd24ae9cb2ed38ed21c24b8ede4088bca4ee0e435',
+            'pretty_version' => '1.x-dev',
+            'version' => '1.9999999.9999999.9999999-dev',
+            'reference' => '23c655e70ba193ee809f9ada774d52b2a27f6e01',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
