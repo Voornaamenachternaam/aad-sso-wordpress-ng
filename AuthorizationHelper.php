@@ -137,13 +137,15 @@ class AuthorizationHelper
         AADSSO_Settings $settings,
         string $antiforgery_id
     ): object {
+        $response = null;
+
         try {
             $response = self::get_http_client()->get($settings->jwks_uri);
-
-            return self::process_jwks_response($response, $id_token, $antiforgery_id, $settings->client_id);
         } catch (Throwable $e) {
             throw new DomainException('Failed to fetch JWKS: ' . $e->getMessage());
         }
+
+        return self::process_jwks_response($response, $id_token, $antiforgery_id, $settings->client_id);
     }
 
     private static function get_http_client(): AADSSO_HttpClient
