@@ -28,6 +28,7 @@ if (file_exists($autoloader)) {
 \define('AADSSO', 'aad-sso-wordpress');
 \define('AADSSO_PLUGIN_URL', plugin_dir_url(__FILE__));
 \define('AADSSO_PLUGIN_DIR', plugin_dir_path(__FILE__));
+\define('AADSSO_VERSION', '0.9.0');
 
 \defined('AADSSO_DEBUG') || \define('AADSSO_DEBUG', false);
 \defined('AADSSO_DEBUG_LEVEL') || \define('AADSSO_DEBUG_LEVEL', 0);
@@ -76,9 +77,33 @@ class AADSSO
 
     public static function activate(): void
     {
+        $previous_version = get_option('aadsso_version', null);
+
+        // Store previous endpoint before any cache invalidation
+        $previous_endpoint = get_option('aadsso_settings', []);
+        if (\is_array($previous_endpoint) && isset($previous_endpoint['openid_configuration_endpoint'])) {
+            update_option('aadsso_previous_openid_endpoint', $previous_endpoint['openid_configuration_endpoint']);
+        }
+
+        // Invalidate OpenID configuration cache on every activation/upgrade
+        // This ensures the new endpoint (if changed) is used immediately
+        self::invalidate_openid_configuration_cache();
+
         $stored_settings = get_option('aadsso_settings', null);
         if (null === $stored_settings) {
-            update_option('aadsso_settings', AADSSO_Settings::get_defaults());
+            update_option('aadsso_settings', self::get_defaults());
+        }
+
+        // Store version for future upgrade migrations
+        update_option('aadsso_version', AADSSO_VERSION);
+
+        // If this is an upgrade (not fresh install), log migration notice
+        if (null !== $previous_version && $previous_version !== AADSSO_VERSION) {
+            AADSSO_Logger::log_info(\sprintf(
+                'Plugin upgraded from %s to %s. OpenID configuration cache invalidated.',
+                $previous_version,
+                AADSSO_VERSION
+            ));
         }
     }
 
