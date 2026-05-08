@@ -98,7 +98,7 @@ class AADSSO
         update_option('aadsso_version', AADSSO_VERSION);
 
         // If this is an upgrade (not fresh install), log migration notice
-        if (null !== $previous_version && $previous_version !== AADSSO_VERSION) {
+        if (null !== $previous_version && AADSSO_VERSION !== $previous_version) {
             AADSSO_Logger::log_info(\sprintf(
                 'Plugin upgraded from %s to %s. OpenID configuration cache invalidated.',
                 $previous_version,

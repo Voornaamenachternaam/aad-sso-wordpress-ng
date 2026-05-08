@@ -319,6 +319,21 @@ class Settings
     }
 
     /**
+     * Invalidate the cached OpenID configuration.
+     * Should be called on plugin activation/upgrade to ensure fresh discovery.
+     */
+    public static function invalidate_openid_configuration_cache(): void
+    {
+        try {
+            $cache = self::get_cache();
+            $cache->delete('aadsso_openid_configuration');
+            AADSSO_Logger::log_info('OpenID configuration cache invalidated');
+        } catch (Throwable $e) {
+            AADSSO_Logger::log_exception($e, 'Failed to invalidate OpenID configuration cache');
+        }
+    }
+
+    /**
      * Safely get blog name, with fallback for when WordPress is not fully initialized.
      */
     private static function safe_get_bloginfo_name(): string
@@ -365,21 +380,6 @@ class Settings
             array_map('strval', array_keys($filtered)),
             array_values($filtered)
         ) ?: $filtered;
-    }
-
-    /**
-     * Invalidate the cached OpenID configuration.
-     * Should be called on plugin activation/upgrade to ensure fresh discovery.
-     */
-    public static function invalidate_openid_configuration_cache(): void
-    {
-        try {
-            $cache = self::get_cache();
-            $cache->delete('aadsso_openid_configuration');
-            AADSSO_Logger::log_info('OpenID configuration cache invalidated');
-        } catch (Throwable $e) {
-            AADSSO_Logger::log_exception($e, 'Failed to invalidate OpenID configuration cache');
-        }
     }
 
     /**
