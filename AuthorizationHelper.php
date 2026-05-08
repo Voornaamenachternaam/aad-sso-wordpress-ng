@@ -148,6 +148,141 @@ class AuthorizationHelper
         return self::process_jwks_response($response, $id_token, $antiforgery_id, $settings->client_id);
     }
 
+    /**
+     * Validate the tenant ID (tid) claim against configured tenant restrictions.
+     *
+     * Per Microsoft identity platform guidance:
+     * "Always check that the tid in a token matches the tenant ID used to store data
+     * with the application. When information is stored in the context of a tenant,
+     * it should only be accessed again later in the same tenant. Never allow data
+     * in one tenant to be accessed from another tenant."
+     *
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
+     *
+     * @param object          $jwt      The decoded JWT token object
+     * @param AADSSO_Settings $settings The plugin settings containing tenant restriction config
+     */
+    public static function validate_tenant_id(object $jwt, AADSSO_Settings $settings): void
+    {
+        // Get tenant restriction mode: 'none', 'single', or 'multi'
+        $mode = $settings->tenantRestrictionMode ?? 'none';
+
+        // If tenant restriction is disabled, accept any valid tenant
+        if ('none' === $mode) {
+            return;
+        }
+
+        // Extract tid claim from token
+        // The tid claim is present in all work/school account tokens
+        // For personal Microsoft accounts (MSA) in the tenant, value is 9188040d-6c67-4c5b-b112-36a304b66dad
+        $token_tid = null;
+        if (isset($jwt->tid) && \is_string($jwt->tid)) {
+            $token_tid = $jwt->tid;
+        }
+
+        if (null === $token_tid || '' === $token_tid) {
+            // tid claim is missing - this could indicate a malformed token
+            // or a token from an unexpected identity provider
+            throw new DomainException('ID token is missing required `tid` (tenant ID) claim. This token may not be from a valid Microsoft Entra ID tenant. For personal Microsoft accounts, ensure the endpoint supports MSA if intended.');
+        }
+
+        switch ($mode) {
+            case 'single':
+                // Single-tenant mode: require exact match with expected_tenant_id
+                $expected = $settings->expected_tenant_id ?? '';
+                if ('' === $expected) {
+                    // If tenant restriction mode is 'single' but no tenant is configured,
+                    // this is a configuration error - reject all tokens
+                    AADSSO_Logger::log_error(
+                        'Tenant restriction mode is set to "single" but no expected tenant ID is configured. '
+                        . 'Please configure the expected tenant ID in the plugin settings.'
+                    );
+                    throw new DomainException('Tenant restriction is enabled but no expected tenant ID is configured. Please configure the expected tenant ID in the plugin settings.');
+                }
+
+                if (!self::is_valid_guid($expected)) {
+                    AADSSO_Logger::log_error(
+                        'Configured expected tenant ID is not a valid GUID: ' . $expected
+                    );
+                    throw new DomainException('Configured expected tenant ID is not a valid GUID format.');
+                }
+
+                // Case-insensitive comparison for GUIDs
+                if (!strcasecmp($token_tid, $expected)) {
+                    AADSSO_Logger::log_debug(
+                        'Tenant ID validated: token tid matches expected tenant',
+                        ['tid' => $token_tid]
+                    );
+
+                    return;
+                }
+
+                AADSSO_Logger::log_error(\sprintf(
+                    'Tenant ID mismatch. Expected "%s", got "%s"',
+                    $expected,
+                    $token_tid
+                ));
+                throw new DomainException(\sprintf('ID token tenant ID validation failed. Token is from tenant "%s", but only "%s" is allowed.', $token_tid, $expected));
+
+            case 'multi':
+                // Multi-tenant controlled mode: require tid to be in allowed_tenant_ids
+                $allowed = $settings->allowed_tenant_ids ?? [];
+                if (empty($allowed)) {
+                    // If tenant restriction mode is 'multi' but no allowed tenants are configured,
+                    // this is a configuration error - reject all tokens
+                    AADSSO_Logger::log_error(
+                        'Tenant restriction mode is set to "multi" but no allowed tenant IDs are configured. '
+                        . 'Please configure at least one allowed tenant ID in the plugin settings.'
+                    );
+                    throw new DomainException('Tenant restriction is enabled but no allowed tenant IDs are configured. Please configure allowed tenant IDs in the plugin settings.');
+                }
+
+                // Validate all allowed tenant IDs are in GUID format
+                foreach ($allowed as $tenant_id) {
+                    if (!self::is_valid_guid($tenant_id)) {
+                        AADSSO_Logger::log_error(
+                            'One or more configured allowed tenant IDs is not a valid GUID: ' . $tenant_id
+                        );
+                        throw new DomainException('One or more configured allowed tenant IDs is not a valid GUID format.');
+                    }
+                }
+
+                // Case-insensitive comparison for GUIDs
+                $found = false;
+                foreach ($allowed as $allowed_tid) {
+                    if (!strcasecmp($token_tid, $allowed_tid)) {
+                        $found = true;
+
+                        break;
+                    }
+                }
+
+                if ($found) {
+                    AADSSO_Logger::log_debug(
+                        'Tenant ID validated: token tid is in allowed tenants list',
+                        ['tid' => $token_tid]
+                    );
+
+                    return;
+                }
+
+                AADSSO_Logger::log_error(\sprintf(
+                    'Tenant ID "%s" is not in the allowed tenants list.',
+                    $token_tid
+                ));
+                throw new DomainException(\sprintf('ID token tenant ID validation failed. Token is from tenant "%s", which is not in the allowed tenants list.', $token_tid));
+
+            default:
+                // Unknown mode - this should not happen with proper sanitization
+                AADSSO_Logger::log_warning(
+                    'Unknown tenant restriction mode: ' . $mode . '. Treating as disabled.'
+                );
+
+                return;
+        }
+    }
+
     private static function get_http_client(): AADSSO_HttpClient
     {
         if (!isset(self::$http_client)) {
@@ -331,163 +466,6 @@ class AuthorizationHelper
         }
 
         return $jwt;
-    }
-
-    /**
-     * Validate the tenant ID (tid) claim against configured tenant restrictions.
-     *
-     * Per Microsoft identity platform guidance:
-     * "Always check that the tid in a token matches the tenant ID used to store data
-     * with the application. When information is stored in the context of a tenant,
-     * it should only be accessed again later in the same tenant. Never allow data
-     * in one tenant to be accessed from another tenant."
-     *
-     * @see https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
-     * @see https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
-     *
-     * @param object $jwt                  The decoded JWT token object
-     * @param AADSSO_Settings $settings    The plugin settings containing tenant restriction config
-     */
-    public static function validate_tenant_id(object $jwt, AADSSO_Settings $settings): void
-    {
-        // Get tenant restriction mode: 'none', 'single', or 'multi'
-        $mode = $settings->tenantRestrictionMode ?? 'none';
-
-        // If tenant restriction is disabled, accept any valid tenant
-        if ('none' === $mode) {
-            return;
-        }
-
-        // Extract tid claim from token
-        // The tid claim is present in all work/school account tokens
-        // For personal Microsoft accounts (MSA) in the tenant, value is 9188040d-6c67-4c5b-b112-36a304b66dad
-        $token_tid = null;
-        if (isset($jwt->tid) && \is_string($jwt->tid)) {
-            $token_tid = $jwt->tid;
-        }
-
-        if (null === $token_tid || '' === $token_tid) {
-            // tid claim is missing - this could indicate a malformed token
-            // or a token from an unexpected identity provider
-            throw new DomainException(
-                'ID token is missing required `tid` (tenant ID) claim. '
-                . 'This token may not be from a valid Microsoft Entra ID tenant. '
-                . 'For personal Microsoft accounts, ensure the endpoint supports MSA if intended.'
-            );
-        }
-
-        switch ($mode) {
-            case 'single':
-                // Single-tenant mode: require exact match with expected_tenant_id
-                $expected = $settings->expected_tenant_id ?? '';
-                if ('' === $expected) {
-                    // If tenant restriction mode is 'single' but no tenant is configured,
-                    // this is a configuration error - reject all tokens
-                    AADSSO_Logger::log_error(
-                        'Tenant restriction mode is set to "single" but no expected tenant ID is configured. '
-                        . 'Please configure the expected tenant ID in the plugin settings.'
-                    );
-                    throw new DomainException(
-                        'Tenant restriction is enabled but no expected tenant ID is configured. '
-                        . 'Please configure the expected tenant ID in the plugin settings.'
-                    );
-                }
-
-                if (!self::is_valid_guid($expected)) {
-                    AADSSO_Logger::log_error(
-                        'Configured expected tenant ID is not a valid GUID: ' . $expected
-                    );
-                    throw new DomainException(
-                        'Configured expected tenant ID is not a valid GUID format.'
-                    );
-                }
-
-                // Case-insensitive comparison for GUIDs
-                if (!strcasecmp($token_tid, $expected)) {
-                    AADSSO_Logger::log_debug(
-                        'Tenant ID validated: token tid matches expected tenant',
-                        ['tid' => $token_tid]
-                    );
-
-                    return;
-                }
-
-                AADSSO_Logger::log_error(\sprintf(
-                    'Tenant ID mismatch. Expected "%s", got "%s"',
-                    $expected,
-                    $token_tid
-                ));
-                throw new DomainException(\sprintf(
-                    'ID token tenant ID validation failed. Token is from tenant "%s", but only "%s" is allowed.',
-                    $token_tid,
-                    $expected
-                ));
-
-            case 'multi':
-                // Multi-tenant controlled mode: require tid to be in allowed_tenant_ids
-                $allowed = $settings->allowed_tenant_ids ?? [];
-                if (empty($allowed)) {
-                    // If tenant restriction mode is 'multi' but no allowed tenants are configured,
-                    // this is a configuration error - reject all tokens
-                    AADSSO_Logger::log_error(
-                        'Tenant restriction mode is set to "multi" but no allowed tenant IDs are configured. '
-                        . 'Please configure at least one allowed tenant ID in the plugin settings.'
-                    );
-                    throw new DomainException(
-                        'Tenant restriction is enabled but no allowed tenant IDs are configured. '
-                        . 'Please configure allowed tenant IDs in the plugin settings.'
-                    );
-                }
-
-                // Validate all allowed tenant IDs are in GUID format
-                foreach ($allowed as $tenant_id) {
-                    if (!self::is_valid_guid($tenant_id)) {
-                        AADSSO_Logger::log_error(
-                            'One or more configured allowed tenant IDs is not a valid GUID: ' . $tenant_id
-                        );
-                        throw new DomainException(
-                            'One or more configured allowed tenant IDs is not a valid GUID format.'
-                        );
-                    }
-                }
-
-                // Case-insensitive comparison for GUIDs
-                $found = false;
-                foreach ($allowed as $allowed_tid) {
-                    if (!strcasecmp($token_tid, $allowed_tid)) {
-                        $found = true;
-
-                        break;
-                    }
-                }
-
-                if ($found) {
-                    AADSSO_Logger::log_debug(
-                        'Tenant ID validated: token tid is in allowed tenants list',
-                        ['tid' => $token_tid]
-                    );
-
-                    return;
-                }
-
-                AADSSO_Logger::log_error(\sprintf(
-                    'Tenant ID "%s" is not in the allowed tenants list.',
-                    $token_tid
-                ));
-                throw new DomainException(\sprintf(
-                    'ID token tenant ID validation failed. Token is from tenant "%s", '
-                    . 'which is not in the allowed tenants list.',
-                    $token_tid
-                ));
-
-            default:
-                // Unknown mode - this should not happen with proper sanitization
-                AADSSO_Logger::log_warning(
-                    'Unknown tenant restriction mode: ' . $mode . '. Treating as disabled.'
-                );
-
-                return;
-        }
     }
 
     /**

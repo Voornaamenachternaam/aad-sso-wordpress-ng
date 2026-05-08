@@ -787,10 +787,12 @@ class SettingsPage
             </option>
         </select>
         <p class="description"><?php echo wp_kses_post(
-            __('Controls whether authentication is restricted to specific Microsoft Entra ID tenants. '
+            __(
+                'Controls whether authentication is restricted to specific Microsoft Entra ID tenants. '
                 . 'When using the <code>/organizations/</code> or <code>/common/</code> endpoints, '
                 . 'enabling tenant restriction is strongly recommended for production environments.',
-                'aad-sso-wordpress')
+                'aad-sso-wordpress'
+            )
         ); ?></p>
         <?php
     }
@@ -807,12 +809,14 @@ class SettingsPage
             $value
         );
         echo '<p class="description">' . wp_kses_post(
-            __('The tenant ID (GUID) that is allowed to authenticate. '
+            __(
+                'The tenant ID (GUID) that is allowed to authenticate. '
                 . 'This is used when <strong>single-tenant mode</strong> is selected above. '
                 . 'Find your tenant ID in the Azure portal under Microsoft Entra ID &rarr; Overview &rarr; '
                 . '<a href="https://entra.microsoft.com" target="_blank" rel="noopener">Tenant ID</a>. '
                 . 'Example: <code>12345678-1234-1234-1234-123456789012</code>',
-                'aad-sso-wordpress')
+                'aad-sso-wordpress'
+            )
         ) . '</p>';
     }
 
@@ -830,11 +834,13 @@ class SettingsPage
         }
         echo '</textarea>';
         echo '<p class="description">' . wp_kses_post(
-            __('Enter allowed tenant IDs (one per line) when using <strong>multi-tenant controlled mode</strong>. '
+            __(
+                'Enter allowed tenant IDs (one per line) when using <strong>multi-tenant controlled mode</strong>. '
                 . 'Each tenant ID must be a valid GUID. Users from any tenant not in this list will be denied access. '
                 . 'Example:<br /><code>12345678-1234-1234-1234-123456789012</code><br />'
                 . '<code>87654321-4321-4321-4321-210987654321</code>',
-                'aad-sso-wordpress')
+                'aad-sso-wordpress'
+            )
         ) . '</p>';
     }
 

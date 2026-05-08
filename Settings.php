@@ -540,7 +540,7 @@ class Settings
         }
 
         /** @var list<string> $sanitized */
-        $sanitized = array_filter(
+        return array_filter(
             array_map(
                 static function (mixed $id): string {
                     if (!\is_string($id)) {
@@ -558,8 +558,6 @@ class Settings
                 $value
             )
         );
-
-        return $sanitized;
     }
 }
 

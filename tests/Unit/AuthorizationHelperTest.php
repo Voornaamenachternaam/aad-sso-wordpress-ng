@@ -333,69 +333,6 @@ class AuthorizationHelperTest extends TestCase
     }
 
     /**
-     * Generate a valid JWT token for testing.
-     *
-     * @param array<string, mixed> $claims Additional claims to merge
-     *
-     * @return string The encoded JWT token
-     */
-    private function generateTestToken(array $claims = []): string
-    {
-        $now = time();
-
-        $payload = array_merge([
-            'iss' => self::TEST_ISSUER,
-            'iat' => $now,
-            'exp' => $now + 3600,
-            'aud' => self::TEST_CLIENT_ID,
-            'nonce' => 'test-nonce-123',
-            'oid' => 'user-object-id-123',
-            'preferred_username' => 'testuser@example.com',
-        ], $claims);
-
-        // Include kid in header for key matching (5th parameter)
-        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
-    }
-
-    /**
-     * Create a mock HTTP response with given body and status code.
-     */
-    private function createMockResponse(string $body, int $statusCode = 200): ResponseInterface
-    {
-        $stream = $this->createMock(StreamInterface::class);
-        $stream->method('getContents')->willReturn($body);
-
-        $response = $this->createMock(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn($statusCode);
-        $response->method('getBody')->willReturn($stream);
-
-        return $response;
-    }
-
-    /**
-     * Create a mock JWKS response with the test public key.
-     */
-    private function createMockJwksResponse(): ResponseInterface
-    {
-        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_public(self::$rsaKeyPair['public_key']));
-
-        $jwks = [
-            'keys' => [
-                [
-                    'kty' => 'RSA',
-                    'use' => 'sig',
-                    'kid' => 'test-key-id',
-                    'alg' => 'RS256',
-                    'n' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['n']), '+/', '-_'), '='),
-                    'e' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['e']), '+/', '-_'), '='),
-                ],
-            ],
-        ];
-
-        return $this->createMockResponse(json_encode($jwks));
-    }
-
-    /**
      * Test that tenant validation passes when mode is 'none'.
      */
     public function testValidateTenantIdPassesWhenModeIsNone(): void
@@ -578,15 +515,80 @@ class AuthorizationHelperTest extends TestCase
     }
 
     /**
+     * Generate a valid JWT token for testing.
+     *
+     * @param array<string, mixed> $claims Additional claims to merge
+     *
+     * @return string The encoded JWT token
+     */
+    private function generateTestToken(array $claims = []): string
+    {
+        $now = time();
+
+        $payload = array_merge([
+            'iss' => self::TEST_ISSUER,
+            'iat' => $now,
+            'exp' => $now + 3600,
+            'aud' => self::TEST_CLIENT_ID,
+            'nonce' => 'test-nonce-123',
+            'oid' => 'user-object-id-123',
+            'preferred_username' => 'testuser@example.com',
+        ], $claims);
+
+        // Include kid in header for key matching (5th parameter)
+        return JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
+    }
+
+    /**
+     * Create a mock HTTP response with given body and status code.
+     */
+    private function createMockResponse(string $body, int $statusCode = 200): ResponseInterface
+    {
+        $stream = $this->createMock(StreamInterface::class);
+        $stream->method('getContents')->willReturn($body);
+
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn($statusCode);
+        $response->method('getBody')->willReturn($stream);
+
+        return $response;
+    }
+
+    /**
+     * Create a mock JWKS response with the test public key.
+     */
+    private function createMockJwksResponse(): ResponseInterface
+    {
+        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_public(self::$rsaKeyPair['public_key']));
+
+        $jwks = [
+            'keys' => [
+                [
+                    'kty' => 'RSA',
+                    'use' => 'sig',
+                    'kid' => 'test-key-id',
+                    'alg' => 'RS256',
+                    'n' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['n']), '+/', '-_'), '='),
+                    'e' => mb_rtrim(strtr(base64_encode($keyDetails['rsa']['e']), '+/', '-_'), '='),
+                ],
+            ],
+        ];
+
+        return $this->createMockResponse(json_encode($jwks));
+    }
+
+    /**
      * Create a mock settings object for testing.
      *
      * @return object
      */
     private function createMockSettings(): object
     {
-        return new class {
+        return new class() {
             public string $tenantRestrictionMode = 'none';
+
             public string $expected_tenant_id = '';
+
             public array $allowed_tenant_ids = [];
         };
     }
