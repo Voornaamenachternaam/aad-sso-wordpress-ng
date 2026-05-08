@@ -75,25 +75,6 @@ class SettingsPage
                 )
             );
             echo '</p></div>';
-
-            return;
-        }
-
-        // Warn if using /organizations/ (no specific tenant)
-        if (str_contains($openid_endpoint, '/organizations/.well-known/openid-configuration')) {
-            echo '<div class="notice notice-info">';
-            echo '<p>';
-            echo wp_kses_post(
-                __(
-                    '<strong>Microsoft Entra ID SSO:</strong> You are using the organizations endpoint '
-                    . '(<code>/organizations/</code>), which works for any work or school account. '
-                    . 'For tighter security and tenant-specific policies, consider using your '
-                    . 'tenant-specific endpoint: '
-                    . '<code>https://login.microsoftonline.com/{your-tenant-id}/.well-known/openid-configuration</code>.',
-                    'aad-sso-wordpress'
-                )
-            );
-            echo '</p></div>';
         }
     }
 
