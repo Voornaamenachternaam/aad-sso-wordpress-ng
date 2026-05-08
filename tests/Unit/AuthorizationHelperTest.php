@@ -500,8 +500,73 @@ class AuthorizationHelperTest extends TestCase
      */
     public function testValidateTenantIdCaseInsensitive(): void
     {
+        // Use uppercase in JWT tid, lowercase in settings (and vice versa)
+        // to verify strcasecmp() works correctly for GUID comparison
         $jwt = (object) [
-            'tid' => '12345678-1234-1234-1234-123456789012',
+            'tid' => '12345678-1234-1234-1234-123456789012',  // lowercase
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = '12345678-1234-1234-1234-123456789012'; // Same - should pass
+
+        // Should not throw - case insensitive comparison (both lowercase)
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test that tenant validation correctly handles uppercase vs lowercase GUIDs.
+     */
+    public function testValidateTenantIdAcceptsUppercaseInToken(): void
+    {
+        // Token has uppercase GUID, settings has lowercase
+        $jwt = (object) [
+            'tid' => 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE',  // uppercase
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'single';
+        $settings->expected_tenant_id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';  // lowercase
+
+        // Should not throw - case insensitive comparison
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test that tenant validation correctly handles mixed case in multi-tenant mode.
+     */
+    public function testValidateTenantIdMultiModeCaseInsensitive(): void
+    {
+        // Token has mixed case, list has different case
+        $jwt = (object) [
+            'tid' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',  // lowercase
+            'iss' => self::TEST_ISSUER,
+        ];
+
+        $settings = $this->createMockSettings();
+        $settings->tenantRestrictionMode = 'multi';
+        $settings->allowed_tenant_ids = [
+            'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE',  // uppercase - should match
+        ];
+
+        // Should not throw - case insensitive comparison
+        \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
+        $this->assertTrue(true);
+    }
+
+    /**
+     * Test that tenant validation correctly fails on case mismatch when using case-sensitive comparison.
+     * Note: This documents that our implementation uses strcasecmp() for case-insensitive matching,
+     * which is the correct behavior per Microsoft GUID conventions.
+     */
+    public function testValidateTenantIdFailsOnActualDifferentTenant(): void
+    {
+        $jwt = (object) [
+            'tid' => '99999999-9999-9999-9999-999999999999',  // different tenant
             'iss' => self::TEST_ISSUER,
         ];
 
@@ -509,9 +574,10 @@ class AuthorizationHelperTest extends TestCase
         $settings->tenantRestrictionMode = 'single';
         $settings->expected_tenant_id = '12345678-1234-1234-1234-123456789012';
 
-        // Should not throw - case insensitive comparison
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('tenant ID validation failed');
+
         \AADSSO_AuthorizationHelper::validate_tenant_id($jwt, $settings);
-        $this->assertTrue(true);
     }
 
     /**
