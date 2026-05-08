@@ -252,8 +252,8 @@ class AuthorizationHelper
         $token_exp = isset($jwt->exp) ? (int) $jwt->exp : 0;
         $token_nbf = isset($jwt->nbf) ? (int) $jwt->nbf : 0;
 
-        // Check token is not expired
-        if ($token_exp > 0 && $now > $token_exp) {
+        // Check token is not expired (with 60-second clock skew tolerance)
+        if ($token_exp > 0 && ($now - 60) > $token_exp) {
             throw new DomainException('Token has expired');
         }
 
