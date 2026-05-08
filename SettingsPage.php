@@ -198,7 +198,7 @@ class SettingsPage
     public function ajax_dismiss_migration_notice(): void
     {
         if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized', 403);
+            wp_die('Unauthorized', '', ['response' => 403]);
         }
 
         check_ajax_referer('aadsso_dismiss_migration', 'nonce');
