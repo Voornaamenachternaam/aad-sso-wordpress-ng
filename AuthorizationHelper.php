@@ -278,16 +278,7 @@ class AuthorizationHelper
         }
 
         // Validate that the configured client_id is in the audience list
-        $audience_valid = false;
-        foreach ($aud_values as $aud_value) {
-            if ($aud_value === $client_id) {
-                $audience_valid = true;
-
-                break;
-            }
-        }
-
-        if (!$audience_valid) {
+        if (!\in_array($client_id, $aud_values, true)) {
             throw new DomainException(\sprintf('ID token audience validation failed. Expected `%s`, got `%s`', $client_id, implode(', ', $aud_values)));
         }
 
