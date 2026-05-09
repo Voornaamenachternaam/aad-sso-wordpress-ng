@@ -111,7 +111,9 @@ class AADSSO
         }
     }
 
-    public static function deactivate(): void {}
+    public static function deactivate(): void
+    {
+    }
 
     public function load_textdomain(): void
     {
