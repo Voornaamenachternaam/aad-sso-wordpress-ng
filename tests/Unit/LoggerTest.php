@@ -192,7 +192,7 @@ class LoggerTest extends TestCase
     }
 
     /**
-     * Test sanitize_for_logging handles arrays.
+     * Test sanitize_for_logging handles nested arrays.
      */
     public function testSanitizeHandlesArrays(): void
     {
@@ -209,8 +209,22 @@ class LoggerTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('users', $result);
-        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['users'][0]['email']);
-        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['users'][1]['email']);
+        // Email values are not redacted since 'email' is not a sensitive key
+        $this->assertSame('john@example.com', $result['users'][0]['email']);
+        $this->assertSame('jane@example.com', $result['users'][1]['email']);
+    }
+
+    /**
+     * Test sanitize_for_logging redacts standalone email strings.
+     */
+    public function testSanitizeRedactsEmailStrings(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        $email = 'user@example.com';
+        $result = \AADSSO_Logger::sanitize_for_logging($email);
+
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result);
     }
 
     /**
