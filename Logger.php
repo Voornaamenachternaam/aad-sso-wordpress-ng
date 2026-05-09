@@ -78,106 +78,6 @@ class Logger
         return self::recursive_sanitize($data);
     }
 
-    /**
-     * @param mixed $data
-     *
-     * @return mixed
-     */
-    private static function recursive_sanitize(mixed $data): mixed
-    {
-        if (null === $data) {
-            return null;
-        }
-
-        if (\is_bool($data) || \is_int($data) || \is_float($data)) {
-            return $data;
-        }
-
-        if (\is_string($data)) {
-            return self::redact_string($data);
-        }
-
-        if (\is_array($data)) {
-            $sanitized = [];
-            foreach ($data as $key => $value) {
-                $sanitized_key = self::is_sensitive_key($key)
-                    ? self::REDACTED_PLACEHOLDER
-                    : $key;
-                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
-            }
-
-            return $sanitized;
-        }
-
-        if (\is_object($data)) {
-            $sanitized = [];
-            foreach ((array) $data as $key => $value) {
-                $clean_key = preg_replace('/[\x00].*$/s', '', (string) $key);
-                $sanitized_key = self::is_sensitive_key($clean_key)
-                    ? self::REDACTED_PLACEHOLDER
-                    : $clean_key;
-                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
-            }
-
-            return (object) $sanitized;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param string $str
-     *
-     * @return string
-     */
-    private static function redact_string(string $str): string
-    {
-        if (\strlen($str) < 20) {
-            return $str;
-        }
-
-        $result = $str;
-        foreach (self::REDACT_PATTERNS as $pattern) {
-            $result = preg_replace_callback(
-                $pattern,
-                static fn (array $matches): string => self::REDACTED_PLACEHOLDER,
-                $result
-            );
-        }
-
-        if ($result !== $str) {
-            return $result;
-        }
-
-        if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $str) || preg_match('/@[\w\-\.]+\.\w{2,}/', $str)) {
-            return preg_replace(
-                '/[\w\.\+\-]+@[\w\-\.]+\.[\w\-\.]+\w+/',
-                self::REDACTED_PLACEHOLDER,
-                $str
-            ) ?? $str;
-        }
-
-        return $str;
-    }
-
-    /**
-     * @param string $key
-     *
-     * @return bool
-     */
-    private static function is_sensitive_key(string $key): bool
-    {
-        $key_lower = mb_strtolower($key);
-
-        foreach (self::SENSITIVE_KEYS as $sensitive_key) {
-            if (false !== mb_strpos($key_lower, $sensitive_key)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public static function get_logger(): LoggerInterface
     {
         if (null === self::$logger) {
@@ -316,6 +216,106 @@ class Logger
         $log_message = $message;
 
         self::get_logger()->error($log_message, $context);
+    }
+
+    /**
+     * @param mixed $data
+     *
+     * @return mixed
+     */
+    private static function recursive_sanitize(mixed $data): mixed
+    {
+        if (null === $data) {
+            return null;
+        }
+
+        if (\is_bool($data) || \is_int($data) || \is_float($data)) {
+            return $data;
+        }
+
+        if (\is_string($data)) {
+            return self::redact_string($data);
+        }
+
+        if (\is_array($data)) {
+            $sanitized = [];
+            foreach ($data as $key => $value) {
+                $sanitized_key = self::is_sensitive_key($key)
+                    ? self::REDACTED_PLACEHOLDER
+                    : $key;
+                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
+            }
+
+            return $sanitized;
+        }
+
+        if (\is_object($data)) {
+            $sanitized = [];
+            foreach ((array) $data as $key => $value) {
+                $clean_key = preg_replace('/[\x00].*$/s', '', (string) $key);
+                $sanitized_key = self::is_sensitive_key($clean_key)
+                    ? self::REDACTED_PLACEHOLDER
+                    : $clean_key;
+                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
+            }
+
+            return (object) $sanitized;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $str
+     *
+     * @return string
+     */
+    private static function redact_string(string $str): string
+    {
+        if (mb_strlen($str) < 20) {
+            return $str;
+        }
+
+        $result = $str;
+        foreach (self::REDACT_PATTERNS as $pattern) {
+            $result = preg_replace_callback(
+                $pattern,
+                static fn (array $matches): string => self::REDACTED_PLACEHOLDER,
+                $result
+            );
+        }
+
+        if ($result !== $str) {
+            return $result;
+        }
+
+        if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $str) || preg_match('/@[\w\-\.]+\.\w{2,}/', $str)) {
+            return preg_replace(
+                '/[\w\.\+\-]+@[\w\-\.]+\.[\w\-\.]+\w+/',
+                self::REDACTED_PLACEHOLDER,
+                $str
+            ) ?? $str;
+        }
+
+        return $str;
+    }
+
+    /**
+     * @param string $key
+     *
+     * @return bool
+     */
+    private static function is_sensitive_key(string $key): bool
+    {
+        $key_lower = mb_strtolower($key);
+
+        foreach (self::SENSITIVE_KEYS as $sensitive_key) {
+            if (false !== mb_strpos($key_lower, $sensitive_key)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

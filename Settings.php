@@ -85,16 +85,6 @@ class Settings
      */
     public bool $block_external_redirects = false;
 
-    /**
-     * @var null|self
-     */
-    private static ?self $instance = null;
-
-    /**
-     * @var null|OptionsResolver
-     */
-    private static ?OptionsResolver $options_resolver = null;
-
     public bool $use_immutable_user_linking = true;
 
     public bool $force_immutable_linking = false;
@@ -104,6 +94,16 @@ class Settings
     public bool $require_tenant_restriction_for_provisioning = true;
 
     public bool $require_role_policy_for_provisioning = true;
+
+    /**
+     * @var null|self
+     */
+    private static ?self $instance = null;
+
+    /**
+     * @var null|OptionsResolver
+     */
+    private static ?OptionsResolver $options_resolver = null;
 
     /**
      * @return array<string, mixed>|mixed

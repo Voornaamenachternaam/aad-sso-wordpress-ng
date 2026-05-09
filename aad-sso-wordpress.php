@@ -528,8 +528,8 @@ class AADSSO
             $jwt->email ?? '(null)',
             \is_string($log_preferred_username) ? $log_preferred_username : '(non-string)',
             \is_string($log_mail) ? $log_mail : '(non-string)',
-            $aad_oid !== '' ? $aad_oid : '(null)',
-            $aad_tid !== '' ? $aad_tid : '(null)'
+            '' !== $aad_oid ? $aad_oid : '(null)',
+            '' !== $aad_tid ? $aad_tid : '(null)'
         ), 10);
 
         if (null === $unique_name) {
@@ -557,7 +557,7 @@ class AADSSO
 
         $user = null;
 
-        if (\strlen($aad_oid) > 0 && true === $this->settings->use_immutable_user_linking) {
+        if (mb_strlen($aad_oid) > 0 && true === $this->settings->use_immutable_user_linking) {
             $user = $this->find_user_by_aad_oid($aad_oid, $aad_tid);
 
             if ($user instanceof WP_User) {
@@ -592,7 +592,7 @@ class AADSSO
             $user = $this->find_user_by_heuristics($email_claim, $unique_name, $upn);
 
             if ($user instanceof WP_User) {
-                if (\strlen($aad_oid) > 0) {
+                if (mb_strlen($aad_oid) > 0) {
                     update_user_meta($user->ID, 'aad_oid', $aad_oid);
                     update_user_meta($user->ID, 'aad_tid', $aad_tid);
                     AADSSO_Logger::log_debug(\sprintf(
@@ -623,7 +623,7 @@ class AADSSO
                 ), 10);
             }
 
-            if (\strlen($aad_oid) > 0) {
+            if (mb_strlen($aad_oid) > 0) {
                 update_user_meta($user->ID, 'aad_oid', $aad_oid);
                 update_user_meta($user->ID, 'aad_tid', $aad_tid);
             }
@@ -733,7 +733,7 @@ class AADSSO
 
                 // Store aad_oid and aad_tid for immutable linking on newly provisioned users
                 // This ensures future logins use the secure immutable method
-                if (\strlen($aad_oid) > 0) {
+                if (mb_strlen($aad_oid) > 0) {
                     update_user_meta($new_user_id, 'aad_oid', $aad_oid);
                     update_user_meta($new_user_id, 'aad_tid', $aad_tid);
                     AADSSO_Logger::log_debug(\sprintf(
@@ -761,91 +761,6 @@ class AADSSO
         }
 
         return $user;
-    }
-
-    /**
-     * @param string $oid
-     * @param string $tid
-     *
-     * @return null|WP_User
-     */
-    private function find_user_by_aad_oid(string $oid, string $tid): ?WP_User
-    {
-        global $wpdb;
-
-        /** @var string */
-        $query = $wpdb->prepare(
-            "SELECT user_id FROM {$wpdb->usermeta} "
-            . "WHERE meta_key = 'aad_oid' AND meta_value = %s "
-            . "LIMIT 1",
-            $oid
-        );
-
-        /** @var string|null */
-        $user_id = $wpdb->get_var($query);
-
-        if (null === $user_id || !is_numeric($user_id)) {
-            return null;
-        }
-
-        $user = new WP_User((int) $user_id);
-
-        return $user instanceof WP_User && $user->exists() ? $user : null;
-    }
-
-    /**
-     * @param null|string $email_claim
-     * @param string      $unique_name
-     * @param null|string $upn
-     *
-     * @return null|WP_User
-     */
-    private function find_user_by_heuristics(?string $email_claim, string $unique_name, ?string $upn): ?WP_User
-    {
-        $match_field = $this->settings->field_to_match_to_upn;
-        $match_value = $unique_name;
-
-        if ('email' === $match_field && null !== $email_claim) {
-            $match_value = $email_claim;
-        }
-
-        $user = get_user_by($match_field, $match_value);
-
-        if (!($user instanceof WP_User)
-            && 'email' === $match_field
-            && null !== $email_claim
-            && $email_claim !== $match_value
-        ) {
-            $user = get_user_by('email', $email_claim);
-        }
-
-        if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
-            $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
-            if (!empty($domain_hint)) {
-                $suffix = '@' . $domain_hint;
-                if (str_ends_with($unique_name, $suffix)) {
-                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
-                    if ('' !== $username) {
-                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
-                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
-                            $user = get_user_by('email', mb_strtolower($username));
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!($user instanceof WP_User) && 'email' === $match_field && null !== $email_claim) {
-            $lowercased_email = mb_strtolower($email_claim);
-            $lowercased_unique = mb_strtolower($unique_name);
-
-            $user = get_user_by($match_field, $lowercased_email);
-            if (!($user instanceof WP_User)) {
-                $user = get_user_by($match_field, $lowercased_unique);
-            }
-        }
-
-        return $user instanceof WP_User ? $user : null;
     }
 
     public function update_wp_user_roles(WP_User $user, mixed $group_memberships): WP_User|WP_Error
@@ -1136,6 +1051,91 @@ class AADSSO
         debug_print_backtrace();
         $trace = ob_get_clean();
         self::debug_log($trace, $level);
+    }
+
+    /**
+     * @param string $oid
+     * @param string $tid
+     *
+     * @return null|WP_User
+     */
+    private function find_user_by_aad_oid(string $oid, string $tid): ?WP_User
+    {
+        global $wpdb;
+
+        /** @var string */
+        $query = $wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} "
+            . "WHERE meta_key = 'aad_oid' AND meta_value = %s "
+            . 'LIMIT 1',
+            $oid
+        );
+
+        /** @var null|string */
+        $user_id = $wpdb->get_var($query);
+
+        if (null === $user_id || !is_numeric($user_id)) {
+            return null;
+        }
+
+        $user = new WP_User((int) $user_id);
+
+        return $user instanceof WP_User && $user->exists() ? $user : null;
+    }
+
+    /**
+     * @param null|string $email_claim
+     * @param string      $unique_name
+     * @param null|string $upn
+     *
+     * @return null|WP_User
+     */
+    private function find_user_by_heuristics(?string $email_claim, string $unique_name, ?string $upn): ?WP_User
+    {
+        $match_field = $this->settings->field_to_match_to_upn;
+        $match_value = $unique_name;
+
+        if ('email' === $match_field && null !== $email_claim) {
+            $match_value = $email_claim;
+        }
+
+        $user = get_user_by($match_field, $match_value);
+
+        if (!($user instanceof WP_User)
+            && 'email' === $match_field
+            && null !== $email_claim
+            && $email_claim !== $match_value
+        ) {
+            $user = get_user_by('email', $email_claim);
+        }
+
+        if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
+            $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
+            if (!empty($domain_hint)) {
+                $suffix = '@' . $domain_hint;
+                if (str_ends_with($unique_name, $suffix)) {
+                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
+                    if ('' !== $username) {
+                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
+                            $user = get_user_by('email', mb_strtolower($username));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!($user instanceof WP_User) && 'email' === $match_field && null !== $email_claim) {
+            $lowercased_email = mb_strtolower($email_claim);
+            $lowercased_unique = mb_strtolower($unique_name);
+
+            $user = get_user_by($match_field, $lowercased_email);
+            if (!($user instanceof WP_User)) {
+                $user = get_user_by($match_field, $lowercased_unique);
+            }
+        }
+
+        return $user instanceof WP_User ? $user : null;
     }
 
     private function wants_to_login(): bool
