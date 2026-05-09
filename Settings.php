@@ -391,6 +391,99 @@ class Settings
     }
 
     /**
+     * Validate a redirect URL against configured security policies.
+     *
+     * This provides defense-in-depth against open redirect attacks.
+     *
+     * Security checks (in order):
+     * 1. If block_external_redirects is enabled, only allow same-site redirects
+     * 2. If allowed_redirect_domains is configured, only allow redirects to those domains
+     * 3. Falls back to wp_safe_redirect() which validates against allowed hosts
+     *
+     * @param string $redirect_url The URL to validate
+     *
+     * @return string The validated URL, or empty string if not allowed
+     */
+    public static function validate_redirect_url(string $redirect_url): string
+    {
+        // Empty URL is always allowed (will use default)
+        if ('' === $redirect_url) {
+            return '';
+        }
+
+        // Parse the redirect URL
+        $parsed = parse_url($redirect_url);
+
+        // If parse failed or no host, it's likely a relative URL - allow it
+        if (false === $parsed || !isset($parsed['host'])) {
+            // Relative URLs are safe within the same site
+            // Accept: /path, ?query=string, #fragment, /path?query#fragment
+            $first_char = $redirect_url[0] ?? '';
+            if ('/' === $first_char || '?' === $first_char || '#' === $first_char) {
+                return $redirect_url;
+            }
+
+            return '';
+        }
+
+        $redirect_host = mb_strtolower($parsed['host']);
+
+        // Check block_external_redirects first
+        if (!empty(self::get_instance()->block_external_redirects)) {
+            // Use home_url() for public-facing URL validation
+            // home_url() returns the URL to the home location of the site as set
+            // in Settings > General, which is appropriate for redirect validation
+            $site_host = mb_strtolower(parse_url(home_url(), \PHP_URL_HOST) ?: '');
+
+            if ($redirect_host !== $site_host) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('External redirect blocked: %s (only %s allowed)', $redirect_url, $site_host)
+                );
+
+                return '';
+            }
+        }
+
+        // Check allowed_redirect_domains
+        // Note: allowed_redirect_domains are stored lowercase during sanitization
+        $allowed_domains = self::get_instance()->allowed_redirect_domains;
+        if (!empty($allowed_domains)) {
+            $redirect_lower = mb_strtolower($redirect_host);
+
+            // Check exact match or subdomain match
+            $is_allowed = false;
+            foreach ($allowed_domains as $allowed) {
+                // Exact match (both already lowercase)
+                if ($redirect_lower === $allowed) {
+                    $is_allowed = true;
+
+                    break;
+                }
+
+                // Subdomain match (example.com allows sub.example.com)
+                if (
+                    mb_strlen($redirect_lower) > mb_strlen($allowed) + 1
+                    && str_ends_with($redirect_lower, '.' . $allowed)
+                ) {
+                    $is_allowed = true;
+
+                    break;
+                }
+            }
+
+            if (!$is_allowed) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('Redirect to untrusted domain blocked: %s (not in allowlist)', $redirect_url)
+                );
+
+                return '';
+            }
+        }
+
+        return $redirect_url;
+    }
+
+    /**
      * Safely get blog name, with fallback for when WordPress is not fully initialized.
      */
     private static function safe_get_bloginfo_name(): string
@@ -706,99 +799,6 @@ class Settings
                 $value
             )
         );
-    }
-
-    /**
-     * Validate a redirect URL against configured security policies.
-     *
-     * This provides defense-in-depth against open redirect attacks.
-     *
-     * Security checks (in order):
-     * 1. If block_external_redirects is enabled, only allow same-site redirects
-     * 2. If allowed_redirect_domains is configured, only allow redirects to those domains
-     * 3. Falls back to wp_safe_redirect() which validates against allowed hosts
-     *
-     * @param string $redirect_url The URL to validate
-     *
-     * @return string The validated URL, or empty string if not allowed
-     */
-    public static function validate_redirect_url(string $redirect_url): string
-    {
-        // Empty URL is always allowed (will use default)
-        if ('' === $redirect_url) {
-            return '';
-        }
-
-        // Parse the redirect URL
-        $parsed = parse_url($redirect_url);
-
-        // If parse failed or no host, it's likely a relative URL - allow it
-        if (false === $parsed || !isset($parsed['host'])) {
-            // Relative URLs are safe within the same site
-            // Accept: /path, ?query=string, #fragment, /path?query#fragment
-            $first_char = $redirect_url[0] ?? '';
-            if ('/' === $first_char || '?' === $first_char || '#' === $first_char) {
-                return $redirect_url;
-            }
-
-            return '';
-        }
-
-        $redirect_host = mb_strtolower($parsed['host']);
-
-        // Check block_external_redirects first
-        if (!empty(self::get_instance()->block_external_redirects)) {
-            // Use home_url() for public-facing URL validation
-            // home_url() returns the URL to the home location of the site as set
-            // in Settings > General, which is appropriate for redirect validation
-            $site_host = mb_strtolower(parse_url(home_url(), \PHP_URL_HOST) ?: '');
-
-            if ($redirect_host !== $site_host) {
-                AADSSO_Logger::log_warning(
-                    \sprintf('External redirect blocked: %s (only %s allowed)', $redirect_url, $site_host)
-                );
-
-                return '';
-            }
-        }
-
-        // Check allowed_redirect_domains
-        // Note: allowed_redirect_domains are stored lowercase during sanitization
-        $allowed_domains = self::get_instance()->allowed_redirect_domains;
-        if (!empty($allowed_domains)) {
-            $redirect_lower = mb_strtolower($redirect_host);
-
-            // Check exact match or subdomain match
-            $is_allowed = false;
-            foreach ($allowed_domains as $allowed) {
-                // Exact match (both already lowercase)
-                if ($redirect_lower === $allowed) {
-                    $is_allowed = true;
-
-                    break;
-                }
-
-                // Subdomain match (example.com allows sub.example.com)
-                if (
-                    mb_strlen($redirect_lower) > mb_strlen($allowed) + 1
-                    && str_ends_with($redirect_lower, '.' . $allowed)
-                ) {
-                    $is_allowed = true;
-
-                    break;
-                }
-            }
-
-            if (!$is_allowed) {
-                AADSSO_Logger::log_warning(
-                    \sprintf('Redirect to untrusted domain blocked: %s (not in allowlist)', $redirect_url)
-                );
-
-                return '';
-            }
-        }
-
-        return $redirect_url;
     }
 }
 
