@@ -298,7 +298,7 @@ class Settings
 
         $plugin_settings = get_option('aadsso_settings');
         if (\is_array($plugin_settings) && !empty($plugin_settings)) {
-            /** @var array<string, mixed> $plugin_settings */
+            // @var array<string, mixed> $plugin_settings
             $instance->load_settings($plugin_settings);
         }
 
@@ -625,7 +625,7 @@ class Settings
         try {
             $cached = $cache->get('aadsso_openid_configuration');
             if (\is_array($cached) && !empty($cached)) {
-                /** @var array<string, mixed> */
+                // @var array<string, mixed>
                 return $cached;
             }
         } catch (Throwable $e) {
@@ -642,7 +642,7 @@ class Settings
             }
         }
 
-        /** @var array<string, mixed>|false */
+        // @var array<string, mixed>|false
         return $config;
     }
 
@@ -667,7 +667,7 @@ class Settings
             }
 
             if (\is_array($openid_configuration) && !empty($openid_configuration)) {
-                /** @var array<string, mixed> */
+                // @var array<string, mixed>
                 return $openid_configuration;
             }
         }
@@ -776,7 +776,7 @@ class Settings
             return [];
         }
 
-        /** @var list<string> */
+        // @var list<string>
         return array_values(
             array_filter(
                 array_map(
@@ -826,7 +826,7 @@ class Settings
             return [];
         }
 
-        /** @var list<string> */
+        // @var list<string>
         return array_values(
             array_filter(
                 array_map(
