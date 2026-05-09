@@ -434,6 +434,21 @@ class AuthorizationHelper
             $access_token = \is_string($access_token_raw) ? $access_token_raw : '';
             $_SESSION['aadsso_token_type'] = $token_type;
             $_SESSION['aadsso_access_token'] = $access_token;
+
+            // Store refresh token if provided
+            $refresh_token_raw = $result['refresh_token'] ?? '';
+            if (\is_string($refresh_token_raw) && '' !== $refresh_token_raw) {
+                $_SESSION['aadsso_refresh_token'] = $refresh_token_raw;
+            }
+
+            // Store token expiration timestamp
+            // expires_in is in seconds from the token response
+            $expires_in_raw = $result['expires_in'] ?? 0;
+            if (\is_int($expires_in_raw) && $expires_in_raw > 0) {
+                $_SESSION['aadsso_token_expires_at'] = time() + $expires_in_raw;
+            } elseif (\is_numeric($expires_in_raw) && (int) $expires_in_raw > 0) {
+                $_SESSION['aadsso_token_expires_at'] = time() + (int) $expires_in_raw;
+            }
         }
 
         return (object) $result;

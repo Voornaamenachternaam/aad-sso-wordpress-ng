@@ -5,24 +5,25 @@
   "license": "MIT",
   "require": {
     "php": ">=8.5.5",
-    "psr/simple-cache": "^3.0",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-openssl": "*",
     "firebase/php-jwt": "^7.0.5",
-    "symfony/options-resolver": "^8.0.8",
+    "guzzlehttp/psr7": "^2.9.0",
+    "microsoft/microsoft-graph": "^3.1.0",
     "monolog/monolog": "^3.10",
-    "symfony/cache": "^8.0.9",
     "psr/http-client": "^1.0.3",
     "psr/http-factory": "^1.1.0",
+    "psr/simple-cache": "^3.0",
+    "symfony/cache": "^8.0.9",
     "symfony/http-client": "^8.0.9",
-    "guzzlehttp/psr7": "^2.9.0",
-    "ext-json": "*",
-    "ext-openssl": "*",
-    "ext-mbstring": "*"
+    "symfony/options-resolver": "^8.0.8"
   },
   "require-dev": {
-    "phpstan/phpstan": "^2.1.54",
     "friendsofphp/php-cs-fixer": "^3.95.1",
-    "szepeviktor/phpstan-wordpress": "^2.0.3",
+    "phpstan/phpstan": "^2.1.54",
     "phpunit/phpunit": "^13.1.8",
+    "szepeviktor/phpstan-wordpress": "^2.0.3",
     "wp-coding-standards/wpcs": "^3.3.0"
   },
   "autoload": {
@@ -32,8 +33,8 @@
   },
   "config": {
     "allow-plugins": {
-      "php-http/discovery": true,
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "php-http/discovery": true
     },
     "sort-packages": true
   },
