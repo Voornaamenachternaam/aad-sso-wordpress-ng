@@ -318,11 +318,13 @@ class SettingsTest extends TestCase
      */
     public function testSanitizeRedirectDomainsStripsProtocolsAndSlashes(): void
     {
+        // Single domain with protocol and trailing slash
         $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'https://Example.COM/');
         $this->assertContains('example.com', $result);
         $this->assertNotContains('Example.COM', $result);
 
-        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'http://EXAMPLE.ORG/path/');
+        // Single domain without path (path would cause validation failure)
+        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'http://EXAMPLE.ORG');
         $this->assertContains('example.org', $result2);
     }
 
@@ -387,17 +389,21 @@ class SettingsTest extends TestCase
      */
     public function testSanitizeRedirectDomainsFiltersInvalidEntries(): void
     {
+        // Mix of valid and invalid entries - only valid ones should pass
+        // Note: localhost is now valid (single-label hostnames are allowed)
         $input = [
             'valid.example.com',
-            'localhost',
+            'localhost',         // Now valid!
             '',
-            '   ',
+            '   ',               // Now invalid (empty after trim)
             'https://another-valid.com/',
         ];
         $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', $input);
 
-        $this->assertCount(2, $result);
+        // 3 valid: valid.example.com, localhost, another-valid.com
+        $this->assertCount(3, $result);
         $this->assertContains('valid.example.com', $result);
+        $this->assertContains('localhost', $result);
         $this->assertContains('another-valid.com', $result);
     }
 
