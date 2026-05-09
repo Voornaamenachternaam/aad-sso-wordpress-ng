@@ -190,7 +190,7 @@ class AADSSO_HttpClient implements ClientInterface
             $flattened[$name] = $headerValue;
         }
 
-        /** @var array<string, string> */
+        // @var array<string, string>
         return $flattened;
     }
 
