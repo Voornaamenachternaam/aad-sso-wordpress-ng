@@ -213,7 +213,7 @@ class Logger
             'exception_line' => $exception->getLine(),
         ];
 
-        $log_message = $message;
+        $log_message = $message ?: $exception->getMessage();
 
         self::get_logger()->error($log_message, $context);
     }
@@ -240,10 +240,11 @@ class Logger
         if (\is_array($data)) {
             $sanitized = [];
             foreach ($data as $key => $value) {
-                $sanitized_key = self::is_sensitive_key($key)
-                    ? self::REDACTED_PLACEHOLDER
-                    : $key;
-                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
+                if (self::is_sensitive_key($key)) {
+                    $sanitized[$key] = self::REDACTED_PLACEHOLDER;
+                } else {
+                    $sanitized[$key] = self::recursive_sanitize($value);
+                }
             }
 
             return $sanitized;
@@ -252,11 +253,14 @@ class Logger
         if (\is_object($data)) {
             $sanitized = [];
             foreach ((array) $data as $key => $value) {
-                $clean_key = preg_replace('/[\x00].*$/s', '', (string) $key);
-                $sanitized_key = self::is_sensitive_key($clean_key)
-                    ? self::REDACTED_PLACEHOLDER
-                    : $clean_key;
-                $sanitized[$sanitized_key] = self::recursive_sanitize($value);
+                $clean_key = preg_replace('/^[\x00][^\x00]*\x00/', '', (string) $key);
+                $clean_key = preg_replace('/[\x00].*$/', '', $clean_key);
+
+                if (self::is_sensitive_key($clean_key)) {
+                    $sanitized[$key] = self::REDACTED_PLACEHOLDER;
+                } else {
+                    $sanitized[$key] = self::recursive_sanitize($value);
+                }
             }
 
             return (object) $sanitized;
@@ -277,27 +281,20 @@ class Logger
         }
 
         $result = $str;
+
         foreach (self::REDACT_PATTERNS as $pattern) {
-            $result = preg_replace_callback(
-                $pattern,
-                static fn (array $matches): string => self::REDACTED_PLACEHOLDER,
-                $result
-            );
+            $result = preg_replace($pattern, self::REDACTED_PLACEHOLDER, $result);
         }
 
-        if ($result !== $str) {
-            return $result;
-        }
-
-        if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $str) || preg_match('/@[\w\-\.]+\.\w{2,}/', $str)) {
-            return preg_replace(
+        if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $result) || preg_match('/@[\w\-\.]+\.\w{2,}/', $result)) {
+            $result = preg_replace(
                 '/[\w\.\+\-]+@[\w\-\.]+\.[\w\-\.]+\w+/',
                 self::REDACTED_PLACEHOLDER,
-                $str
-            ) ?? $str;
+                $result
+            ) ?? $result;
         }
 
-        return $str;
+        return $result;
     }
 
     /**
