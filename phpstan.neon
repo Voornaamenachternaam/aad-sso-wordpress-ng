@@ -3,7 +3,7 @@ includes:
 
 parameters:
     level: 5
-    phpVersion: 80505
+    phpVersion: 80200
     paths:
         - aad-sso-wordpress.php
         - AuthorizationHelper.php
