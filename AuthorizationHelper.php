@@ -449,12 +449,7 @@ class AuthorizationHelper
         if (null !== $azp_claim && \is_string($azp_claim) && $azp_claim !== $client_id) {
             // azp is present and does not match expected client_id
             // This may indicate the token was issued for a different application
-            throw new DomainException(\sprintf(
-                'ID token authorized party (azp) mismatch. Expected `%s`, got `%s`. '
-                . 'This token may have been issued for a different application.',
-                $client_id,
-                $azp_claim
-            ));
+            throw new DomainException(\sprintf('ID token authorized party (azp) mismatch. Expected `%s`, got `%s`. This token may have been issued for a different application.', $client_id, $azp_claim));
         }
 
         $token_nonce = $jwt->nonce ?? '';
