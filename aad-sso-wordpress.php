@@ -833,29 +833,19 @@ class AADSSO
             // - HttpOnly: Prevent JavaScript access to session cookie
             // - SameSite=Lax: Provides CSRF protection while allowing top-level navigation
             //
+            // Note: Plugin requires PHP 8.5.5+, so PHP 7.3+ array signature is always available.
+            //
             // References:
             // - https://php.net/manual/en/function.session-set-cookie-params.php
             // - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
-            if (\PHP_VERSION_ID >= 70300) {
-                // PHP 7.3+ supports the array signature for session_set_cookie_params
-                session_set_cookie_params([
-                    'lifetime' => 0,    // Session cookie (expires when browser closes)
-                    'path' => '/',
-                    'domain' => '',
-                    'secure' => true,   // HTTPS only
-                    'httponly' => true, // No JavaScript access
-                    'samesite' => 'Lax',
-                ]);
-            } else {
-                // Fallback for PHP < 7.3
-                session_set_cookie_params(
-                    0,      // lifetime
-                    '/',    // path
-                    '',     // domain
-                    true,   // secure
-                    true    // httponly
-                );
-            }
+            session_set_cookie_params([
+                'lifetime' => 0,    // Session cookie (expires when browser closes)
+                'path' => '/',
+                'domain' => '',
+                'secure' => true,   // HTTPS only
+                'httponly' => true, // No JavaScript access
+                'samesite' => 'Lax',
+            ]);
 
             // NOW start the session - all settings above will take effect
             session_start();
