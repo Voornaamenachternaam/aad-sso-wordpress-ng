@@ -830,7 +830,7 @@ class AADSSO
 
             // Set hardened session cookie parameters BEFORE starting the session
             // Per PHP session security best practices:
-            // - Secure: Only send cookie over HTTPS
+            // - Secure: Only send cookie over HTTPS (use is_ssl() for dynamic detection)
             // - HttpOnly: Prevent JavaScript access to session cookie
             // - SameSite=Lax: Provides CSRF protection while allowing top-level navigation
             //
@@ -839,11 +839,24 @@ class AADSSO
             // References:
             // - https://php.net/manual/en/function.session-set-cookie-params.php
             // - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
+            //
+            // Use WordPress is_ssl() to detect HTTPS, with fallback for non-WordPress contexts
+            $is_secure = false;
+            if (\function_exists('is_ssl')) {
+                $is_secure = (bool) is_ssl();
+            } else {
+                // Fallback: check if HTTPS is detected via server variables
+                $is_secure = (
+                    (!empty($_SERVER['HTTPS']) && 'off' !== mb_strtolower($_SERVER['HTTPS']))
+                    || (!empty($_SERVER['SERVER_PORT']) && 443 === (int) $_SERVER['SERVER_PORT'])
+                );
+            }
+
             session_set_cookie_params([
                 'lifetime' => 0,    // Session cookie (expires when browser closes)
                 'path' => '/',
                 'domain' => '',
-                'secure' => true,   // HTTPS only
+                'secure' => $is_secure,   // Dynamic: HTTPS only when on SSL connection
                 'httponly' => true, // No JavaScript access
                 'samesite' => 'Lax',
             ]);

@@ -411,6 +411,17 @@ class Settings
             return '';
         }
 
+        // Reject protocol-relative URLs (//host, /\host, ///host)
+        // These are external redirects disguised as relative URLs
+        // e.g., //evil.com or /\evil.com or ///evil.com
+        if (0 === strncmp($redirect_url, '//', 2) || 0 === strncmp($redirect_url, '/\\', 2)) {
+            AADSSO_Logger::log_warning(
+                \sprintf('Protocol-relative redirect blocked: %s', $redirect_url)
+            );
+
+            return '';
+        }
+
         // Parse the redirect URL
         $parsed = parse_url($redirect_url);
 
@@ -418,6 +429,7 @@ class Settings
         if (false === $parsed || !isset($parsed['host'])) {
             // Relative URLs are safe within the same site
             // Accept: /path, ?query=string, #fragment, /path?query#fragment
+            // Reject any malformed URL (e.g., multiple leading slashes caught above)
             $first_char = $redirect_url[0] ?? '';
             if ('/' === $first_char || '?' === $first_char || '#' === $first_char) {
                 return $redirect_url;
@@ -433,9 +445,16 @@ class Settings
             // Use home_url() for public-facing URL validation
             // home_url() returns the URL to the home location of the site as set
             // in Settings > General, which is appropriate for redirect validation
-            $site_host = mb_strtolower(parse_url(home_url(), \PHP_URL_HOST) ?: '');
+            //
+            // Fall back to empty string if home_url() is not available
+            // (e.g., during bootstrap or in some test environments)
+            if (\function_exists('home_url')) {
+                $site_host = mb_strtolower(parse_url(home_url(), \PHP_URL_HOST) ?: '');
+            } else {
+                $site_host = '';
+            }
 
-            if ($redirect_host !== $site_host) {
+            if ('' !== $site_host && $redirect_host !== $site_host) {
                 AADSSO_Logger::log_warning(
                     \sprintf('External redirect blocked: %s (only %s allowed)', $redirect_url, $site_host)
                 );
