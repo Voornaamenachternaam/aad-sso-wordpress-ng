@@ -484,6 +484,21 @@ class Settings
     }
 
     /**
+     * Public API for sanitizing option values.
+     *
+     * This provides a testable public interface for sanitization logic.
+     *
+     * @param string $key   The option key to sanitize
+     * @param mixed  $value The raw option value
+     *
+     * @return mixed The sanitized value
+     */
+    public static function sanitize_option(string $key, mixed $value): mixed
+    {
+        return self::sanitize_setting($key, $value);
+    }
+
+    /**
      * Safely get blog name, with fallback for when WordPress is not fully initialized.
      */
     private static function safe_get_bloginfo_name(): string
