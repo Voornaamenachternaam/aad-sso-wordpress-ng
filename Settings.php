@@ -110,7 +110,6 @@ class Settings
      */
     public static function get_defaults(?string $key = null): mixed
     {
-        /** @var array<string, mixed> */
         static $defaults = null;
 
         if (null === $defaults) {
