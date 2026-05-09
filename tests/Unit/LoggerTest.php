@@ -221,7 +221,8 @@ class LoggerTest extends TestCase
     {
         \AADSSO_Logger::set_safe_debug_mode(true);
 
-        $email = 'user@example.com';
+        // Email must be >= 20 chars to trigger redaction (min length check in redact_string)
+        $email = 'verylongusername@example.com';
         $result = \AADSSO_Logger::sanitize_for_logging($email);
 
         $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result);
