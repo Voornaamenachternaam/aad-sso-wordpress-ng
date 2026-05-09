@@ -587,6 +587,38 @@ class SettingsPage
             'aadsso_settings_page',
             'aadsso_settings_advanced'
         );
+
+        add_settings_field(
+            'use_immutable_user_linking',
+            esc_html__('Immutable User Linking', 'aad-sso-wordpress'),
+            [$this, 'immutable_user_linking_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
+            'provisioning_policy',
+            esc_html__('Auto-Provisioning Policies', 'aad-sso-wordpress'),
+            [$this, 'provisioning_policy_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
+            'enable_safe_debug_mode',
+            esc_html__('Debug Logging', 'aad-sso-wordpress'),
+            [$this, 'safe_debug_mode_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
+
+        add_settings_field(
+            'graph_permissions_info',
+            esc_html__('Graph API Permissions', 'aad-sso-wordpress'),
+            [$this, 'graph_permissions_info_callback'],
+            'aadsso_settings_page',
+            'aadsso_settings_security'
+        );
     }
 
     public function security_info_callback(): void
@@ -721,6 +753,17 @@ class SettingsPage
         // Parse allowed_tenant_ids - centralized in Settings::sanitize_tenant_ids()
         $allowed_tenant_ids_raw = $input['allowed_tenant_ids'] ?? '';
         $sanitized['allowed_tenant_ids'] = AADSSO_Settings::sanitize_tenant_ids($allowed_tenant_ids_raw);
+
+        // F-07: Immutable user linking settings
+        $sanitized['use_immutable_user_linking'] = !empty($input['use_immutable_user_linking']);
+        $sanitized['force_immutable_linking'] = !empty($input['force_immutable_linking']);
+
+        // F-08: Auto-provisioning policy guardrails
+        $sanitized['require_tenant_restriction_for_provisioning'] = !empty($input['require_tenant_restriction_for_provisioning']);
+        $sanitized['require_role_policy_for_provisioning'] = !empty($input['require_role_policy_for_provisioning']);
+
+        // F-10: Safe debug mode
+        $sanitized['enable_safe_debug_mode'] = !empty($input['enable_safe_debug_mode']);
 
         return $sanitized;
     }
@@ -1073,6 +1116,199 @@ class SettingsPage
                 'aad-sso-wordpress'
             )
         ) . '</p>';
+    }
+
+    public function graph_permissions_info_callback(): void
+    {
+        echo '<div class="notice notice-info" style="padding: 10px 15px; margin: 10px 0;">';
+        echo '<h4>' . esc_html__('Microsoft Graph API Permissions', 'aad-sso-wordpress') . '</h4>';
+        echo '<p>' . wp_kses_post(
+            __(
+                'When <strong>Microsoft Entra ID group to WordPress role association</strong> is enabled, '
+                . 'this plugin requires the following Graph API permissions:',
+                'aad-sso-wordpress'
+            )
+        ) . '</p>';
+        echo '<table class="widefat" style="margin: 10px 0; max-width: 700px;">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__('Permission', 'aad-sso-wordpress') . '</th>';
+        echo '<th>' . esc_html__('Type', 'aad-sso-wordpress') . '</th>';
+        echo '<th>' . esc_html__('Purpose', 'aad-sso-wordpress') . '</th>';
+        echo '<th>' . esc_html__('Risk', 'aad-sso-wordpress') . '</th>';
+        echo '</tr></thead><tbody>';
+
+        // Permission rows
+        $permissions = [
+            [
+                'scope' => 'User.Read',
+                'type' => 'Delegated',
+                'purpose' => 'Verify user authentication and retrieve basic profile',
+                'risk' => 'Low',
+            ],
+            [
+                'scope' => 'GroupMember.Read.All',
+                'type' => 'Delegated',
+                'purpose' => 'Check user group membership for role mapping',
+                'risk' => 'Medium',
+            ],
+        ];
+
+        foreach ($permissions as $perm) {
+            $risk_class = 'Medium' === $perm['risk'] ? 'notice-warning' : 'notice-success';
+            echo '<tr>';
+            echo '<td><code>' . esc_html($perm['scope']) . '</code></td>';
+            echo '<td>' . esc_html($perm['type']) . '</td>';
+            echo '<td>' . esc_html($perm['purpose']) . '</td>';
+            echo '<td><span class="notice ' . $risk_class . '" style="display: inline; padding: 2px 8px;">'
+                . esc_html($perm['risk']) . '</span></td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
+
+        echo '<p><strong>' . esc_html__('About GroupMember.Read.All:', 'aad-sso-wordpress') . '</strong></p>';
+        echo '<ul style="list-style: disc; margin-left: 20px;">';
+        echo '<li>' . wp_kses_post(
+            __(
+                '<code>GroupMember.Read.All</code> allows reading all group memberships, not just the groups '
+                . 'mapped to WordPress roles. This is a Microsoft Graph API limitation - there is no '
+                . 'scope to read only specific group memberships.',
+                'aad-sso-wordpress'
+            )
+        ) . '</li>';
+        echo '<li>' . wp_kses_post(
+            __(
+                'The plugin only uses group membership to map to configured WordPress roles. '
+                . 'It does not store or exfiltrate group membership data.',
+                'aad-sso-wordpress'
+            )
+        ) . '</li>';
+        echo '<li>' . wp_kses_post(
+            __(
+                'Consider implementing <a href="https://learn.microsoft.com/en-us/graph/api/resources/azure-ad-m365-security-pricing-overview" target="_blank" rel="noopener">Conditional Access policies</a> '
+                . 'to restrict which users can consent to this permission.',
+                'aad-sso-wordpress'
+            )
+        ) . '</li>';
+        echo '</ul>';
+
+        echo '<p><strong>' . esc_html__('Least-Privilege Alternatives:', 'aad-sso-wordpress') . '</strong></p>';
+        echo '<ul style="list-style: disc; margin-left: 20px;">';
+        echo '<li>' . wp_kses_post(
+            __(
+                'If you only need to map a few groups, consider using Azure AD application roles instead of '
+                . '<code>GroupMember.Read.All</code>. Application roles are checked in the ID token and do not '
+                . 'require a Graph API call. See '
+                . '<a href="https://learn.microsoft.com/en-us/entra/identity-platform/howto-applications-oamy-add-properties#understanding-azure-ad-application-roles" target="_blank" rel="noopener">Microsoft documentation</a>.',
+                'aad-sso-wordpress'
+            )
+        ) . '</li>';
+        echo '<li>' . wp_kses_post(
+            __(
+                'For organizations with advanced security requirements, consider creating a dedicated app '
+                . 'registration specifically for WordPress with only the required permissions.',
+                'aad-sso-wordpress'
+            )
+        ) . '</li>';
+        echo '</ul>';
+
+        echo '<p class="description">' . wp_kses_post(
+            __(
+                'References: <a href="https://learn.microsoft.com/en-us/graph/permissions-reference" target="_blank" rel="noopener">Microsoft Graph permissions reference</a>, '
+                . '<a href="https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc" target="_blank" rel="noopener">Microsoft identity platform scopes</a>',
+                'aad-sso-wordpress'
+            )
+        ) . '</p>';
+        echo '</div>';
+    }
+
+    public function immutable_user_linking_callback(): void
+    {
+        $use_immutable = !empty($this->settings['use_immutable_user_linking']);
+        $force_immutable = !empty($this->settings['force_immutable_linking']);
+        ?>
+        <p><?php esc_html_e('Immutable user linking uses the Microsoft Entra ID object ID (oid) to match users, which never changes. This prevents account takeover when a user\'s email or UPN changes.', 'aad-sso-wordpress'); ?></p>
+
+        <p>
+            <input type="checkbox" name="aadsso_settings[use_immutable_user_linking]" id="use_immutable_user_linking" value="1"<?php checked($use_immutable, true); ?> />
+            <label for="use_immutable_user_linking">
+                <?php esc_html_e('Enable immutable user linking (recommended)', 'aad-sso-wordpress'); ?>
+            </label>
+        </p>
+
+        <p>
+            <input type="checkbox" name="aadsso_settings[force_immutable_linking]" id="force_immutable_linking" value="1"<?php checked($force_immutable, true); ?> />
+            <label for="force_immutable_linking">
+                <?php esc_html_e('Require immutable linking (disables fallback matching)', 'aad-sso-wordpress'); ?>
+            </label>
+        </p>
+
+        <p class="description"><?php echo wp_kses_post(
+            __(
+                '<strong>Note:</strong> When immutable linking is enabled, existing users without stored Entra ID '
+                . 'identifiers will be migrated automatically on their next login. If <strong>force immutable '
+                . 'linking</strong> is enabled, users without stored identifiers cannot log in until manually linked.',
+                'aad-sso-wordpress'
+            )
+        ); ?></p>
+        <?php
+    }
+
+    public function provisioning_policy_callback(): void
+    {
+        $require_tenant = !empty($this->settings['require_tenant_restriction_for_provisioning']);
+        $require_role = !empty($this->settings['require_role_policy_for_provisioning']);
+        ?>
+        <p><?php esc_html_e('Configure safety policies for automatic user provisioning. These settings help prevent unauthorized access.', 'aad-sso-wordpress'); ?></p>
+
+        <p>
+            <input type="checkbox" name="aadsso_settings[require_tenant_restriction_for_provisioning]" id="require_tenant_restriction_for_provisioning" value="1"<?php checked($require_tenant, true); ?> />
+            <label for="require_tenant_restriction_for_provisioning">
+                <?php esc_html_e('Require tenant restriction for auto-provisioning', 'aad-sso-wordpress'); ?>
+            </label>
+        </p>
+        <p class="description"><?php esc_html_e('When enabled, auto-provisioning requires tenant restriction to be active (single-tenant or multi-tenant controlled mode).', 'aad-sso-wordpress'); ?></p>
+
+        <p>
+            <input type="checkbox" name="aadsso_settings[require_role_policy_for_provisioning]" id="require_role_policy_for_provisioning" value="1"<?php checked($require_role, true); ?> />
+            <label for="require_role_policy_for_provisioning">
+                <?php esc_html_e('Require role mapping policy for auto-provisioning', 'aad-sso-wordpress'); ?>
+            </label>
+        </p>
+        <p class="description"><?php esc_html_e('When enabled, auto-provisioning requires either a default WordPress role to be set, or group-based role mapping to be enabled.', 'aad-sso-wordpress'); ?></p>
+
+        <p class="description"><?php echo wp_kses_post(
+            __(
+                '<strong>Security note:</strong> These policies are enabled by default for your protection. '
+                . 'Disable them only if you understand the security implications.',
+                'aad-sso-wordpress'
+            )
+        ); ?></p>
+        <?php
+    }
+
+    public function safe_debug_mode_callback(): void
+    {
+        $safe_debug = !empty($this->settings['enable_safe_debug_mode']);
+        ?>
+        <p>
+            <input type="checkbox" name="aadsso_settings[enable_safe_debug_mode]" id="enable_safe_debug_mode" value="1"<?php checked($safe_debug, true); ?> />
+            <label for="enable_safe_debug_mode">
+                <?php esc_html_e('Enable safe debug mode (recommended)', 'aad-sso-wordpress'); ?>
+            </label>
+        </p>
+
+        <p class="description"><?php echo wp_kses_post(
+            __(
+                'When enabled, sensitive data (tokens, credentials, PII) is automatically redacted from '
+                . 'debug logs. This prevents accidental exposure of sensitive information in log files. '
+                . '<strong>Recommended for production environments.</strong>',
+                'aad-sso-wordpress'
+            )
+        ); ?></p>
+
+        <p class="description"><?php esc_html_e('Redacted data includes: JWTs, Bearer tokens, access tokens, client secrets, and email addresses.', 'aad-sso-wordpress'); ?></p>
+        <?php
     }
 
     public function render_text_field(string $name): void

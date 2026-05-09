@@ -95,6 +95,16 @@ class Settings
      */
     private static ?OptionsResolver $options_resolver = null;
 
+    public bool $use_immutable_user_linking = true;
+
+    public bool $force_immutable_linking = false;
+
+    public bool $enable_safe_debug_mode = true;
+
+    public bool $require_tenant_restriction_for_provisioning = true;
+
+    public bool $require_role_policy_for_provisioning = true;
+
     /**
      * @return array<string, mixed>|mixed
      */
@@ -256,6 +266,26 @@ class Settings
             self::$options_resolver->define('block_external_redirects')
                 ->allowedTypes('bool')
                 ->default(false);
+
+            self::$options_resolver->define('use_immutable_user_linking')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('force_immutable_linking')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('enable_safe_debug_mode')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('require_tenant_restriction_for_provisioning')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('require_role_policy_for_provisioning')
+                ->allowedTypes('bool')
+                ->default(true);
         }
 
         return self::$options_resolver;
@@ -677,7 +707,15 @@ class Settings
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
             'enable_aad_group_to_wp_role',
-            'enable_full_logout' => (bool) $value,
+            'enable_full_logout',
+            // F-07: Immutable user linking settings
+            'use_immutable_user_linking',
+            'force_immutable_linking',
+            // F-08: Auto-provisioning policy guardrails
+            'require_tenant_restriction_for_provisioning',
+            'require_role_policy_for_provisioning',
+            // F-10: Safe debug mode
+            'enable_safe_debug_mode' => (bool) $value,
             'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
             default => $value,
         };

@@ -456,16 +456,16 @@ For the stated use case (WordPress login via Entra ID), this plugin is now produ
   - Tenant policy check (`tid` with single/multi-tenant modes)
   - `azp` handling per OIDC Core 1.0 Section 3.1.3.7
 
-- **Phase 1 (near-term hardening)**: ✅ PKCE & SESSION HARDENING RESOLVED
+- **Phase 1 (near-term hardening)**: ✅ ALL RESOLVED
   - ✅ PKCE S256 to authorization code flow (F-04)
   - ✅ Session regeneration post-auth (F-05)
-  - Redirect target policy tightening (F-06)
-  - ⬜ Immutable user linking with `oid` (F-07 - pending)
+  - ✅ Redirect target policy tightening (F-06)
+  - ✅ Immutable user linking with `oid` (F-07)
 
-- **Phase 2 (operational maturity)**: Pending
-  - Permission transparency in settings UI
-  - Sensitive logging redaction
-  - Security-focused integration tests
+- **Phase 2 (operational maturity)**: ✅ ALL RESOLVED
+  - ✅ Permission transparency in settings UI (F-09)
+  - ✅ Sensitive logging redaction (F-10)
+  - Auto-provisioning policy guardrails (F-08)
 
 ### Security Posture
 
@@ -475,8 +475,11 @@ The plugin now has robust security hardening including:
 - ✅ Secure cookie attributes (Secure, HttpOnly, SameSite)
 - ✅ Redirect allowlisting and external redirect blocking
 - ✅ All Phase 0 critical security fixes (aud, tid, azp)
+- ✅ Immutable user linking with oid/tid for account security
+- ✅ Auto-provisioning gated behind tenant and role policies
+- ✅ Sensitive data redaction in debug logs
 
-The remaining F-07 (immutable user linking) and Phase 2 items are recommended but not blocking for production use.
+**May 9, 2026**: All Phase 1 and Phase 2 items from AUDIT.md have been resolved. The plugin implements all recommendations from the security audit.
 
 ---
 *Last updated: May 9, 2026 (UTC)*
