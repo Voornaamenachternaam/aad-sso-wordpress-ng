@@ -411,12 +411,13 @@ class Settings
             return '';
         }
 
-        // Reject protocol-relative URLs (//host, /\host, ///host)
-        // These are external redirects disguised as relative URLs
-        // e.g., //evil.com or /\evil.com or ///evil.com
-        if (0 === strncmp($redirect_url, '//', 2) || 0 === strncmp($redirect_url, '/\\', 2)) {
+        // Reject URLs starting with any combination of slashes or backslashes
+        // Protocol-relative URLs like //host, /\host are external redirects
+        // Multiple slashes like ///evil.com or //\/evil.com also bypass parse_url()
+        // These can lead to open redirect vulnerabilities if not explicitly blocked
+        if (preg_match('#^[/\\\\]+#', $redirect_url)) {
             AADSSO_Logger::log_warning(
-                \sprintf('Protocol-relative redirect blocked: %s', $redirect_url)
+                \sprintf('Redirect starting with multiple slashes blocked: %s', $redirect_url)
             );
 
             return '';
