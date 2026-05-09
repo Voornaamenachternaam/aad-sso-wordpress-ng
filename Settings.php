@@ -85,6 +85,16 @@ class Settings
      */
     public bool $block_external_redirects = false;
 
+    public bool $use_immutable_user_linking = true;
+
+    public bool $force_immutable_linking = false;
+
+    public bool $enable_safe_debug_mode = true;
+
+    public bool $require_tenant_restriction_for_provisioning = true;
+
+    public bool $require_role_policy_for_provisioning = true;
+
     /**
      * @var null|self
      */
@@ -256,6 +266,26 @@ class Settings
             self::$options_resolver->define('block_external_redirects')
                 ->allowedTypes('bool')
                 ->default(false);
+
+            self::$options_resolver->define('use_immutable_user_linking')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('force_immutable_linking')
+                ->allowedTypes('bool')
+                ->default(false);
+
+            self::$options_resolver->define('enable_safe_debug_mode')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('require_tenant_restriction_for_provisioning')
+                ->allowedTypes('bool')
+                ->default(true);
+
+            self::$options_resolver->define('require_role_policy_for_provisioning')
+                ->allowedTypes('bool')
+                ->default(true);
         }
 
         return self::$options_resolver;
@@ -611,6 +641,7 @@ class Settings
             }
         }
 
+        // @var array<string, mixed>|false
         return $config;
     }
 
@@ -625,6 +656,7 @@ class Settings
         );
 
         if (!empty($remote_response)) {
+            /** @var mixed */
             $openid_configuration = json_decode($remote_response, true);
 
             if (\JSON_ERROR_NONE !== json_last_error()) {
@@ -677,7 +709,15 @@ class Settings
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
             'enable_aad_group_to_wp_role',
-            'enable_full_logout' => (bool) $value,
+            'enable_full_logout',
+            // F-07: Immutable user linking settings
+            'use_immutable_user_linking',
+            'force_immutable_linking',
+            // F-08: Auto-provisioning policy guardrails
+            'require_tenant_restriction_for_provisioning',
+            'require_role_policy_for_provisioning',
+            // F-10: Safe debug mode
+            'enable_safe_debug_mode' => (bool) $value,
             'aad_group_to_wp_role_map' => \is_array($value) ? $value : [],
             default => $value,
         };
@@ -735,23 +775,25 @@ class Settings
             return [];
         }
 
-        // @var list<string> $sanitized
-        return array_filter(
-            array_map(
-                static function (mixed $id): string {
-                    if (!\is_string($id)) {
-                        return '';
-                    }
-                    // Validate GUID format (tenant ID should be a GUID)
-                    $trimmed = mb_trim($id);
-                    // GUID format: 8-4-4-4-12 hex characters
-                    if (preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
-                        return $trimmed;
-                    }
+        // @var list<string>
+        return array_values(
+            array_filter(
+                array_map(
+                    static function (mixed $id): string {
+                        if (!\is_string($id)) {
+                            return '';
+                        }
+                        // Validate GUID format (tenant ID should be a GUID)
+                        $trimmed = mb_trim($id);
+                        // GUID format: 8-4-4-4-12 hex characters
+                        if (preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
+                            return $trimmed;
+                        }
 
-                    return '';
-                },
-                $value
+                        return '';
+                    },
+                    $value
+                )
             )
         );
     }
@@ -783,55 +825,57 @@ class Settings
             return [];
         }
 
-        // @var list<string> $sanitized
-        return array_filter(
-            array_map(
-                static function (mixed $domain): string {
-                    if (!\is_string($domain)) {
-                        return '';
-                    }
+        // @var list<string>
+        return array_values(
+            array_filter(
+                array_map(
+                    static function (mixed $domain): string {
+                        if (!\is_string($domain)) {
+                            return '';
+                        }
 
-                    $trimmed = mb_trim($domain);
+                        $trimmed = mb_trim($domain);
 
-                    // Empty strings are filtered out
-                    if ('' === $trimmed) {
-                        return '';
-                    }
+                        // Empty strings are filtered out
+                        if ('' === $trimmed) {
+                            return '';
+                        }
 
-                    // Remove protocol if present (normalize input)
-                    $trimmed = preg_replace('#^https?://#', '', $trimmed);
+                        // Remove protocol if present (normalize input)
+                        $stripped = preg_replace('#^https?://#', '', $trimmed);
 
-                    // Remove trailing slash
-                    $trimmed = mb_rtrim($trimmed, '/');
+                        // Remove trailing slash
+                        $trimmed = \is_string($stripped) ? mb_rtrim($stripped, '/') : '';
 
-                    // Validate hostname format:
-                    // - Must not be empty after removing protocol/slash
-                    // - Must contain only valid hostname characters
-                    // - Supports single-label (localhost, devserver) and multi-label (example.com)
-                    //
-                    // Valid patterns:
-                    //   localhost
-                    //   devserver
-                    //   example.com
-                    //   sub.example.com
-                    //   my-server.local
-                    //
-                    // Invalid:
-                    //   (empty string)
-                    //   host-
-                    //   -host
-                    //   contains spaces
-                    if (
-                        '' === $trimmed
-                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
-                    ) {
-                        return '';
-                    }
+                        // Validate hostname format:
+                        // - Must not be empty after removing protocol/slash
+                        // - Must contain only valid hostname characters
+                        // - Supports single-label (localhost, devserver) and multi-label (example.com)
+                        //
+                        // Valid patterns:
+                        //   localhost
+                        //   devserver
+                        //   example.com
+                        //   sub.example.com
+                        //   my-server.local
+                        //
+                        // Invalid:
+                        //   (empty string)
+                        //   host-
+                        //   -host
+                        //   contains spaces
+                        if (
+                            '' === $trimmed
+                            || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
+                        ) {
+                            return '';
+                        }
 
-                    // Normalize to lowercase for consistent comparison
-                    return mb_strtolower($trimmed);
-                },
-                $value
+                        // Normalize to lowercase for consistent comparison
+                        return mb_strtolower($trimmed);
+                    },
+                    $value
+                )
             )
         );
     }

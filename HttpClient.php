@@ -186,8 +186,7 @@ class AADSSO_HttpClient implements ClientInterface
     {
         $flattened = [];
         foreach ($request->getHeaders() as $name => $values) {
-            $headerValue = implode(', ', $values);
-            // @var string $headerValue
+            $headerValue = implode(', ', (array) $values);
             $flattened[$name] = $headerValue;
         }
 

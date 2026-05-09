@@ -123,4 +123,134 @@ class LoggerTest extends TestCase
         $cache2 = \AADSSO_Logger::get_cache();
         $this->assertSame($cache1, $cache2);
     }
+
+    /**
+     * Test safe debug mode is enabled by default.
+     */
+    public function testSafeDebugModeIsEnabledByDefault(): void
+    {
+        $this->assertTrue(\AADSSO_Logger::get_safe_debug_mode());
+    }
+
+    /**
+     * Test safe debug mode can be toggled.
+     */
+    public function testSafeDebugModeCanBeToggled(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(false);
+        $this->assertFalse(\AADSSO_Logger::get_safe_debug_mode());
+
+        \AADSSO_Logger::set_safe_debug_mode(true);
+        $this->assertTrue(\AADSSO_Logger::get_safe_debug_mode());
+    }
+
+    /**
+     * Test sanitize_for_logging redacts JWT tokens.
+     */
+    public function testSanitizeRedactsJwtTokens(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        // JWT token
+        $jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+        $result = \AADSSO_Logger::sanitize_for_logging($jwt);
+
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result);
+    }
+
+    /**
+     * Test sanitize_for_logging redacts Bearer tokens.
+     */
+    public function testSanitizeRedactsBearerTokens(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        $bearer = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+        $result = \AADSSO_Logger::sanitize_for_logging($bearer);
+
+        $this->assertStringContainsString('[REDACTED_SENSITIVE_DATA]', $result);
+    }
+
+    /**
+     * Test sanitize_for_logging redacts sensitive keys.
+     */
+    public function testSanitizeRedactsSensitiveKeys(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        $data = [
+            'username' => 'johndoe',
+            'access_token' => 'super-secret-token-value-12345678901234567890',
+            'password' => 'secretpassword',
+        ];
+
+        $result = \AADSSO_Logger::sanitize_for_logging($data);
+
+        $this->assertSame('johndoe', $result['username']);
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['access_token']);
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['password']);
+    }
+
+    /**
+     * Test sanitize_for_logging handles nested arrays.
+     */
+    public function testSanitizeHandlesArrays(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        $data = [
+            'users' => [
+                ['name' => 'John', 'email' => 'john@example.com'],
+                ['name' => 'Jane', 'email' => 'jane@example.com'],
+            ],
+        ];
+
+        $result = \AADSSO_Logger::sanitize_for_logging($data);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('users', $result);
+        // Email values are not redacted since 'email' is not a sensitive key
+        $this->assertSame('john@example.com', $result['users'][0]['email']);
+        $this->assertSame('jane@example.com', $result['users'][1]['email']);
+    }
+
+    /**
+     * Test sanitize_for_logging redacts standalone email strings.
+     */
+    public function testSanitizeRedactsEmailStrings(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        // Email must be >= 20 chars to trigger redaction (min length check in redact_string)
+        $email = 'verylongusername@example.com';
+        $result = \AADSSO_Logger::sanitize_for_logging($email);
+
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result);
+    }
+
+    /**
+     * Test sanitize_for_logging returns original when disabled.
+     */
+    public function testSanitizeReturnsOriginalWhenDisabled(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(false);
+
+        $jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+        $result = \AADSSO_Logger::sanitize_for_logging($jwt);
+
+        $this->assertSame($jwt, $result);
+    }
+
+    /**
+     * Test sanitize_for_logging preserves non-sensitive strings.
+     */
+    public function testSanitizePreservesNonSensitiveStrings(): void
+    {
+        \AADSSO_Logger::set_safe_debug_mode(true);
+
+        $data = 'This is a regular log message without sensitive data.';
+        $result = \AADSSO_Logger::sanitize_for_logging($data);
+
+        $this->assertSame($data, $result);
+    }
 }

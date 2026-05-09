@@ -20,9 +20,63 @@ if (!\defined('AADSSO_PLUGIN_DIR')) {
 
 class Logger
 {
+    private const MIN_TOKEN_LENGTH = 40;
+
+    private const REDACT_PATTERNS = [
+        '~\\bBearer\\s+[A-Za-z0-9\\-_]+\\.[A-Za-z0-9\\-_]+\\.[A-Za-z0-9\\-_]*~i',
+        '~\\beyJ[Aa-zA-Z0-9\\-_]+\\.[Aa-zA-Z0-9\\-_]+\\.[Aa-zA-Z0-9\\-_]*~',
+        '~\\b[A-Za-z0-9+/]{' . self::MIN_TOKEN_LENGTH . ',}[=]{0,2}\\b~',
+    ];
+
+    private const SENSITIVE_KEYS = [
+        'access_token',
+        'refresh_token',
+        'id_token',
+        'client_secret',
+        'password',
+        'secret',
+        'token',
+        'credential',
+        'authorization',
+        'auth',
+        'bearer',
+        'api_key',
+        'apikey',
+        'private_key',
+        'privatekey',
+    ];
+
+    private const REDACTED_PLACEHOLDER = '[REDACTED_SENSITIVE_DATA]';
+
     private static ?LoggerInterface $logger = null;
 
     private static ?CacheInterface $cache = null;
+
+    private static bool $safe_debug_mode = true;
+
+    public static function set_safe_debug_mode(bool $enabled): void
+    {
+        self::$safe_debug_mode = $enabled;
+    }
+
+    public static function get_safe_debug_mode(): bool
+    {
+        return self::$safe_debug_mode;
+    }
+
+    /**
+     * @param mixed $data
+     *
+     * @return mixed
+     */
+    public static function sanitize_for_logging(mixed $data): mixed
+    {
+        if (!self::$safe_debug_mode) {
+            return $data;
+        }
+
+        return self::recursive_sanitize($data);
+    }
 
     public static function get_logger(): LoggerInterface
     {
@@ -116,7 +170,8 @@ class Logger
             return;
         }
 
-        self::get_logger()->debug($message);
+        $sanitized_message = self::sanitize_for_logging($message);
+        self::get_logger()->debug((string) $sanitized_message);
     }
 
     /**
@@ -125,7 +180,8 @@ class Logger
     public static function log_info(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
-        self::get_logger()->info($message, $context);
+        $sanitized_context = self::sanitize_for_logging($context);
+        self::get_logger()->info($message, (array) $sanitized_context);
     }
 
     /**
@@ -134,7 +190,8 @@ class Logger
     public static function log_warning(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
-        self::get_logger()->warning($message, $context);
+        $sanitized_context = self::sanitize_for_logging($context);
+        self::get_logger()->warning($message, (array) $sanitized_context);
     }
 
     /**
@@ -143,7 +200,8 @@ class Logger
     public static function log_error(string $message, array $context = []): void
     {
         $context['source'] = 'AADSSO';
-        self::get_logger()->error($message, $context);
+        $sanitized_context = self::sanitize_for_logging($context);
+        self::get_logger()->error($message, (array) $sanitized_context);
     }
 
     public static function log_exception(Throwable $exception, string $message = ''): void
@@ -158,6 +216,105 @@ class Logger
         $log_message = $message ?: $exception->getMessage();
 
         self::get_logger()->error($log_message, $context);
+    }
+
+    /**
+     * @param mixed $data
+     *
+     * @return mixed
+     */
+    private static function recursive_sanitize(mixed $data): mixed
+    {
+        if (null === $data) {
+            return null;
+        }
+
+        if (\is_bool($data) || \is_int($data) || \is_float($data)) {
+            return $data;
+        }
+
+        if (\is_string($data)) {
+            return self::redact_string($data);
+        }
+
+        if (\is_array($data)) {
+            $sanitized = [];
+            foreach ($data as $key => $value) {
+                $key_str = (string) $key;
+                if (self::is_sensitive_key($key_str)) {
+                    $sanitized[$key] = self::REDACTED_PLACEHOLDER;
+                } else {
+                    $sanitized[$key] = self::recursive_sanitize($value);
+                }
+            }
+
+            return $sanitized;
+        }
+
+        if (\is_object($data)) {
+            $sanitized = [];
+            foreach ((array) $data as $key => $value) {
+                $key_str = (string) $key;
+                $clean_key = preg_replace('/^[\x00][^\x00]*\x00/', '', $key_str) ?: $key_str;
+                $clean_key = preg_replace('/[\x00].*$/', '', $clean_key) ?: '';
+
+                if ('' !== $clean_key && self::is_sensitive_key($clean_key)) {
+                    $sanitized[$key] = self::REDACTED_PLACEHOLDER;
+                } else {
+                    $sanitized[$key] = self::recursive_sanitize($value);
+                }
+            }
+
+            return (object) $sanitized;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $str
+     *
+     * @return string
+     */
+    private static function redact_string(string $str): string
+    {
+        if (mb_strlen($str) < 20) {
+            return $str;
+        }
+
+        $result = $str;
+
+        foreach (self::REDACT_PATTERNS as $pattern) {
+            $result = preg_replace($pattern, self::REDACTED_PLACEHOLDER, $result) ?? $result;
+        }
+
+        if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $result) || preg_match('/@[\w\-\.]+\.\w{2,}/', $result)) {
+            $result = preg_replace(
+                '/[\w\.\+\-]+@[\w\-\.]+\.[\w\-\.]+\w+/',
+                self::REDACTED_PLACEHOLDER,
+                $result
+            ) ?? $result;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param string $key
+     *
+     * @return bool
+     */
+    private static function is_sensitive_key(string $key): bool
+    {
+        $key_lower = mb_strtolower($key);
+
+        foreach (self::SENSITIVE_KEYS as $sensitive_key) {
+            if (false !== mb_strpos($key_lower, $sensitive_key)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

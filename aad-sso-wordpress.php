@@ -73,6 +73,10 @@ class AADSSO
         add_action('login_init', [$this, 'save_redirect_and_maybe_bypass_login'], 20);
         add_filter('login_redirect', [$this, 'redirect_after_login'], 20, 3);
         add_action('plugins_loaded', [$this, 'load_textdomain']);
+
+        if (isset($this->settings->enable_safe_debug_mode)) {
+            AADSSO_Logger::set_safe_debug_mode($this->settings->enable_safe_debug_mode);
+        }
     }
 
     public static function activate(): void
@@ -506,37 +510,26 @@ class AADSSO
         $unique_name_raw = $jwt->unique_name ?? null;
         $unique_name = \is_string($unique_name_raw) ? $unique_name_raw : $upn;
 
-        // Collect all possible email/identifier claims for matching
-        // Priority: email > preferred_username > upn > unique_name
-        // Note: 'mail' is not a standard ID token claim - it's a Graph API attribute
-        /** @var null|string */
-        $email_claim = null;
-        /** @var mixed */
-        $email_raw = $jwt->email ?? null;
-        if (\is_string($email_raw)) {
-            $email_claim = $email_raw;
-        }
-        // Note: preferred_username is snake_case (OpenID Connect standard)
-        /** @var mixed */
-        $preferred_username_raw = $jwt->preferred_username ?? null;
-        if (null === $email_claim && \is_string($preferred_username_raw)) {
-            // For guest users, preferred_username often contains their actual email
-            // (while upn contains the #EXT# format)
-            $email_claim = $preferred_username_raw;
-        }
+        /** @var string */
+        $oid_raw = $jwt->oid ?? '';
+        $aad_oid = \is_string($oid_raw) ? $oid_raw : '';
+        /** @var string */
+        $tid_raw = $jwt->tid ?? '';
+        $aad_tid = \is_string($tid_raw) ? $tid_raw : '';
 
-        // Log available claims for debugging
         /** @var mixed */
         $log_preferred_username = $jwt->preferred_username ?? '(null)';
         /** @var mixed */
         $log_mail = $jwt->mail ?? '(null)';
         AADSSO_Logger::log_debug(\sprintf(
-            'User claims: upn=%s, unique_name=%s, email=%s, preferred_username=%s, mail=%s',
+            'User claims: upn=%s, unique_name=%s, email=%s, preferred_username=%s, mail=%s, oid=%s, tid=%s',
             $upn ?? '(null)',
             $unique_name ?? '(null)',
-            $email_claim ?? '(null)',
+            $jwt->email ?? '(null)',
             \is_string($log_preferred_username) ? $log_preferred_username : '(non-string)',
-            \is_string($log_mail) ? $log_mail : '(non-string)'
+            \is_string($log_mail) ? $log_mail : '(non-string)',
+            '' !== $aad_oid ? $aad_oid : '(null)',
+            '' !== $aad_tid ? $aad_tid : '(null)'
         ), 10);
 
         if (null === $unique_name) {
@@ -549,90 +542,156 @@ class AADSSO
             );
         }
 
-        // Determine which field to match
-        $match_field = $this->settings->field_to_match_to_upn;
-        $match_value = $unique_name;
-
-        // If matching by email and we have an email claim, prefer that over UPN
-        if ('email' === $match_field && null !== $email_claim) {
-            $match_value = $email_claim;
+        /** @var null|string */
+        $email_claim = null;
+        /** @var mixed */
+        $email_raw = $jwt->email ?? null;
+        if (\is_string($email_raw)) {
+            $email_claim = $email_raw;
+        }
+        /** @var mixed */
+        $preferred_username_raw = $jwt->preferred_username ?? null;
+        if (null === $email_claim && \is_string($preferred_username_raw)) {
+            $email_claim = $preferred_username_raw;
         }
 
-        $user = get_user_by($match_field, $match_value);
+        $user = null;
 
-        // If no match by primary value, try fallback with email claim
-        // Only applies when matching by email - doesn't make sense for other fields
-        if (!($user instanceof WP_User)
-            && 'email' === $match_field
-            && null !== $email_claim
-            && $email_claim !== $match_value
-        ) {
-            $user = get_user_by('email', $email_claim);
+        if (mb_strlen($aad_oid) > 0 && true === $this->settings->use_immutable_user_linking) {
+            $user = $this->find_user_by_aad_oid($aad_oid, $aad_tid);
+
             if ($user instanceof WP_User) {
+                $stored_tid = get_user_meta($user->ID, 'aad_tid', true);
+
+                if ('' === $stored_tid && '' !== $aad_tid) {
+                    AADSSO_Logger::log_warning(\sprintf(
+                        'Storing tenant ID for oid=%s: tid=%s (first match).',
+                        $aad_oid,
+                        $aad_tid
+                    ));
+                    update_user_meta($user->ID, 'aad_tid', $aad_tid);
+                    $stored_tid = $aad_tid;
+                }
+
+                if ('' !== $stored_tid && '' !== $aad_tid && $stored_tid !== $aad_tid) {
+                    AADSSO_Logger::log_warning(\sprintf(
+                        'Tenant ID mismatch for oid=%s: stored=%s, token=%s.',
+                        $aad_oid,
+                        $stored_tid,
+                        $aad_tid
+                    ));
+
+                    return new WP_Error(
+                        'tenant_mismatch',
+                        __(
+                            'ERROR: Your account tenant does not match the stored tenant. '
+                            . 'This may indicate a security issue. Please contact an administrator.',
+                            'aad-sso-wordpress'
+                        )
+                    );
+                }
+
                 AADSSO_Logger::log_debug(\sprintf(
-                    'Matched user by email claim (%s) instead of primary value (%s).',
-                    $email_claim,
-                    $match_value
+                    'Matched user by immutable oid [%s] to WordPress user [%s].',
+                    $aad_oid,
+                    (string) $user->ID
                 ), 10);
             }
         }
 
-        // Try UPN alias matching if enabled and still no match
-        if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
-            $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
-            if (!empty($domain_hint)) {
-                // Match the domain hint at the end of the string
-                $suffix = '@' . $domain_hint;
-                if (str_ends_with($unique_name, $suffix)) {
-                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
-                    if ('' !== $username) {
-                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
-                        // Try lowercase for email matching (case-insensitive)
-                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
-                            $user = get_user_by('email', mb_strtolower($username));
-                        }
-                    }
+        if (!($user instanceof WP_User) && !$this->settings->force_immutable_linking) {
+            $user = $this->find_user_by_heuristics($email_claim, $unique_name, $upn);
+
+            if ($user instanceof WP_User) {
+                if (mb_strlen($aad_oid) > 0) {
+                    update_user_meta($user->ID, 'aad_oid', $aad_oid);
+                    update_user_meta($user->ID, 'aad_tid', $aad_tid);
+                    AADSSO_Logger::log_debug(\sprintf(
+                        'Migrated user [%s] to immutable linking with oid [%s].',
+                        (string) $user->ID,
+                        $aad_oid
+                    ), 10);
                 }
+
+                AADSSO_Logger::log_debug(\sprintf(
+                    'Matched user by heuristic fallback: [%s] to [%s].',
+                    $unique_name,
+                    (string) $user->ID
+                ), 10);
             }
         }
-
-        // Final fallback: try matching by any known identifier (email matching only)
-        // Only lowercase for case-insensitive match fields (like email)
-        if (!($user instanceof WP_User) && 'email' === $match_field && null !== $email_claim) {
-            $lowercased_email = mb_strtolower($email_claim);
-            $lowercased_unique = mb_strtolower($unique_name);
-
-            // For email matching, try lowercase normalization
-            $user = get_user_by($match_field, $lowercased_email);
-            if (!($user instanceof WP_User)) {
-                $user = get_user_by($match_field, $lowercased_unique);
-            }
-        }
-        // Note: For non-email match fields (e.g., 'login'), no fallback is attempted
-        // as matching by email would be semantically incorrect and could match wrong users
 
         if ($user instanceof WP_User) {
-            // Warn if email in WordPress doesn't match Entra ID email claim (case-insensitive comparison)
             if (
                 null !== $email_claim
                 && mb_strtolower($user->user_email) !== mb_strtolower($email_claim)
             ) {
                 AADSSO_Logger::log_warning(\sprintf(
-                    'Email mismatch for user %d: WordPress has %s, Entra ID has %s. '
-                    . 'Consider updating the user email to ensure consistency.',
+                    'Email mismatch for user %d: WordPress has %s, Entra ID has %s.',
                     $user->ID,
                     $user->user_email,
                     $email_claim
                 ), 10);
             }
 
-            AADSSO_Logger::log_debug(\sprintf(
-                'Matched Microsoft Entra ID user [%s] to existing WordPress user [%s].',
-                $unique_name,
-                (string) $user->ID
-            ), 10);
+            if (mb_strlen($aad_oid) > 0) {
+                update_user_meta($user->ID, 'aad_oid', $aad_oid);
+                update_user_meta($user->ID, 'aad_tid', $aad_tid);
+            }
         } else {
             if (true === $this->settings->enable_auto_provisioning) {
+                $provisioning_denied = false;
+                $denial_reasons = [];
+
+                if ($this->settings->require_tenant_restriction_for_provisioning) {
+                    $tenant_mode = $this->settings->tenantRestrictionMode;
+                    if ('none' === $tenant_mode) {
+                        $provisioning_denied = true;
+                        $denial_reasons[] = 'Tenant restriction is not enforced.';
+                        AADSSO_Logger::log_warning('Auto-provisioning blocked: tenant restriction not enforced.');
+                    } elseif ('single' === $tenant_mode) {
+                        $expected_tid = $this->settings->expected_tenant_id;
+                        if ('' !== $expected_tid && '' !== $aad_tid && $expected_tid !== $aad_tid) {
+                            $provisioning_denied = true;
+                            $denial_reasons[] = \sprintf('User tenant (%s) does not match expected tenant (%s).', $aad_tid, $expected_tid);
+                        }
+                    } elseif ('multi' === $tenant_mode) {
+                        $allowed_tids = $this->settings->allowed_tenant_ids;
+                        if (!empty($allowed_tids) && '' !== $aad_tid && !\in_array($aad_tid, $allowed_tids, true)) {
+                            $provisioning_denied = true;
+                            $denial_reasons[] = \sprintf('User tenant (%s) is not in the allowed tenants list.', $aad_tid);
+                        }
+                    }
+                }
+
+                if ($this->settings->require_role_policy_for_provisioning && !$provisioning_denied) {
+                    $has_role_policy = false;
+
+                    if (!empty($this->settings->default_wp_role)) {
+                        $has_role_policy = true;
+                    }
+
+                    if (true === $this->settings->enable_aad_group_to_wp_role) {
+                        $has_role_policy = true;
+                    }
+
+                    if (!$has_role_policy) {
+                        $provisioning_denied = true;
+                        $denial_reasons[] = 'No role assignment policy configured.';
+                        AADSSO_Logger::log_warning('Auto-provisioning blocked: no role assignment policy configured.');
+                    }
+                }
+
+                if ($provisioning_denied) {
+                    return new WP_Error(
+                        'auto_provisioning_policy_violation',
+                        '<strong>Auto-provisioning is blocked for security.</strong><br />'
+                        . 'Reasons: ' . esc_html(implode(' ', $denial_reasons)) . '<br />'
+                        . 'Please contact your administrator.'
+                    );
+                }
+
+                // Group membership check for role-mapped provisioning
                 /** @var stdClass $group_memberships */
                 $has_group_memberships = false !== $group_memberships
                     && isset($group_memberships->value)
@@ -651,6 +710,7 @@ class AADSSO
                     );
                 }
 
+                // Create the new user
                 /** @var mixed */
                 $given_name_raw = $jwt->given_name ?? '';
                 $given_name = \is_string($given_name_raw) ? sanitize_text_field($given_name_raw) : '';
@@ -658,9 +718,7 @@ class AADSSO
                 $family_name_raw = $jwt->family_name ?? '';
                 $family_name = \is_string($family_name_raw) ? sanitize_text_field($family_name_raw) : '';
 
-                // Use email claim for new user email if available, otherwise use unique_name
                 $user_email = null !== $email_claim ? sanitize_email($email_claim) : sanitize_email($unique_name);
-                // Ensure email is valid before using it
                 if (!is_email($user_email)) {
                     $user_email = sanitize_email($unique_name);
                 }
@@ -682,6 +740,19 @@ class AADSSO
                             esc_html($unique_name)
                         )
                     );
+                }
+
+                // Store aad_oid and aad_tid for immutable linking on newly provisioned users
+                // This ensures future logins use the secure immutable method
+                if (mb_strlen($aad_oid) > 0) {
+                    update_user_meta($new_user_id, 'aad_oid', $aad_oid);
+                    update_user_meta($new_user_id, 'aad_tid', $aad_tid);
+                    AADSSO_Logger::log_debug(\sprintf(
+                        'Stored immutable identifier for new user [%s]: oid=%s, tid=%s.',
+                        (string) $new_user_id,
+                        $aad_oid,
+                        $aad_tid
+                    ), 10);
                 }
 
                 AADSSO_Logger::log_info("Created new user: '" . $unique_name . "', user id " . $new_user_id . '.');
@@ -991,6 +1062,91 @@ class AADSSO
         debug_print_backtrace();
         $trace = ob_get_clean();
         self::debug_log($trace, $level);
+    }
+
+    /**
+     * @param string $oid
+     * @param string $tid
+     *
+     * @return null|WP_User
+     */
+    private function find_user_by_aad_oid(string $oid, string $tid): ?WP_User
+    {
+        global $wpdb;
+
+        /** @var string */
+        $query = $wpdb->prepare(
+            "SELECT user_id FROM {$wpdb->usermeta} "
+            . "WHERE meta_key = 'aad_oid' AND meta_value = %s "
+            . 'LIMIT 1',
+            $oid
+        );
+
+        /** @var null|string */
+        $user_id = $wpdb->get_var($query);
+
+        if (null === $user_id || !is_numeric($user_id)) {
+            return null;
+        }
+
+        $user = new WP_User((int) $user_id);
+
+        return $user->exists() ? $user : null;
+    }
+
+    /**
+     * @param null|string $email_claim
+     * @param string      $unique_name
+     * @param null|string $upn
+     *
+     * @return null|WP_User
+     */
+    private function find_user_by_heuristics(?string $email_claim, string $unique_name, ?string $upn): ?WP_User
+    {
+        $match_field = $this->settings->field_to_match_to_upn;
+        $match_value = $unique_name;
+
+        if ('email' === $match_field && null !== $email_claim) {
+            $match_value = $email_claim;
+        }
+
+        $user = get_user_by($match_field, $match_value);
+
+        if (!($user instanceof WP_User)
+            && 'email' === $match_field
+            && null !== $email_claim
+            && $email_claim !== $match_value
+        ) {
+            $user = get_user_by('email', $email_claim);
+        }
+
+        if (true === $this->settings->match_on_upn_alias && !($user instanceof WP_User)) {
+            $domain_hint = sanitize_text_field($this->settings->org_domain_hint);
+            if (!empty($domain_hint)) {
+                $suffix = '@' . $domain_hint;
+                if (str_ends_with($unique_name, $suffix)) {
+                    $username = mb_trim(mb_substr($unique_name, 0, -mb_strlen($suffix)));
+                    if ('' !== $username) {
+                        $user = get_user_by($this->settings->field_to_match_to_upn, $username);
+                        if (!($user instanceof WP_User) && 'email' === $this->settings->field_to_match_to_upn) {
+                            $user = get_user_by('email', mb_strtolower($username));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!($user instanceof WP_User) && 'email' === $match_field && null !== $email_claim) {
+            $lowercased_email = mb_strtolower($email_claim);
+            $lowercased_unique = mb_strtolower($unique_name);
+
+            $user = get_user_by($match_field, $lowercased_email);
+            if (!($user instanceof WP_User)) {
+                $user = get_user_by($match_field, $lowercased_unique);
+            }
+        }
+
+        return $user instanceof WP_User ? $user : null;
     }
 
     private function wants_to_login(): bool
