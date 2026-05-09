@@ -452,11 +452,7 @@ class AuthorizationHelper
         // but not a string, the token is malformed and MUST be rejected per the
         // Zero Trust principle: reject unexpected claim formats.
         if (null !== $azp_claim && !\is_string($azp_claim)) {
-            throw new DomainException(\sprintf(
-                'ID token contains malformed `azp` claim. Expected string (GUID), got `%s`. '
-                . 'This may indicate token tampering or an invalid identity provider.',
-                \gettype($azp_claim)
-            ));
+            throw new DomainException(\sprintf('ID token contains malformed `azp` claim. Expected string (GUID), got `%s`. This may indicate token tampering or an invalid identity provider.', \gettype($azp_claim)));
         }
 
         // Validate azp matches client_id if present
