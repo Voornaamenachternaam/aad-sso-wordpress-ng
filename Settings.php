@@ -110,6 +110,7 @@ class Settings
      */
     public static function get_defaults(?string $key = null): mixed
     {
+        /** @var array<string, mixed> $defaults */
         static $defaults = null;
 
         if (null === $defaults) {
@@ -297,7 +298,7 @@ class Settings
 
         $plugin_settings = get_option('aadsso_settings');
         if (\is_array($plugin_settings) && !empty($plugin_settings)) {
-            // @var array<string, mixed> $plugin_settings
+            /** @var array<string, mixed> $plugin_settings */
             $instance->load_settings($plugin_settings);
         }
 
@@ -624,7 +625,7 @@ class Settings
         try {
             $cached = $cache->get('aadsso_openid_configuration');
             if (\is_array($cached) && !empty($cached)) {
-                // @var array<string, mixed>
+                /** @var array<string, mixed> */
                 return $cached;
             }
         } catch (Throwable $e) {
@@ -641,6 +642,7 @@ class Settings
             }
         }
 
+        /** @var array<string, mixed>|false */
         return $config;
     }
 
@@ -655,6 +657,7 @@ class Settings
         );
 
         if (!empty($remote_response)) {
+            /** @var mixed $decoded */
             $openid_configuration = json_decode($remote_response, true);
 
             if (\JSON_ERROR_NONE !== json_last_error()) {
@@ -664,7 +667,7 @@ class Settings
             }
 
             if (\is_array($openid_configuration) && !empty($openid_configuration)) {
-                // @var array<string, mixed>
+                /** @var array<string, mixed> */
                 return $openid_configuration;
             }
         }
@@ -773,23 +776,25 @@ class Settings
             return [];
         }
 
-        // @var list<string> $sanitized
-        return array_filter(
-            array_map(
-                static function (mixed $id): string {
-                    if (!\is_string($id)) {
-                        return '';
-                    }
-                    // Validate GUID format (tenant ID should be a GUID)
-                    $trimmed = mb_trim($id);
-                    // GUID format: 8-4-4-4-12 hex characters
-                    if (preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
-                        return $trimmed;
-                    }
+        /** @var list<string> */
+        return array_values(
+            array_filter(
+                array_map(
+                    static function (mixed $id): string {
+                        if (!\is_string($id)) {
+                            return '';
+                        }
+                        // Validate GUID format (tenant ID should be a GUID)
+                        $trimmed = mb_trim($id);
+                        // GUID format: 8-4-4-4-12 hex characters
+                        if (preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $trimmed)) {
+                            return $trimmed;
+                        }
 
-                    return '';
-                },
-                $value
+                        return '';
+                    },
+                    $value
+                )
             )
         );
     }
@@ -821,28 +826,29 @@ class Settings
             return [];
         }
 
-        // @var list<string> $sanitized
-        return array_filter(
-            array_map(
-                static function (mixed $domain): string {
-                    if (!\is_string($domain)) {
-                        return '';
-                    }
+        /** @var list<string> */
+        return array_values(
+            array_filter(
+                array_map(
+                    static function (mixed $domain): string {
+                        if (!\is_string($domain)) {
+                            return '';
+                        }
 
-                    $trimmed = mb_trim($domain);
+                        $trimmed = mb_trim($domain);
 
-                    // Empty strings are filtered out
-                    if ('' === $trimmed) {
-                        return '';
-                    }
+                        // Empty strings are filtered out
+                        if ('' === $trimmed) {
+                            return '';
+                        }
 
-                    // Remove protocol if present (normalize input)
-                    $trimmed = preg_replace('#^https?://#', '', $trimmed);
+                        // Remove protocol if present (normalize input)
+                        $stripped = preg_replace('#^https?://#', '', $trimmed);
 
-                    // Remove trailing slash
-                    $trimmed = mb_rtrim($trimmed, '/');
+                        // Remove trailing slash
+                        $trimmed = \is_string($stripped) ? mb_rtrim($stripped, '/') : '';
 
-                    // Validate hostname format:
+                        // Validate hostname format:
                     // - Must not be empty after removing protocol/slash
                     // - Must contain only valid hostname characters
                     // - Supports single-label (localhost, devserver) and multi-label (example.com)
