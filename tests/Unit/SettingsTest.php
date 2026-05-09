@@ -271,20 +271,32 @@ class SettingsTest extends TestCase
 
     /**
      * Test validate_redirect_url rejects external redirects when block_external_redirects is true.
+     *
+     * Note: This test requires WordPress functions (home_url()) to be available.
+     * Without WordPress, home_url() returns empty and all hosts are considered "external".
+     * In a full WordPress test environment, this would be mocked.
      */
     public function testValidateRedirectUrlRejectsExternalWhenBlocked(): void
     {
+        // Enable external redirect blocking
         $settings = \AADSSO_Settings::get_instance();
+        $original_block_setting = $settings->block_external_redirects;
         $settings->block_external_redirects = true;
-        // Mock site_url to return a known value for testing
-        // In a real test environment, this would need to be mocked
 
-        // For unit testing without WordPress, we test the logic directly
-        // This tests the sanitize_redirect_domains method
-        $domains = \AADSSO_Settings::sanitize_redirect_domains("example.com\nexternal-site.com");
+        // Test external URL is rejected
+        // Without WordPress initialized, home_url() returns empty, so ALL hosts are "external"
+        $result = \AADSSO_Settings::validate_redirect_url('https://evil.com/steal?redirect=bank');
+        $this->assertEquals('', $result, 'External redirect should be blocked when block_external_redirects is true');
 
-        $this->assertContains('example.com', $domains);
-        $this->assertContains('external-site.com', $domains);
+        // Test same-site URL (if home_url() works) would be allowed
+        // This tests the positive case - internal URLs should pass through
+        // When WordPress is not initialized, this may also be blocked due to home_url() returning empty
+        $result2 = \AADSSO_Settings::validate_redirect_url('/wp-admin/');
+        // Relative URLs are always allowed regardless of block_external_redirects
+        $this->assertEquals('/wp-admin/', $result2, 'Relative URLs should always be allowed');
+
+        // Restore original setting
+        $settings->block_external_redirects = $original_block_setting;
     }
 
     /**
