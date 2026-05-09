@@ -240,7 +240,8 @@ class Logger
         if (\is_array($data)) {
             $sanitized = [];
             foreach ($data as $key => $value) {
-                if (self::is_sensitive_key($key)) {
+                $key_str = (string) $key;
+                if (self::is_sensitive_key($key_str)) {
                     $sanitized[$key] = self::REDACTED_PLACEHOLDER;
                 } else {
                     $sanitized[$key] = self::recursive_sanitize($value);
