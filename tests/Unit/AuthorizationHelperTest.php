@@ -414,15 +414,17 @@ class AuthorizationHelperTest extends TestCase
     }
 
     /**
-     * Test that azp validation correctly handles non-string azp values.
+     * Test that azp validation rejects non-string azp values (malformed token).
+     * Per Microsoft Entra ID spec (May 2026), azp is "String, a GUID".
+     * If present but not a string, the token is malformed and MUST be rejected.
      */
-    public function testValidateIdTokenIgnoresNonStringAzp(): void
+    public function testValidateIdTokenRejectsNonStringAzp(): void
     {
         $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
         $method = $reflection->getMethod('process_jwks_response');
         $method->setAccessible(true);
 
-        // Token with non-string azp (array) - should be ignored per type check
+        // Token with non-string azp (array) - should be rejected as malformed
         $token = $this->generateTestToken([
             'azp' => [self::TEST_CLIENT_ID],  // array instead of string
         ]);
@@ -433,10 +435,37 @@ class AuthorizationHelperTest extends TestCase
 
         $response = $this->createMockJwksResponse();
 
-        // Should pass - non-string azp is ignored
-        $result = $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('malformed `azp` claim');
 
-        $this->assertIsObject($result);
+        $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+    }
+
+    /**
+     * Test that azp validation rejects integer azp values (malformed token).
+     * Per Microsoft Entra ID spec (May 2026), azp is "String, a GUID".
+     */
+    public function testValidateIdTokenRejectsIntegerAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with integer azp - should be rejected as malformed
+        $token = $this->generateTestToken([
+            'azp' => 1234567890,  // integer instead of string
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('malformed `azp` claim');
+
+        $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
     }
 
     /**

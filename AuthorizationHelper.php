@@ -418,11 +418,16 @@ class AuthorizationHelper
         // - For multi-audience tokens (array aud with multiple values),
         //   azp SHOULD be present and MUST contain the client_id
         //
+        // Microsoft Entra ID specification (May 2026):
+        // - `azp` is defined as "String, a GUID" (per access token claims reference)
+        // - If present but not a string, the token is MALFORMED and MUST be rejected
+        //
         // Note: v1.0 endpoints are deprecated; v2.0 is the only supported path.
         //
         // References:
         // - https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
         // - https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
+        // - https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference
         // - https://openid.net/specs/openid-connect-core-1_0-final.html (Section 3.1.3.7)
         // ─────────────────────────────────────────────────────────────────────
 
@@ -442,11 +447,23 @@ class AuthorizationHelper
             );
         }
 
+        // azp claim type validation
+        // Microsoft Entra ID specifies azp as "String, a GUID". If azp is present
+        // but not a string, the token is malformed and MUST be rejected per the
+        // Zero Trust principle: reject unexpected claim formats.
+        if (null !== $azp_claim && !\is_string($azp_claim)) {
+            throw new DomainException(\sprintf(
+                'ID token contains malformed `azp` claim. Expected string (GUID), got `%s`. '
+                . 'This may indicate token tampering or an invalid identity provider.',
+                \gettype($azp_claim)
+            ));
+        }
+
         // Validate azp matches client_id if present
         // Per OIDC spec: "If an azp Claim is present, the Client SHOULD verify
         // that its client_id is the Claim Value."
         // For confidential clients like this WordPress plugin, this is MUST.
-        if (null !== $azp_claim && \is_string($azp_claim) && $azp_claim !== $client_id) {
+        if (\is_string($azp_claim) && $azp_claim !== $client_id) {
             // azp is present and does not match expected client_id
             // This may indicate the token was issued for a different application
             throw new DomainException(\sprintf('ID token authorized party (azp) mismatch. Expected `%s`, got `%s`. This token may have been issued for a different application.', $client_id, $azp_claim));
