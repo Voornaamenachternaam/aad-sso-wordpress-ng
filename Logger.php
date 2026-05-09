@@ -254,10 +254,11 @@ class Logger
         if (\is_object($data)) {
             $sanitized = [];
             foreach ((array) $data as $key => $value) {
-                $clean_key = preg_replace('/^[\x00][^\x00]*\x00/', '', (string) $key);
-                $clean_key = preg_replace('/[\x00].*$/', '', $clean_key);
+                $key_str = (string) $key;
+                $clean_key = preg_replace('/^[\x00][^\x00]*\x00/', '', $key_str) ?: $key_str;
+                $clean_key = preg_replace('/[\x00].*$/', '', $clean_key) ?: '';
 
-                if (self::is_sensitive_key($clean_key)) {
+                if ('' !== $clean_key && self::is_sensitive_key($clean_key)) {
                     $sanitized[$key] = self::REDACTED_PLACEHOLDER;
                 } else {
                     $sanitized[$key] = self::recursive_sanitize($value);
@@ -284,7 +285,7 @@ class Logger
         $result = $str;
 
         foreach (self::REDACT_PATTERNS as $pattern) {
-            $result = preg_replace($pattern, self::REDACTED_PLACEHOLDER, $result);
+            $result = preg_replace($pattern, self::REDACTED_PLACEHOLDER, $result) ?? $result;
         }
 
         if (preg_match('/@[\w\-]+\.[\w\-\.]+\.\w+/', $result) || preg_match('/@[\w\-\.]+\.\w{2,}/', $result)) {

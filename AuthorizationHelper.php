@@ -603,7 +603,8 @@ class AuthorizationHelper
 
         // Check token was not issued too far in the past (optional: 24-hour max age)
         $now = time();
-        $token_iat = isset($jwt->iat) ? (int) $jwt->iat : 0;
+        $token_iat_raw = $jwt->iat ?? 0;
+        $token_iat = \is_numeric($token_iat_raw) ? (int) $token_iat_raw : 0;
         if ($token_iat > 0) {
             $max_token_age = 86400; // 24 hours
             $token_age = $now - $token_iat;
