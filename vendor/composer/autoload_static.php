@@ -7,16 +7,28 @@ namespace Composer\Autoload;
 class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
 {
     public static $files = array (
-        'ad155f8f1cf0d418fe49e248db8c661b' => __DIR__ . '/..' . '/react/promise/src/functions_include.php',
-        '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
+        '5897ea0ac4cccf14d323035e65887801' => __DIR__ . '/..' . '/symfony/polyfill-php82/bootstrap.php',
+        'e39a8b23c42d4e1452234d762b03835a' => __DIR__ . '/..' . '/ramsey/uuid/src/functions.php',
+        '8e92226780215d0ec758aa7b73e0ede9' => __DIR__ . '/..' . '/open-telemetry/context/fiber/initialize_fiber_handler.php',
         '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
+        '7b11c4dc42b3b3023073cb14e519683c' => __DIR__ . '/..' . '/ralouphie/getallheaders/src/getallheaders.php',
+        'c7b4a5d8b94d270f0f9a84f81e1dd63d' => __DIR__ . '/..' . '/open-telemetry/api/Trace/functions.php',
+        'c695cb998ba36e4bafc3d028efc7d113' => __DIR__ . '/..' . '/open-telemetry/sdk/Common/Util/functions.php',
+        'd991bdbfe253499825156f17c4a721db' => __DIR__ . '/..' . '/open-telemetry/sdk/Logs/Exporter/_register.php',
+        '01d424d2624f29a2eef00b09eb00935e' => __DIR__ . '/..' . '/open-telemetry/sdk/Metrics/MetricExporter/_register.php',
+        '063d0a0034c5e2149209c15208de47e4' => __DIR__ . '/..' . '/open-telemetry/sdk/Propagation/_register.php',
+        '2cc49ecec7e065b3a5423e964c0275e6' => __DIR__ . '/..' . '/open-telemetry/sdk/Trace/SpanExporter/_register.php',
+        '062120a429d7568eacd495a8c34fcf09' => __DIR__ . '/..' . '/open-telemetry/sdk/Common/Dev/Compatibility/_load.php',
+        '88e3b63cfb48eb8ea316a8a85a5f5c5f' => __DIR__ . '/..' . '/open-telemetry/sdk/_autoload.php',
+        '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
+        'ad155f8f1cf0d418fe49e248db8c661b' => __DIR__ . '/..' . '/react/promise/src/functions_include.php',
+        '37a3dc5111fe8f707ab4c132ef1dbc62' => __DIR__ . '/..' . '/guzzlehttp/guzzle/src/functions_include.php',
         '320cde22f66dd4f5d3fd621d3e88b98f' => __DIR__ . '/..' . '/symfony/polyfill-ctype/bootstrap.php',
         '8825ede83f2f289127722d4e842cf7e8' => __DIR__ . '/..' . '/symfony/polyfill-intl-grapheme/bootstrap.php',
         'e69f7f6ee287b969198c3c9d6777bd38' => __DIR__ . '/..' . '/symfony/polyfill-intl-normalizer/bootstrap.php',
         'b6b991a57620e2fb6b2f66f03fe9ddc2' => __DIR__ . '/..' . '/symfony/string/Resources/functions.php',
         '6124b4c8570aa390c21fafd04a26c69f' => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy/deep_copy.php',
         '9b38cf48e83f5d8f60375221cd213eee' => __DIR__ . '/..' . '/phpstan/phpstan/bootstrap.php',
-        '7b11c4dc42b3b3023073cb14e519683c' => __DIR__ . '/..' . '/ralouphie/getallheaders/src/getallheaders.php',
         'a4a119a56e50fbb293281d9a48007e0e' => __DIR__ . '/..' . '/symfony/polyfill-php80/bootstrap.php',
         '23c18046f52bef3eea034657bafda50f' => __DIR__ . '/..' . '/symfony/polyfill-php81/bootstrap.php',
         '9d2b9fc6db0f153a0a149fefb182415e' => __DIR__ . '/..' . '/symfony/polyfill-php84/bootstrap.php',
@@ -28,6 +40,7 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         array (
             'SzepeViktor\\PHPStan\\WordPress\\' => 30,
             'Symfony\\Polyfill\\Php84\\' => 23,
+            'Symfony\\Polyfill\\Php82\\' => 23,
             'Symfony\\Polyfill\\Php81\\' => 23,
             'Symfony\\Polyfill\\Php80\\' => 23,
             'Symfony\\Polyfill\\Mbstring\\' => 26,
@@ -49,6 +62,7 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
             'Symfony\\Component\\EventDispatcher\\' => 34,
             'Symfony\\Component\\Console\\' => 26,
             'Symfony\\Component\\Cache\\' => 24,
+            'StdUriTemplate\\' => 15,
         ),
         'R' =>
         array (
@@ -59,6 +73,8 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
             'React\\Dns\\' => 10,
             'React\\ChildProcess\\' => 19,
             'React\\Cache\\' => 12,
+            'Ramsey\\Uuid\\' => 12,
+            'Ramsey\\Collection\\' => 18,
         ),
         'P' =>
         array (
@@ -73,13 +89,45 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
             'PhpCsFixer\\' => 11,
             'PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\' => 57,
         ),
+        'O' =>
+        array (
+            'OpenTelemetry\\SemConv\\' => 22,
+            'OpenTelemetry\\SDK\\' => 18,
+            'OpenTelemetry\\Context\\' => 22,
+            'OpenTelemetry\\API\\' => 18,
+        ),
+        'N' =>
+        array (
+            'Nyholm\\Psr7Server\\' => 18,
+            'Nevay\\SPI\\' => 10,
+        ),
         'M' =>
         array (
             'Monolog\\' => 8,
+            'Microsoft\\Kiota\\Serialization\\Text\\' => 35,
+            'Microsoft\\Kiota\\Serialization\\Multipart\\' => 40,
+            'Microsoft\\Kiota\\Serialization\\Json\\' => 35,
+            'Microsoft\\Kiota\\Serialization\\Form\\' => 35,
+            'Microsoft\\Kiota\\Http\\' => 21,
+            'Microsoft\\Kiota\\Authentication\\' => 31,
+            'Microsoft\\Kiota\\Abstractions\\' => 29,
+            'Microsoft\\Graph\\Core\\' => 21,
+            'Microsoft\\Graph\\' => 16,
+        ),
+        'L' =>
+        array (
+            'League\\OAuth2\\Client\\' => 21,
+        ),
+        'H' =>
+        array (
+            'Http\\Promise\\' => 13,
+            'Http\\Discovery\\' => 15,
         ),
         'G' =>
         array (
             'GuzzleHttp\\Psr7\\' => 16,
+            'GuzzleHttp\\Promise\\' => 19,
+            'GuzzleHttp\\' => 11,
         ),
         'F' =>
         array (
@@ -93,6 +141,8 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         ),
         'D' =>
         array (
+            'Doctrine\\Common\\Lexer\\' => 22,
+            'Doctrine\\Common\\Annotations\\' => 28,
             'DeepCopy\\' => 9,
         ),
         'C' =>
@@ -101,6 +151,10 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
             'Composer\\Semver\\' => 16,
             'Composer\\Pcre\\' => 14,
             'Clue\\React\\NDJson\\' => 18,
+        ),
+        'B' =>
+        array (
+            'Brick\\Math\\' => 11,
         ),
     );
 
@@ -112,6 +166,10 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'Symfony\\Polyfill\\Php84\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-php84',
+        ),
+        'Symfony\\Polyfill\\Php82\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/symfony/polyfill-php82',
         ),
         'Symfony\\Polyfill\\Php81\\' =>
         array (
@@ -197,6 +255,10 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         array (
             0 => __DIR__ . '/..' . '/symfony/cache',
         ),
+        'StdUriTemplate\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/stduritemplate/stduritemplate/src',
+        ),
         'React\\Stream\\' =>
         array (
             0 => __DIR__ . '/..' . '/react/stream/src',
@@ -224,6 +286,14 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'React\\Cache\\' =>
         array (
             0 => __DIR__ . '/..' . '/react/cache/src',
+        ),
+        'Ramsey\\Uuid\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/ramsey/uuid/src',
+        ),
+        'Ramsey\\Collection\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/ramsey/collection/src',
         ),
         'Psr\\SimpleCache\\' =>
         array (
@@ -266,13 +336,93 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         array (
             0 => __DIR__ . '/..' . '/dealerdirect/phpcodesniffer-composer-installer/src',
         ),
+        'OpenTelemetry\\SemConv\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/open-telemetry/sem-conv',
+        ),
+        'OpenTelemetry\\SDK\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/open-telemetry/sdk',
+        ),
+        'OpenTelemetry\\Context\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/open-telemetry/context',
+        ),
+        'OpenTelemetry\\API\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/open-telemetry/api',
+        ),
+        'Nyholm\\Psr7Server\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/nyholm/psr7-server/src',
+        ),
+        'Nevay\\SPI\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/tbachert/spi/src',
+        ),
         'Monolog\\' =>
         array (
             0 => __DIR__ . '/..' . '/monolog/monolog/src/Monolog',
         ),
+        'Microsoft\\Kiota\\Serialization\\Text\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-serialization-text/src',
+        ),
+        'Microsoft\\Kiota\\Serialization\\Multipart\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-serialization-multipart/src',
+        ),
+        'Microsoft\\Kiota\\Serialization\\Json\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-serialization-json/src',
+        ),
+        'Microsoft\\Kiota\\Serialization\\Form\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-serialization-form/src',
+        ),
+        'Microsoft\\Kiota\\Http\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-http-guzzle/src',
+        ),
+        'Microsoft\\Kiota\\Authentication\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-authentication-phpleague/src',
+        ),
+        'Microsoft\\Kiota\\Abstractions\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/kiota-abstractions/src',
+        ),
+        'Microsoft\\Graph\\Core\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/microsoft-graph-core/src',
+        ),
+        'Microsoft\\Graph\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/microsoft/microsoft-graph/src',
+        ),
+        'League\\OAuth2\\Client\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/league/oauth2-client/src',
+        ),
+        'Http\\Promise\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/php-http/promise/src',
+        ),
+        'Http\\Discovery\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/php-http/discovery/src',
+        ),
         'GuzzleHttp\\Psr7\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/psr7/src',
+        ),
+        'GuzzleHttp\\Promise\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/guzzlehttp/promises/src',
+        ),
+        'GuzzleHttp\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/guzzlehttp/guzzle/src',
         ),
         'Firebase\\JWT\\' =>
         array (
@@ -290,6 +440,14 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'Ergebnis\\AgentDetector\\' =>
         array (
             0 => __DIR__ . '/..' . '/ergebnis/agent-detector/src',
+        ),
+        'Doctrine\\Common\\Lexer\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/doctrine/lexer/src',
+        ),
+        'Doctrine\\Common\\Annotations\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/doctrine/annotations/lib/Doctrine/Common/Annotations',
         ),
         'DeepCopy\\' =>
         array (
@@ -311,9 +469,14 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         array (
             0 => __DIR__ . '/..' . '/clue/ndjson-react/src',
         ),
+        'Brick\\Math\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/brick/math/src',
+        ),
     );
 
     public static $classMap = array (
+        'AllowDynamicProperties' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/AllowDynamicProperties.php',
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
         'CURLStringFile' => __DIR__ . '/..' . '/symfony/polyfill-php81/Resources/stubs/CURLStringFile.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
@@ -1483,6 +1646,12 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'PharIo\\Version\\VersionConstraintValue' => __DIR__ . '/..' . '/phar-io/version/src/VersionConstraintValue.php',
         'PharIo\\Version\\VersionNumber' => __DIR__ . '/..' . '/phar-io/version/src/VersionNumber.php',
         'PhpToken' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/PhpToken.php',
+        'Random\\BrokenRandomEngineError' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/BrokenRandomEngineError.php',
+        'Random\\CryptoSafeEngine' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/CryptoSafeEngine.php',
+        'Random\\Engine' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/Engine.php',
+        'Random\\Engine\\Secure' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/Engine/Secure.php',
+        'Random\\RandomError' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/RandomError.php',
+        'Random\\RandomException' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/Random/RandomException.php',
         'ReflectionConstant' => __DIR__ . '/..' . '/symfony/polyfill-php84/Resources/stubs/ReflectionConstant.php',
         'ReturnTypeWillChange' => __DIR__ . '/..' . '/symfony/polyfill-php81/Resources/stubs/ReturnTypeWillChange.php',
         'RoundingMode' => __DIR__ . '/..' . '/symfony/polyfill-php84/Resources/stubs/RoundingMode.php',
@@ -1727,6 +1896,8 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'SebastianBergmann\\Type\\UnknownType' => __DIR__ . '/..' . '/sebastian/type/src/type/UnknownType.php',
         'SebastianBergmann\\Type\\VoidType' => __DIR__ . '/..' . '/sebastian/type/src/type/VoidType.php',
         'SebastianBergmann\\Version' => __DIR__ . '/..' . '/sebastian/version/src/Version.php',
+        'SensitiveParameter' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/SensitiveParameter.php',
+        'SensitiveParameterValue' => __DIR__ . '/..' . '/symfony/polyfill-php82/Resources/stubs/SensitiveParameterValue.php',
         'Stringable' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Stringable.php',
         'TheSeer\\Tokenizer\\Exception' => __DIR__ . '/..' . '/theseer/tokenizer/src/Exception.php',
         'TheSeer\\Tokenizer\\NamespaceUri' => __DIR__ . '/..' . '/theseer/tokenizer/src/NamespaceUri.php',

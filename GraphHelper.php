@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use League\OAuth2\Client\Token\AccessToken;
 use Microsoft\Graph\Core\Authentication\GraphPhpLeagueAuthenticationProvider;
-use Microsoft\Graph\GraphPhpLeagueAccessTokenProvider;
-use Microsoft\Graph\GraphServiceClient;
+use Microsoft\Graph\{GraphPhpLeagueAccessTokenProvider, GraphServiceClient};
+use Microsoft\Graph\Models\ODataErrors\ODataError;
 use Microsoft\Kiota\Authentication\Cache\InMemoryAccessTokenCache;
 use Microsoft\Kiota\Authentication\Oauth\TokenRequestContext;
-use Microsoft\Graph\Models\ODataErrors\ODataError;
 
 /**
  * Microsoft Graph API helper using the official Microsoft Graph SDK.
@@ -103,7 +102,7 @@ class GraphHelper
      * @param list<string> $group_ids List of group IDs to check membership for
      *
      * @return object|WP_Error Object with 'value' property containing array of group IDs the user is a member of,
-     *                        or WP_Error on failure
+     *                         or WP_Error on failure
      */
     public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
     {
@@ -119,7 +118,7 @@ class GraphHelper
             $client = self::get_graph_client($access_token);
 
             // Build the request body with group IDs
-            $body = new \Microsoft\Graph\Users\Item\CheckMemberGroups\CheckMemberGroupsPostRequestBody([
+            $body = new Microsoft\Graph\Users\Item\CheckMemberGroups\CheckMemberGroupsPostRequestBody([
                 'groupIds' => $group_ids,
             ]);
 
@@ -228,6 +227,7 @@ class GraphHelper
     {
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $token = $_SESSION['aadsso_access_token'] ?? '';
+
             return \is_string($token) ? $token : '';
         }
 
@@ -243,6 +243,7 @@ class GraphHelper
     {
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $expires_at = $_SESSION['aadsso_token_expires_at'] ?? 0;
+
             return \is_int($expires_at) ? $expires_at : 0;
         }
 
@@ -258,6 +259,7 @@ class GraphHelper
     {
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $refresh_token = $_SESSION['aadsso_refresh_token'] ?? '';
+
             return \is_string($refresh_token) ? $refresh_token : '';
         }
 
@@ -270,11 +272,11 @@ class GraphHelper
      * This ensures backward compatibility with existing code that expects
      * stdClass properties like $user->id, $user->mail, etc.
      *
-     * @param \Microsoft\Graph\Models\User $user The Graph SDK User model
+     * @param Microsoft\Graph\Models\User $user The Graph SDK User model
      *
      * @return object Plain object representation
      */
-    private static function user_to_object(\Microsoft\Graph\Models\User $user): object
+    private static function user_to_object(Microsoft\Graph\Models\User $user): object
     {
         $data = [];
 

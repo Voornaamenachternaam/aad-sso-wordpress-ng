@@ -2,6 +2,13 @@
 
 All notable changes are documented in this file using the [Keep a CHANGELOG](http://keepachangelog.com/) principles.
 
+## [14.1.8] - 2026-05-09
+
+### Fixed
+
+* [#1159](https://github.com/sebastianbergmann/php-code-coverage/issues/1159): Statements inside a closure passed as a call argument are incorrectly reported as not covered
+* `case` statements are treated as branch operators
+
 ## [14.1.7] - 2026-05-04
 
 ### Fixed
@@ -68,6 +75,7 @@ All notable changes are documented in this file using the [Keep a CHANGELOG](htt
 
 * [#1147](https://github.com/sebastianbergmann/php-code-coverage/pull/1147): `CoversClass` does not transitively target traits used by enumerations
 
+[14.1.8]: https://github.com/sebastianbergmann/php-code-coverage/compare/14.1.7...14.1.8
 [14.1.7]: https://github.com/sebastianbergmann/php-code-coverage/compare/14.1.6...14.1.7
 [14.1.6]: https://github.com/sebastianbergmann/php-code-coverage/compare/14.1.5...14.1.6
 [14.1.5]: https://github.com/sebastianbergmann/php-code-coverage/compare/14.1.4...14.1.5

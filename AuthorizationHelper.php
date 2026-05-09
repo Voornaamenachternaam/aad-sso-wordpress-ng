@@ -446,7 +446,7 @@ class AuthorizationHelper
             $expires_in_raw = $result['expires_in'] ?? 0;
             if (\is_int($expires_in_raw) && $expires_in_raw > 0) {
                 $_SESSION['aadsso_token_expires_at'] = time() + $expires_in_raw;
-            } elseif (\is_numeric($expires_in_raw) && (int) $expires_in_raw > 0) {
+            } elseif (is_numeric($expires_in_raw) && (int) $expires_in_raw > 0) {
                 $_SESSION['aadsso_token_expires_at'] = time() + (int) $expires_in_raw;
             }
         }
