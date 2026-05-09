@@ -718,29 +718,9 @@ class SettingsPage
             $sanitized['expected_tenant_id'] = '';
         }
 
-        // Parse allowed_tenant_ids from textarea (one per line)
+        // Parse allowed_tenant_ids - centralized in Settings::sanitize_tenant_ids()
         $allowed_tenant_ids_raw = $input['allowed_tenant_ids'] ?? '';
-        $sanitized_allowed_tenants = [];
-        if (\is_string($allowed_tenant_ids_raw)) {
-            $lines = array_filter(
-                array_map('trim', explode("\n", $allowed_tenant_ids_raw))
-            );
-            foreach ($lines as $line) {
-                $line = sanitize_text_field($line);
-                // Validate GUID format
-                if ('' !== $line && 1 === preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $line)) {
-                    $sanitized_allowed_tenants[] = $line;
-                }
-            }
-        } elseif (\is_array($allowed_tenant_ids_raw)) {
-            foreach ($allowed_tenant_ids_raw as $tenant_id) {
-                $tenant_id_trimmed = \is_string($tenant_id) ? mb_trim(sanitize_text_field($tenant_id)) : '';
-                if ('' !== $tenant_id_trimmed && 1 === preg_match('#^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$#i', $tenant_id_trimmed)) {
-                    $sanitized_allowed_tenants[] = $tenant_id_trimmed;
-                }
-            }
-        }
-        $sanitized['allowed_tenant_ids'] = $sanitized_allowed_tenants;
+        $sanitized['allowed_tenant_ids'] = \AADSSO_Settings::sanitize_tenant_ids($allowed_tenant_ids_raw);
 
         return $sanitized;
     }

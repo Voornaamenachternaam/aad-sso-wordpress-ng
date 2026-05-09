@@ -557,12 +557,23 @@ class Settings
     /**
      * Sanitize and validate tenant IDs.
      *
-     * @param mixed $value
+     * Handles both array and newline-separated string input for flexibility.
+     * String input is parsed and each line is treated as a separate tenant ID.
+     *
+     * @param mixed $value Array of tenant IDs or newline-separated string
      *
      * @return list<string>
      */
     private static function sanitize_tenant_ids(mixed $value): array
     {
+        // Handle newline-separated string input (from UI textarea)
+        if (\is_string($value)) {
+            $lines = array_filter(
+                array_map('trim', explode("\n", $value))
+            );
+            $value = $lines;
+        }
+
         if (!\is_array($value)) {
             return [];
         }
