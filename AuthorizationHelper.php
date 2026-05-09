@@ -436,7 +436,8 @@ class AuthorizationHelper
         // Validate azp presence for multi-audience tokens (OIDC Core 1.0 Section 3.1.3.7)
         // Per spec: "If the ID Token contains multiple audiences, the Client SHOULD verify
         // that an azp Claim is present."
-        if (\is_array($aud_values) && \count($aud_values) > 1 && null === $azp_claim) {
+        // Note: $aud_values is always an array (set earlier from aud claim processing)
+        if (\count($aud_values) > 1 && null === $azp_claim) {
             // For multi-audience tokens without azp, log a warning but don't block.
             // This is a SHOULD requirement (not MUST), and most Microsoft Entra tokens
             // with multiple audiences will include azp anyway.
