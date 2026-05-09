@@ -250,11 +250,23 @@ class SettingsTest extends TestCase
      */
     public function testValidateRedirectUrlAllowsRelativeUrls(): void
     {
+        // Path-only URLs
         $result = \AADSSO_Settings::validate_redirect_url('/wp-admin/');
         $this->assertEquals('/wp-admin/', $result);
 
         $result2 = \AADSSO_Settings::validate_redirect_url('/dashboard');
         $this->assertEquals('/dashboard', $result2);
+
+        // Query string only URLs
+        $result3 = \AADSSO_Settings::validate_redirect_url('?page=123');
+        $this->assertEquals('?page=123', $result3);
+
+        $result4 = \AADSSO_Settings::validate_redirect_url('?redirect=admin');
+        $this->assertEquals('?redirect=admin', $result4);
+
+        // Fragment-only URLs
+        $result5 = \AADSSO_Settings::validate_redirect_url('#section');
+        $this->assertEquals('#section', $result5);
     }
 
     /**
@@ -294,10 +306,11 @@ class SettingsTest extends TestCase
      */
     public function testSanitizeRedirectDomainsStripsProtocolsAndSlashes(): void
     {
-        $result = \AADSSO_Settings::sanitize_redirect_domains('https://example.com/');
+        $result = \AADSSO_Settings::sanitize_redirect_domains('https://Example.COM/');
         $this->assertContains('example.com', $result);
+        $this->assertNotContains('Example.COM', $result);
 
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains('http://example.org/path/');
+        $result2 = \AADSSO_Settings::sanitize_redirect_domains('http://EXAMPLE.ORG/path/');
         $this->assertContains('example.org', $result2);
     }
 
