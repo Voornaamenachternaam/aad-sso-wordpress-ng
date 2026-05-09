@@ -209,6 +209,8 @@ class LoggerTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('users', $result);
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['users'][0]['email']);
+        $this->assertSame('[REDACTED_SENSITIVE_DATA]', $result['users'][1]['email']);
     }
 
     /**
