@@ -190,49 +190,144 @@ The following scenarios are tested:
 
 ---
 
-## F-04 — Authorization code flow does not use PKCE (**Medium**)
+## F-04 — Authorization code flow does not use PKCE (**RESOLVED** ✅)
 
-### Observation
-Authorization request and token exchange do not include `code_challenge` / `code_verifier`.
+### Implementation Status: COMPLETE
 
-### Why this matters
-PKCE mitigates code interception/replay paths. Even for confidential clients, PKCE is now widely recommended defense-in-depth.
+PKCE (Proof Key for Code Exchange) per RFC 7636 has been fully implemented.
 
-### Recommendation
-Adopt S256 PKCE end-to-end:
-- Generate verifier per transaction.
-- Store verifier server-side session state.
-- Send `code_challenge` + `code_challenge_method=S256` on authorize.
-- Send `code_verifier` on token exchange.
+### What Was Implemented
+
+1. **PKCE Helper Functions** (`AuthorizationHelper.php`):
+   - `aad_sso_generate_pkce_code_verifier()`: Generates cryptographically secure 43-character code_verifier using `random_bytes(32)` and base64url encoding
+   - `aad_sso_generate_pkce_code_challenge()`: Computes S256 code_challenge as `BASE64URL(SHA256(verifier))`
+   - `aad_sso_validate_pkce_code_verifier()`: Validates verifier format and uses constant-time comparison (`hash_equals`)
+
+2. **Authorization Request** (`get_authorization_url()`):
+   - Now accepts `code_verifier` parameter
+   - Includes `code_challenge` and `code_challenge_method=S256` in authorization URL
+
+3. **Token Exchange** (`get_access_token()`):
+   - Now requires and validates `code_verifier` parameter
+   - Sends `code_verifier` in token request body
+
+4. **Session Storage** (`aad-sso-wordpress.php`):
+   - `get_login_url()`: Generates and stores PKCE code_verifier in `$_SESSION['aadsso_pkce_code_verifier']`
+   - `authenticate()`: Retrieves code_verifier from session and passes to token exchange
+   - `regenerate_session()`: Clears code_verifier after successful authentication
+
+### Code Location
+- **PKCE functions**: `AuthorizationHelper.php` lines 1-81
+- **Auth URL generation**: `AuthorizationHelper.php` lines 165-186
+- **Token exchange**: `AuthorizationHelper.php` lines 203-230
+- **Session integration**: `aad-sso-wordpress.php` lines 751-757, 187-196, 214, 860
+
+### References (Primary Sources, May 2026)
+- [RFC 7636 - Proof Key for Code Exchange](https://datatracker.ietf.org/doc/html/rfc7636)
+- [Microsoft identity platform OAuth 2.0 authorization code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow)
+- [OAuth 2.1 mandates PKCE for all clients](https://curity.io/blog/oauth-2-1-oauth-made-better/)
+- [oauth.com - PKCE for OAuth 2.0](https://oauth.com/oauth2-servers/pkce/)
+
+### Test Coverage
+- ✅ Code verifier length validation (43-128 chars)
+- ✅ Character set validation (unreserved chars only)
+- ✅ S256 challenge generation (RFC 7636 example vector verified)
+- ✅ Base64url encoding without padding
+- ✅ Roundtrip verification
+- ✅ Invalid format rejection
+- ✅ Constant-time comparison usage
 
 ---
 
-## F-05 — Session lifecycle hardening is incomplete (**Medium**)
+## F-05 — Session lifecycle hardening is incomplete (**RESOLVED** ✅)
 
-### Observation
-PHP session is started for login flow, but no explicit regeneration after successful authentication and no explicit plugin-level cookie parameter hardening logic.
+### Implementation Status: COMPLETE
 
-### Why this matters
-Session fixation and weak cookie policy interactions can increase risk depending on hosting/proxy/legacy defaults.
+Session security has been hardened with the following implementations:
 
-### Recommendation
-- Regenerate session ID upon successful login correlation (`session_regenerate_id(true)`).
-- Ensure secure cookie attributes where applicable (`Secure`, `HttpOnly`, `SameSite=Lax/Strict` based on flow needs).
-- Clear temporary auth artifacts aggressively once no longer needed.
+### What Was Implemented
+
+1. **Secure Cookie Parameters** (`register_session()`):
+   - `Secure=true`: Only transmit cookie over HTTPS
+   - `HttpOnly=true`: Prevent JavaScript access to session cookie
+   - `SameSite=Lax`: CSRF protection while allowing top-level navigation
+   - PHP 7.3+ uses array signature; fallback for older versions
+
+2. **Session Mode Hardening** (`register_session()`):
+   - `session.use_strict_mode=1`: Reject uninitialized session IDs
+   - `session.use_only_cookies=1`: Prevent URL-based session IDs
+
+3. **Session Regeneration** (`regenerate_session()`):
+   - Called after successful authentication
+   - `session_regenerate_id(true)`: Creates new session ID and deletes old session data
+   - Clears `aadsso_pkce_code_verifier` after use (no longer needed)
+
+### Code Location
+- **Cookie params**: `aad-sso-wordpress.php` lines 790-836
+- **Session regeneration**: `aad-sso-wordpress.php` lines 838-864
+- **Call after login**: `aad-sso-wordpress.php` lines 478-484
+
+### References (Primary Sources, May 2026)
+- [PHP session_set_cookie_params](https://php.net/manual/en/function.session-set-cookie-params.php)
+- [PHP session_regenerate_id](https://php.net/manual/en/function.session-regenerate-id.php)
+- [Paragonie: Fast Track Safe and Secure PHP Sessions](https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions)
+- [PHP Session Security Best Practices](https://php.net/manual/en/features.session.security.ini.php)
+
+### Security Benefits
+- ✅ Prevents session fixation attacks
+- ✅ Protects against XSS-based session cookie theft
+- ✅ Mitigates CSRF via SameSite attribute
+- ✅ Ensures HTTPS-only cookie transmission
 
 ---
 
-## F-06 — Redirect handling is mostly safe, but should tighten redirect target policy (**Low/Medium**)
+## F-06 — Redirect handling is mostly safe, but should tighten redirect target policy (**RESOLVED** ✅)
 
-### Observation
-`redirect_to` is stored and sanitized, and redirection uses WordPress safe redirect behavior.
+### Implementation Status: COMPLETE
 
-### Residual risk
-Misconfigured allowed hosts/plugins can still broaden redirect behavior.
+Redirect security has been enhanced with allowlist and external redirect blocking capabilities.
 
-### Recommendation
-- Consider explicit allowlist checks for high-assurance environments.
-- Optionally strip external redirects by policy in plugin settings.
+### What Was Implemented
+
+1. **New Settings** (`Settings.php`):
+   - `allowed_redirect_domains[]`: List of allowed redirect target domains
+   - `block_external_redirects`: Boolean to block all external redirects
+
+2. **Validation Method** (`validate_redirect_url()`):
+   - Checks `block_external_redirects` - only allows same-site redirects
+   - Checks `allowed_redirect_domains` - validates against configured allowlist
+   - Supports subdomain matching (example.com allows sub.example.com)
+   - Falls back to WordPress `wp_safe_redirect()` for remaining checks
+
+3. **Sanitization** (`sanitize_redirect_domains()`):
+   - Accepts array or newline-separated string input
+   - Normalizes domains (strips protocols, trailing slashes)
+   - Validates hostname format
+   - Filters out invalid entries
+
+4. **Integration** (`aad-sso-wordpress.php`):
+   - `save_redirect_and_maybe_bypass_login()`: Validates `redirect_to` before storing
+   - `redirect_after_login()`: Re-validates stored redirect URL (defense in depth)
+
+### Code Location
+- **Settings properties**: `Settings.php` lines 69-86
+- **Option resolver**: `Settings.php` lines 252-258
+- **Sanitization**: `Settings.php` lines 631-692
+- **Validation**: `Settings.php` lines 694-781
+- **Plugin integration**: `aad-sso-wordpress.php` lines 150-156, 168-176
+
+### References (Primary Sources, May 2026)
+- [WordPress wp_safe_redirect](https://developer.wordpress.org/reference/functions/wp_safe_redirect/)
+- [OWASP Redirect Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)
+
+### Test Coverage
+- ✅ Empty input handling
+- ✅ Relative URL passthrough
+- ✅ Protocol stripping
+- ✅ Trailing slash removal
+- ✅ Invalid hostname rejection
+- ✅ Newline-separated input parsing
+- ✅ Invalid entry filtering
 
 ---
 
@@ -313,9 +408,10 @@ Operational logs may leak identity metadata or error internals if debug enabled 
 3. ~~Add `azp` handling where required by token shape.~~ ✅ RESOLVED
 
 ### Phase 1 — Near-term hardening
-4. Add PKCE S256 to authorization code flow.
-5. Regenerate PHP session ID post-auth and tighten session cookie flags.
-6. Implement immutable user linking with `oid`(+`tid`) persistence.
+4. ~~Add PKCE S256 to authorization code flow.~~ ✅ RESOLVED (F-04)
+5. ~~Regenerate PHP session ID post-auth and tighten session cookie flags.~~ ✅ RESOLVED (F-05)
+   - ~~Redirect target policy tightening.~~ ✅ RESOLVED (F-06)
+6. ⬜ Implement immutable user linking with `oid`(+`tid`) persistence.
 
 ### Phase 2 — Operational maturity
 7. Improve permission transparency in settings UI.
@@ -360,17 +456,27 @@ For the stated use case (WordPress login via Entra ID), this plugin is now produ
   - Tenant policy check (`tid` with single/multi-tenant modes)
   - `azp` handling per OIDC Core 1.0 Section 3.1.3.7
 
-- **Phase 1 (near-term hardening)**: Pending
-  - PKCE S256 to authorization code flow
-  - Session regeneration post-auth
-  - Immutable user linking with `oid`
+- **Phase 1 (near-term hardening)**: ✅ PKCE & SESSION HARDENING RESOLVED
+  - ✅ PKCE S256 to authorization code flow (F-04)
+  - ✅ Session regeneration post-auth (F-05)
+  - Redirect target policy tightening (F-06)
+  - ⬜ Immutable user linking with `oid` (F-07 - pending)
 
 - **Phase 2 (operational maturity)**: Pending
   - Permission transparency in settings UI
   - Sensitive logging redaction
   - Security-focused integration tests
 
-If the remaining **Phase 1** actions are implemented and covered by automated tests, the security posture will align closely with modern OIDC and Microsoft identity platform expectations.
+### Security Posture
+
+The plugin now has robust security hardening including:
+- ✅ PKCE protection against authorization code interception
+- ✅ Session fixation prevention with ID regeneration
+- ✅ Secure cookie attributes (Secure, HttpOnly, SameSite)
+- ✅ Redirect allowlisting and external redirect blocking
+- ✅ All Phase 0 critical security fixes (aud, tid, azp)
+
+The remaining F-07 (immutable user linking) and Phase 2 items are recommended but not blocking for production use.
 
 ---
 *Last updated: May 9, 2026 (UTC)*

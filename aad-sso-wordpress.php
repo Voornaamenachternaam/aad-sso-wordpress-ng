@@ -148,7 +148,13 @@ class AADSSO
 
         if ($this->wants_to_login()) {
             if (isset($_GET['redirect_to']) && \is_string($_GET['redirect_to'])) {
-                $_SESSION['aadsso_redirect_to'] = sanitize_url($_GET['redirect_to']);
+                // First validate against configured security policies
+                // Then sanitize as defense-in-depth before storing in session
+                $validated_redirect = AADSSO_Settings::validate_redirect_url($_GET['redirect_to']);
+                if ('' !== $validated_redirect) {
+                    // Apply WordPress sanitization as additional defense-in-depth
+                    $_SESSION['aadsso_redirect_to'] = sanitize_url($validated_redirect);
+                }
             }
 
             if ($auto_redirect && !isset($_GET['code']) && !isset($_POST['log'])) {
@@ -162,7 +168,11 @@ class AADSSO
     {
         if ($user instanceof WP_User && isset($_SESSION['aadsso_redirect_to'])) {
             $redirect_raw = $_SESSION['aadsso_redirect_to'];
-            $redirect_to = \is_string($redirect_raw) ? sanitize_url($redirect_raw) : $redirect_to;
+            // Re-validate the stored redirect URL (defense in depth)
+            $validated_redirect = AADSSO_Settings::validate_redirect_url($redirect_raw);
+            if ('' !== $validated_redirect) {
+                $redirect_to = $validated_redirect;
+            }
             unset($_SESSION['aadsso_redirect_to']);
         }
 
@@ -176,10 +186,22 @@ class AADSSO
         }
 
         if (isset($_GET['code']) && \is_string($_GET['code'])) {
+            // Check for required session data (antiforgery + PKCE)
             if (!isset($_SESSION['aadsso_antiforgery-id'])) {
                 return new WP_Error(
                     'missing_antiforgery_id',
                     __('Session does not contain antiforgery ID.', 'aad-sso-wordpress')
+                );
+            }
+
+            // PKCE code_verifier is required for token exchange
+            // This binds the token exchange to the original authorization request
+            if (!isset($_SESSION['aadsso_pkce_code_verifier'])) {
+                AADSSO_Logger::log_error('Session does not contain PKCE code_verifier');
+
+                return new WP_Error(
+                    'missing_pkce_verifier',
+                    __('Session does not contain PKCE code verifier. This may indicate a session timeout or security issue.', 'aad-sso-wordpress')
                 );
             }
 
@@ -199,8 +221,10 @@ class AADSSO
             }
 
             $code = (string) wp_unslash($_GET['code']);
+            $code_verifier = $_SESSION['aadsso_pkce_code_verifier'];
+
             /** @var mixed */
-            $token_raw = AADSSO_AuthorizationHelper::get_access_token($code, $this->settings);
+            $token_raw = AADSSO_AuthorizationHelper::get_access_token($code, $this->settings, $code_verifier);
 
             if (is_wp_error($token_raw)) {
                 /** @var WP_Error $token */
@@ -463,6 +487,10 @@ class AADSSO
 
         if ($user instanceof WP_User) {
             $_SESSION['aadsso_signed_in_with_entra_id'] = true;
+
+            // Regenerate session ID after successful authentication
+            // This prevents session fixation attacks and clears PKCE verifier
+            $this->regenerate_session();
         }
 
         // @var WP_User|null
@@ -748,7 +776,12 @@ class AADSSO
         $antiforgery_id = aad_sso_create_uuid();
         $_SESSION['aadsso_antiforgery-id'] = $antiforgery_id;
 
-        return AADSSO_AuthorizationHelper::get_authorization_url($this->settings, $antiforgery_id);
+        // Generate PKCE code_verifier (RFC 7636)
+        // This is stored and sent during token exchange for security
+        $code_verifier = aad_sso_generate_pkce_code_verifier();
+        $_SESSION['aadsso_pkce_code_verifier'] = $code_verifier;
+
+        return AADSSO_AuthorizationHelper::get_authorization_url($this->settings, $antiforgery_id, $code_verifier);
     }
 
     public function get_logout_url(): string
@@ -771,7 +804,93 @@ class AADSSO
     public function register_session(): void
     {
         if (!session_id()) {
+            // ─────────────────────────────────────────────────────────────────
+            // Session security hardening - MUST be set BEFORE session_start()
+            //
+            // Per PHP security best practices:
+            // - session.use_strict_mode: Reject uninitialized session IDs
+            // - session.use_only_cookies: Prevent URL-based session IDs
+            //
+            // References:
+            // - https://php.net/manual/en/features.session.security.ini.php
+            // - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
+            // ─────────────────────────────────────────────────────────────────
+
+            // Enable strict session mode to reject uninitialized session IDs
+            // This must be set BEFORE session_start() to take effect
+            if ('0' === \ini_get('session.use_strict_mode')) {
+                ini_set('session.use_strict_mode', '1');
+            }
+
+            // Force cookie-only sessions (no URL-based session IDs)
+            // This must be set BEFORE session_start() to take effect
+            if ('0' === \ini_get('session.use_only_cookies')) {
+                ini_set('session.use_only_cookies', '1');
+            }
+
+            // Set hardened session cookie parameters BEFORE starting the session
+            // Per PHP session security best practices:
+            // - Secure: Only send cookie over HTTPS (use is_ssl() for dynamic detection)
+            // - HttpOnly: Prevent JavaScript access to session cookie
+            // - SameSite=Lax: Provides CSRF protection while allowing top-level navigation
+            //
+            // Note: Plugin requires PHP 8.5.5+, so PHP 7.3+ array signature is always available.
+            //
+            // References:
+            // - https://php.net/manual/en/function.session-set-cookie-params.php
+            // - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
+            //
+            // Use WordPress is_ssl() to detect HTTPS, with fallback for non-WordPress contexts
+            $is_secure = false;
+            if (\function_exists('is_ssl')) {
+                $is_secure = (bool) is_ssl();
+            } else {
+                // Fallback: check if HTTPS is detected via server variables
+                $is_secure = (
+                    (!empty($_SERVER['HTTPS']) && 'off' !== mb_strtolower($_SERVER['HTTPS']))
+                    || (!empty($_SERVER['SERVER_PORT']) && 443 === (int) $_SERVER['SERVER_PORT'])
+                );
+            }
+
+            session_set_cookie_params([
+                'lifetime' => 0,    // Session cookie (expires when browser closes)
+                'path' => '/',
+                'domain' => '',
+                'secure' => $is_secure,   // Dynamic: HTTPS only when on SSL connection
+                'httponly' => true, // No JavaScript access
+                'samesite' => 'Lax',
+            ]);
+
+            // NOW start the session - all settings above will take effect
             session_start();
+        }
+    }
+
+    /**
+     * Regenerate session ID and clear sensitive auth-related session data.
+     *
+     * Per PHP session security best practices, session ID should be regenerated:
+     * - After successful authentication (to prevent session fixation)
+     * - After privilege level changes
+     *
+     * The true parameter requests deletion of the old session data.
+     *
+     * References:
+     * - https://php.net/manual/en/function.session-regenerate-id.php
+     * - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
+     */
+    public function regenerate_session(): void
+    {
+        if (session_id()) {
+            // Regenerate session ID before clearing old session data
+            // This prevents session fixation attacks
+            session_regenerate_id(true);
+
+            // Clear sensitive authentication-related session data
+            // These values are no longer needed after successful authentication
+            unset($_SESSION['aadsso_pkce_code_verifier']);
+
+            AADSSO_Logger::log_debug('Session ID regenerated after successful authentication', 10);
         }
     }
 

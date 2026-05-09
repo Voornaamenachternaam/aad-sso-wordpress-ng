@@ -67,6 +67,25 @@ class Settings
     public array $allowed_tenant_ids = [];
 
     /**
+     * Allowed redirect domains for post-login redirect validation.
+     *
+     * If non-empty, the redirect_to parameter will only be accepted
+     * if it points to a domain in this list. This prevents open redirect
+     * vulnerabilities where an attacker could redirect users to a malicious site.
+     *
+     * @var list<string>
+     */
+    public array $allowed_redirect_domains = [];
+
+    /**
+     * Whether to block external redirects entirely.
+     *
+     * If true, redirects are only allowed to the current WordPress site domain.
+     * This provides defense-in-depth against open redirect attacks.
+     */
+    public bool $block_external_redirects = false;
+
+    /**
      * @var null|self
      */
     private static ?self $instance = null;
@@ -229,6 +248,14 @@ class Settings
             self::$options_resolver->define('allowed_tenant_ids')
                 ->allowedTypes('array')
                 ->default([]);
+
+            self::$options_resolver->define('allowed_redirect_domains')
+                ->allowedTypes('array')
+                ->default([]);
+
+            self::$options_resolver->define('block_external_redirects')
+                ->allowedTypes('bool')
+                ->default(false);
         }
 
         return self::$options_resolver;
@@ -361,6 +388,134 @@ class Settings
         } catch (Throwable) {
             // Silently fail - transient deletion above is primary
         }
+    }
+
+    /**
+     * Validate a redirect URL against configured security policies.
+     *
+     * This provides defense-in-depth against open redirect attacks.
+     *
+     * Security checks (in order):
+     * 1. If block_external_redirects is enabled, only allow same-site redirects
+     * 2. If allowed_redirect_domains is configured, only allow redirects to those domains
+     * 3. Falls back to wp_safe_redirect() which validates against allowed hosts
+     *
+     * @param string $redirect_url The URL to validate
+     *
+     * @return string The validated URL, or empty string if not allowed
+     */
+    public static function validate_redirect_url(string $redirect_url): string
+    {
+        // Empty URL is always allowed (will use default)
+        if ('' === $redirect_url) {
+            return '';
+        }
+
+        // Reject URLs starting with multiple slashes or backslashes
+        // Protocol-relative URLs like //host are external redirects
+        // Multiple slashes like ///evil.com can bypass parse_url() host extraction
+        // A single slash /path is valid; two or more is not
+        if (preg_match('#^[/\\\\]{2,}#', $redirect_url)) {
+            AADSSO_Logger::log_warning(
+                \sprintf('Redirect starting with multiple slashes blocked: %s', $redirect_url)
+            );
+
+            return '';
+        }
+
+        // Parse the redirect URL
+        $parsed = parse_url($redirect_url);
+
+        // If parse failed or no host, it's likely a relative URL - allow it
+        if (false === $parsed || !isset($parsed['host'])) {
+            // Relative URLs are safe within the same site
+            // Accept: /path, ?query=string, #fragment, /path?query#fragment
+            // Reject any malformed URL (e.g., multiple leading slashes caught above)
+            $first_char = $redirect_url[0] ?? '';
+            if ('/' === $first_char || '?' === $first_char || '#' === $first_char) {
+                return $redirect_url;
+            }
+
+            return '';
+        }
+
+        $redirect_host = mb_strtolower($parsed['host']);
+
+        // Check block_external_redirects first
+        if (!empty(self::get_instance()->block_external_redirects)) {
+            // Use home_url() for public-facing URL validation
+            // home_url() returns the URL to the home location of the site as set
+            // in Settings > General, which is appropriate for redirect validation
+            //
+            // Fall back to empty string if home_url() is not available
+            // (e.g., during bootstrap or in some test environments)
+            if (\function_exists('home_url')) {
+                $site_host = mb_strtolower(parse_url(home_url(), \PHP_URL_HOST) ?: '');
+            } else {
+                $site_host = '';
+            }
+
+            if ('' !== $site_host && $redirect_host !== $site_host) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('External redirect blocked: %s (only %s allowed)', $redirect_url, $site_host)
+                );
+
+                return '';
+            }
+        }
+
+        // Check allowed_redirect_domains
+        // Note: allowed_redirect_domains are stored lowercase during sanitization
+        $allowed_domains = self::get_instance()->allowed_redirect_domains;
+        if (!empty($allowed_domains)) {
+            $redirect_lower = mb_strtolower($redirect_host);
+
+            // Check exact match or subdomain match
+            $is_allowed = false;
+            foreach ($allowed_domains as $allowed) {
+                // Exact match (both already lowercase)
+                if ($redirect_lower === $allowed) {
+                    $is_allowed = true;
+
+                    break;
+                }
+
+                // Subdomain match (example.com allows sub.example.com)
+                if (
+                    mb_strlen($redirect_lower) > mb_strlen($allowed) + 1
+                    && str_ends_with($redirect_lower, '.' . $allowed)
+                ) {
+                    $is_allowed = true;
+
+                    break;
+                }
+            }
+
+            if (!$is_allowed) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('Redirect to untrusted domain blocked: %s (not in allowlist)', $redirect_url)
+                );
+
+                return '';
+            }
+        }
+
+        return $redirect_url;
+    }
+
+    /**
+     * Public API for sanitizing option values.
+     *
+     * This provides a testable public interface for sanitization logic.
+     *
+     * @param string $key   The option key to sanitize
+     * @param mixed  $value The raw option value
+     *
+     * @return mixed The sanitized value
+     */
+    public static function sanitize_option(string $key, mixed $value): mixed
+    {
+        return self::sanitize_setting($key, $value);
     }
 
     /**
@@ -516,6 +671,8 @@ class Settings
             'tenantRestrictionMode' => \is_string($value) && \in_array($value, ['none', 'single', 'multi'], true) ? $value : 'none',
             'expected_tenant_id' => self::sanitize_tenant_id($value),
             'allowed_tenant_ids' => self::sanitize_tenant_ids($value),
+            'allowed_redirect_domains' => self::sanitize_redirect_domains($value),
+            'block_external_redirects',
             'match_on_upn_alias',
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
@@ -593,6 +750,86 @@ class Settings
                     }
 
                     return '';
+                },
+                $value
+            )
+        );
+    }
+
+    /**
+     * Sanitize and validate allowed redirect domains.
+     *
+     * Validates each domain to ensure it follows proper hostname format.
+     * Accepts both single-label hostnames (e.g., "localhost") and multi-label
+     * domain names (e.g., "example.com", "sub.example.org").
+     *
+     * Handles both array and newline-separated string input for flexibility.
+     *
+     * @param mixed $value Array of domains or newline-separated string
+     *
+     * @return list<string>
+     */
+    private static function sanitize_redirect_domains(mixed $value): array
+    {
+        // Handle newline-separated string input (from UI textarea)
+        if (\is_string($value)) {
+            $lines = array_filter(
+                array_map('trim', explode("\n", $value))
+            );
+            $value = $lines;
+        }
+
+        if (!\is_array($value)) {
+            return [];
+        }
+
+        // @var list<string> $sanitized
+        return array_filter(
+            array_map(
+                static function (mixed $domain): string {
+                    if (!\is_string($domain)) {
+                        return '';
+                    }
+
+                    $trimmed = mb_trim($domain);
+
+                    // Empty strings are filtered out
+                    if ('' === $trimmed) {
+                        return '';
+                    }
+
+                    // Remove protocol if present (normalize input)
+                    $trimmed = preg_replace('#^https?://#', '', $trimmed);
+
+                    // Remove trailing slash
+                    $trimmed = mb_rtrim($trimmed, '/');
+
+                    // Validate hostname format:
+                    // - Must not be empty after removing protocol/slash
+                    // - Must contain only valid hostname characters
+                    // - Supports single-label (localhost, devserver) and multi-label (example.com)
+                    //
+                    // Valid patterns:
+                    //   localhost
+                    //   devserver
+                    //   example.com
+                    //   sub.example.com
+                    //   my-server.local
+                    //
+                    // Invalid:
+                    //   (empty string)
+                    //   host-
+                    //   -host
+                    //   contains spaces
+                    if (
+                        '' === $trimmed
+                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
+                    ) {
+                        return '';
+                    }
+
+                    // Normalize to lowercase for consistent comparison
+                    return mb_strtolower($trimmed);
                 },
                 $value
             )
