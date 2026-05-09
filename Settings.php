@@ -849,33 +849,34 @@ class Settings
                         $trimmed = \is_string($stripped) ? mb_rtrim($stripped, '/') : '';
 
                         // Validate hostname format:
-                    // - Must not be empty after removing protocol/slash
-                    // - Must contain only valid hostname characters
-                    // - Supports single-label (localhost, devserver) and multi-label (example.com)
-                    //
-                    // Valid patterns:
-                    //   localhost
-                    //   devserver
-                    //   example.com
-                    //   sub.example.com
-                    //   my-server.local
-                    //
-                    // Invalid:
-                    //   (empty string)
-                    //   host-
-                    //   -host
-                    //   contains spaces
-                    if (
-                        '' === $trimmed
-                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
-                    ) {
-                        return '';
-                    }
+                        // - Must not be empty after removing protocol/slash
+                        // - Must contain only valid hostname characters
+                        // - Supports single-label (localhost, devserver) and multi-label (example.com)
+                        //
+                        // Valid patterns:
+                        //   localhost
+                        //   devserver
+                        //   example.com
+                        //   sub.example.com
+                        //   my-server.local
+                        //
+                        // Invalid:
+                        //   (empty string)
+                        //   host-
+                        //   -host
+                        //   contains spaces
+                        if (
+                            '' === $trimmed
+                            || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
+                        ) {
+                            return '';
+                        }
 
-                    // Normalize to lowercase for consistent comparison
-                    return mb_strtolower($trimmed);
-                },
-                $value
+                        // Normalize to lowercase for consistent comparison
+                        return mb_strtolower($trimmed);
+                    },
+                    $value
+                )
             )
         );
     }
