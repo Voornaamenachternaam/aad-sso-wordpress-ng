@@ -283,6 +283,192 @@ class AuthorizationHelperTest extends TestCase
     }
 
     /**
+     * Test that multi-audience token with matching azp passes validation.
+     */
+    public function testValidateIdTokenMultiAudienceWithMatchingAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with multiple audiences and matching azp
+        $token = $this->generateTestToken([
+            'aud' => [
+                self::TEST_CLIENT_ID,
+                'another-client-id-12345',
+            ],
+            'azp' => self::TEST_CLIENT_ID,
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $result = $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+
+        $this->assertIsObject($result);
+        $this->assertEquals(self::TEST_CLIENT_ID, $result->azp);
+    }
+
+    /**
+     * Test that multi-audience token with mismatched azp fails validation.
+     */
+    public function testValidateIdTokenMultiAudienceWithMismatchedAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with multiple audiences but wrong azp
+        $wrongAzp = '99999999-9999-9999-9999-999999999999';
+        $token = $this->generateTestToken([
+            'aud' => [
+                self::TEST_CLIENT_ID,
+                'another-client-id-12345',
+            ],
+            'azp' => $wrongAzp,
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('ID token authorized party (azp) mismatch');
+
+        $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+    }
+
+    /**
+     * Test that multi-audience token without azp passes validation (with warning logged).
+     * Per OIDC Core 1.0 Section 3.1.3.7: "the Client SHOULD verify that an azp Claim is present."
+     * This is a SHOULD requirement, not MUST, so we allow it with a warning.
+     */
+    public function testValidateIdTokenMultiAudienceWithoutAzpPasses(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with multiple audiences but no azp
+        // Note: generateTestToken defaults 'aud' to self::TEST_CLIENT_ID (string)
+        // so we need to override it to create a multi-audience token
+        $now = time();
+        $payload = [
+            'iss' => self::TEST_ISSUER,
+            'iat' => $now,
+            'exp' => $now + 3600,
+            'aud' => [
+                self::TEST_CLIENT_ID,
+                'another-client-id-12345',
+            ],
+            // No azp claim
+            'nonce' => 'test-nonce-123',
+            'oid' => 'user-object-id-123',
+            'preferred_username' => 'testuser@example.com',
+        ];
+        $token = JWT::encode($payload, self::$rsaKeyPair['private_key'], 'RS256', self::$rsaKeyPair['kid']);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        // Should pass without throwing
+        $result = $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+
+        $this->assertIsObject($result);
+        $this->assertFalse(isset($result->azp));
+    }
+
+    /**
+     * Test that single-audience token with matching azp passes validation.
+     */
+    public function testValidateIdTokenSingleAudienceWithMatchingAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Single audience with matching azp (typical Microsoft Entra token)
+        $token = $this->generateTestToken([
+            'aud' => self::TEST_CLIENT_ID,
+            'azp' => self::TEST_CLIENT_ID,
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $result = $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+
+        $this->assertIsObject($result);
+        $this->assertEquals(self::TEST_CLIENT_ID, $result->azp);
+    }
+
+    /**
+     * Test that azp validation rejects non-string azp values (malformed token).
+     * Per Microsoft Entra ID spec (May 2026), azp is "String, a GUID".
+     * If present but not a string, the token is malformed and MUST be rejected.
+     */
+    public function testValidateIdTokenRejectsNonStringAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with non-string azp (array) - should be rejected as malformed
+        $token = $this->generateTestToken([
+            'azp' => [self::TEST_CLIENT_ID],  // array instead of string
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('malformed `azp` claim');
+
+        $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+    }
+
+    /**
+     * Test that azp validation rejects integer azp values (malformed token).
+     * Per Microsoft Entra ID spec (May 2026), azp is "String, a GUID".
+     */
+    public function testValidateIdTokenRejectsIntegerAzp(): void
+    {
+        $reflection = new \ReflectionClass(\AADSSO_AuthorizationHelper::class);
+        $method = $reflection->getMethod('process_jwks_response');
+        $method->setAccessible(true);
+
+        // Token with integer azp - should be rejected as malformed
+        $token = $this->generateTestToken([
+            'azp' => 1234567890,  // integer instead of string
+        ]);
+
+        $httpClientProperty = $reflection->getProperty('http_client');
+        $httpClientProperty->setAccessible(true);
+        $httpClientProperty->setValue(null, null);
+
+        $response = $this->createMockJwksResponse();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('malformed `azp` claim');
+
+        $method->invoke(null, $response, $token, 'test-nonce-123', self::TEST_CLIENT_ID);
+    }
+
+    /**
      * Test that nonce validation rejects mismatched nonce.
      */
     public function testValidateIdTokenRejectsMismatchedNonce(): void
