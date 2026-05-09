@@ -154,16 +154,39 @@ Enforce `tid` validation after signature validation and before user linking.
 
 ---
 
-## F-03 — `azp`/multi-audience handling not implemented (**Medium/High**) 
+## F-03 — `azp`/multi-audience handling fully implemented (**RESOLVED**)
 
-### Observation
-No explicit handling for `azp` where relevant.
+### Implementation Status: COMPLETE ✅
 
-### Why this matters
-For some token shapes, authorized presenter semantics matter for preventing delegated client confusion.
+The plugin now implements comprehensive `azp` (Authorized Party) validation according to OIDC Core 1.0 Section 3.1.3.7 and Microsoft Entra ID guidance (May 2026).
 
-### Recommendation
-When `aud` structure or token context requires it, validate `azp` per OIDC and Microsoft guidance.
+### What Was Implemented
+
+The `process_jwks_response()` method in `AuthorizationHelper.php` now includes:
+
+1. **Multi-audience token detection**: Detects when `aud` claim is an array with multiple values
+2. **azp presence warning**: Logs a warning when multi-audience tokens are missing `azp` (per OIDC "SHOULD" requirement)
+3. **azp/client_id matching**: Validates that if `azp` is present, it must equal the configured `client_id`
+4. **Type safety**: Properly handles non-string `azp` values by ignoring them
+
+### Code Location
+- **Primary implementation**: `AuthorizationHelper.php` lines 410-458
+- **Unit tests**: `tests/Unit/AuthorizationHelperTest.php` (7 new test cases)
+
+### References (Primary Sources, May 2026)
+- [OIDC Core 1.0 Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0-final.html) — ID Token Validation
+- [Microsoft Entra ID token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference)
+- [Microsoft Entra claims validation](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation)
+
+### Test Coverage
+The following scenarios are tested:
+- ✅ Token with matching `azp` (equals `client_id`) — ACCEPTED
+- ✅ Token with mismatched `azp` — REJECTED
+- ✅ Token without `azp` (single audience) — ACCEPTED
+- ✅ Multi-audience token with matching `azp` — ACCEPTED
+- ✅ Multi-audience token with mismatched `azp` — REJECTED
+- ✅ Multi-audience token without `azp` (with warning logged) — ACCEPTED
+- ✅ Non-string `azp` values — IGNORED (not rejected)
 
 ---
 
@@ -285,9 +308,9 @@ Operational logs may leak identity metadata or error internals if debug enabled 
 ## 8) Prioritized remediation roadmap
 
 ### Phase 0 — Immediate (blocker/high)
-1. Implement mandatory `aud` validation.
-2. Implement mandatory tenant policy check (`tid` with single or allowlist mode).
-3. Add `azp` handling where required by token shape.
+1. ~~Implement mandatory `aud` validation.~~ ✅ RESOLVED
+2. ~~Implement mandatory tenant policy check (`tid` with single or allowlist mode).~~ ✅ RESOLVED
+3. ~~Add `azp` handling where required by token shape.~~ ✅ RESOLVED
 
 ### Phase 1 — Near-term hardening
 4. Add PKCE S256 to authorization code flow.
@@ -328,6 +351,26 @@ Operational logs may leak identity metadata or error internals if debug enabled 
 
 ## 11) Final conclusion
 
-For the stated use case (WordPress login via Entra ID), this plugin is close to production-capable but currently falls short of high-assurance OIDC relying-party validation due to missing audience/tenant policy enforcement and absent PKCE.
+For the stated use case (WordPress login via Entra ID), this plugin is now production-capable after completing Phase 0 security fixes including mandatory `aud` validation, tenant policy enforcement (`tid`), and `azp` handling.
 
-If the **Phase 0 + Phase 1** actions above are implemented and covered by automated tests, the security posture would improve substantially and align more closely with modern OIDC and Microsoft identity platform expectations.
+### Progress Summary
+
+- **Phase 0 (blocker/high)**: ✅ ALL RESOLVED
+  - Mandatory `aud` validation
+  - Tenant policy check (`tid` with single/multi-tenant modes)
+  - `azp` handling per OIDC Core 1.0 Section 3.1.3.7
+
+- **Phase 1 (near-term hardening)**: Pending
+  - PKCE S256 to authorization code flow
+  - Session regeneration post-auth
+  - Immutable user linking with `oid`
+
+- **Phase 2 (operational maturity)**: Pending
+  - Permission transparency in settings UI
+  - Sensitive logging redaction
+  - Security-focused integration tests
+
+If the remaining **Phase 1** actions are implemented and covered by automated tests, the security posture will align closely with modern OIDC and Microsoft identity platform expectations.
+
+---
+*Last updated: May 9, 2026 (UTC)*

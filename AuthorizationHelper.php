@@ -410,24 +410,51 @@ class AuthorizationHelper
         // ─────────────────────────────────────────────────────────────────────
         // Authorized Party (azp) validation
         //
-        // Per OIDC Core 1.0 Section 3.1.3.7 and Microsoft guidance:
+        // Per OIDC Core 1.0 Section 3.1.3.7 and Microsoft guidance (May 2026):
         // - `azp` is present when the token has a single audience and the
         //   authorized party differs from the audience
         // - For confidential clients (which this WordPress plugin represents),
-        //   the `azp` should match the client_id if present
+        //   the `azp` MUST match the client_id if present
+        // - For multi-audience tokens (array aud with multiple values),
+        //   azp SHOULD be present and MUST contain the client_id
         //
         // Note: v1.0 endpoints are deprecated; v2.0 is the only supported path.
         //
         // References:
         // - https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
-        // - https://openid.net/specs/openid-connect-core-1_0-final.html
+        // - https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
+        // - https://openid.net/specs/openid-connect-core-1_0-final.html (Section 3.1.3.7)
         // ─────────────────────────────────────────────────────────────────────
 
         $azp_claim = $jwt->azp ?? null;
+
+        // Validate azp presence for multi-audience tokens (OIDC Core 1.0 Section 3.1.3.7)
+        // Per spec: "If the ID Token contains multiple audiences, the Client SHOULD verify
+        // that an azp Claim is present."
+        if (\is_array($aud_values) && \count($aud_values) > 1 && null === $azp_claim) {
+            // For multi-audience tokens without azp, log a warning but don't block.
+            // This is a SHOULD requirement (not MUST), and most Microsoft Entra tokens
+            // with multiple audiences will include azp anyway.
+            AADSSO_Logger::log_warning(
+                'Multi-audience ID token does not contain azp claim. '
+                . 'While not required, including azp improves security.',
+                ['audiences' => $aud_values]
+            );
+        }
+
+        // Validate azp matches client_id if present
+        // Per OIDC spec: "If an azp Claim is present, the Client SHOULD verify
+        // that its client_id is the Claim Value."
+        // For confidential clients like this WordPress plugin, this is MUST.
         if (null !== $azp_claim && \is_string($azp_claim) && $azp_claim !== $client_id) {
             // azp is present and does not match expected client_id
             // This may indicate the token was issued for a different application
-            throw new DomainException(\sprintf('ID token authorized party (azp) mismatch. Expected `%s`, got `%s`', $client_id, $azp_claim));
+            throw new DomainException(\sprintf(
+                'ID token authorized party (azp) mismatch. Expected `%s`, got `%s`. '
+                . 'This token may have been issued for a different application.',
+                $client_id,
+                $azp_claim
+            ));
         }
 
         $token_nonce = $jwt->nonce ?? '';
