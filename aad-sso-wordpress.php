@@ -562,6 +562,17 @@ class AADSSO
 
             if ($user instanceof WP_User) {
                 $stored_tid = get_user_meta($user->ID, 'aad_tid', true);
+
+                if ('' === $stored_tid && '' !== $aad_tid) {
+                    AADSSO_Logger::log_warning(\sprintf(
+                        'Storing tenant ID for oid=%s: tid=%s (first match).',
+                        $aad_oid,
+                        $aad_tid
+                    ));
+                    update_user_meta($user->ID, 'aad_tid', $aad_tid);
+                    $stored_tid = $aad_tid;
+                }
+
                 if ('' !== $stored_tid && '' !== $aad_tid && $stored_tid !== $aad_tid) {
                     AADSSO_Logger::log_warning(\sprintf(
                         'Tenant ID mismatch for oid=%s: stored=%s, token=%s.',
