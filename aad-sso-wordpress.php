@@ -817,14 +817,14 @@ class AADSSO
 
             // Enable strict session mode to reject uninitialized session IDs
             // This must be set BEFORE session_start() to take effect
-            if (\ini_get('session.use_strict_mode') === '0') {
-                \ini_set('session.use_strict_mode', '1');
+            if ('0' === \ini_get('session.use_strict_mode')) {
+                ini_set('session.use_strict_mode', '1');
             }
 
             // Force cookie-only sessions (no URL-based session IDs)
             // This must be set BEFORE session_start() to take effect
-            if (\ini_get('session.use_only_cookies') === '0') {
-                \ini_set('session.use_only_cookies', '1');
+            if ('0' === \ini_get('session.use_only_cookies')) {
+                ini_set('session.use_only_cookies', '1');
             }
 
             // Set hardened session cookie parameters BEFORE starting the session
