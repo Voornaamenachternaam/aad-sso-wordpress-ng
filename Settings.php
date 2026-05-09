@@ -411,11 +411,11 @@ class Settings
             return '';
         }
 
-        // Reject URLs starting with any combination of slashes or backslashes
-        // Protocol-relative URLs like //host, /\host are external redirects
-        // Multiple slashes like ///evil.com or //\/evil.com also bypass parse_url()
-        // These can lead to open redirect vulnerabilities if not explicitly blocked
-        if (preg_match('#^[/\\\\]+#', $redirect_url)) {
+        // Reject URLs starting with multiple slashes or backslashes
+        // Protocol-relative URLs like //host are external redirects
+        // Multiple slashes like ///evil.com can bypass parse_url() host extraction
+        // A single slash /path is valid; two or more is not
+        if (preg_match('#^[/\\\\]{2,}#', $redirect_url)) {
             AADSSO_Logger::log_warning(
                 \sprintf('Redirect starting with multiple slashes blocked: %s', $redirect_url)
             );
