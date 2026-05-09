@@ -34,7 +34,7 @@ function aad_sso_generate_pkce_code_verifier(): string
     $random_bytes = random_bytes(32);
 
     // Base64url encode (RFC 4648 Section 5 with URL-safe alphabet)
-    return rtrim(strtr(base64_encode($random_bytes), '+/', '-_'), '=');
+    return mb_rtrim(strtr(base64_encode($random_bytes), '+/', '-_'), '=');
 }
 
 /**
@@ -54,13 +54,13 @@ function aad_sso_generate_pkce_code_challenge(string $code_verifier): string
     $hash = hash('sha256', $code_verifier, true);
 
     // Base64url encode the hash without padding
-    return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+    return mb_rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
 }
 
 /**
  * Validate a PKCE code_verifier against an expected code_challenge.
  *
- * @param string $code_verifier The verifier to validate
+ * @param string $code_verifier      The verifier to validate
  * @param string $expected_challenge The expected code_challenge from the authorization request
  *
  * @return bool True if the verifier produces the expected challenge
@@ -158,7 +158,7 @@ class AuthorizationHelper
      *
      * @param AADSSO_Settings $settings
      * @param string          $antiforgery_id
-     * @param string          $code_verifier The PKCE code_verifier (stored in session for token exchange)
+     * @param string          $code_verifier  The PKCE code_verifier (stored in session for token exchange)
      *
      * @return string The authorization URL
      */
@@ -194,7 +194,7 @@ class AuthorizationHelper
      *
      * @see https://datatracker.ietf.org/doc/html/rfc7636
      *
-     * @param string          $code         The authorization code
+     * @param string          $code          The authorization code
      * @param AADSSO_Settings $settings
      * @param string          $code_verifier The PKCE code_verifier (previously generated and stored)
      *

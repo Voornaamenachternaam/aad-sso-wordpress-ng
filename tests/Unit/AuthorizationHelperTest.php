@@ -775,17 +775,17 @@ class AuthorizationHelperTest extends TestCase
      */
     public function testPkceCodeVerifierGeneration(): void
     {
-        $verifier = \aad_sso_generate_pkce_code_verifier();
+        $verifier = aad_sso_generate_pkce_code_verifier();
 
         // RFC 7636: code_verifier MUST be between 43 and 128 characters
-        $this->assertGreaterThanOrEqual(43, strlen($verifier));
-        $this->assertLessThanOrEqual(128, strlen($verifier));
+        $this->assertGreaterThanOrEqual(43, mb_strlen($verifier));
+        $this->assertLessThanOrEqual(128, mb_strlen($verifier));
 
         // RFC 7636: code_verifier MUST use only unreserved characters [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~"
         $this->assertMatchesRegularExpression('/^[A-Za-z0-9\-._~]+$/', $verifier);
 
         // Generate multiple to ensure uniqueness (CSPRNG)
-        $verifier2 = \aad_sso_generate_pkce_code_verifier();
+        $verifier2 = aad_sso_generate_pkce_code_verifier();
         $this->assertNotEquals($verifier, $verifier2);
     }
 
@@ -799,7 +799,7 @@ class AuthorizationHelperTest extends TestCase
         $expected_challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
         $test_verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 
-        $challenge = \aad_sso_generate_pkce_code_challenge($test_verifier);
+        $challenge = aad_sso_generate_pkce_code_challenge($test_verifier);
 
         $this->assertEquals($expected_challenge, $challenge);
     }
@@ -809,8 +809,8 @@ class AuthorizationHelperTest extends TestCase
      */
     public function testPkceCodeChallengeHasNoPadding(): void
     {
-        $verifier = \aad_sso_generate_pkce_code_verifier();
-        $challenge = \aad_sso_generate_pkce_code_challenge($verifier);
+        $verifier = aad_sso_generate_pkce_code_verifier();
+        $challenge = aad_sso_generate_pkce_code_challenge($verifier);
 
         // Base64url encoding should have no padding
         $this->assertStringNotContainsString('=', $challenge);
@@ -823,11 +823,11 @@ class AuthorizationHelperTest extends TestCase
      */
     public function testPkceCodeVerifierValidationSuccess(): void
     {
-        $verifier = \aad_sso_generate_pkce_code_verifier();
-        $challenge = \aad_sso_generate_pkce_code_challenge($verifier);
+        $verifier = aad_sso_generate_pkce_code_verifier();
+        $challenge = aad_sso_generate_pkce_code_challenge($verifier);
 
         // Validation should succeed
-        $this->assertTrue(\aad_sso_validate_pkce_code_verifier($verifier, $challenge));
+        $this->assertTrue(aad_sso_validate_pkce_code_verifier($verifier, $challenge));
     }
 
     /**
@@ -835,14 +835,14 @@ class AuthorizationHelperTest extends TestCase
      */
     public function testPkceCodeVerifierValidationFailsOnMismatch(): void
     {
-        $verifier = \aad_sso_generate_pkce_code_verifier();
-        $challenge = \aad_sso_generate_pkce_code_challenge($verifier);
+        $verifier = aad_sso_generate_pkce_code_verifier();
+        $challenge = aad_sso_generate_pkce_code_challenge($verifier);
 
         // Use a different verifier - validation should fail
-        $different_verifier = \aad_sso_generate_pkce_code_verifier();
+        $different_verifier = aad_sso_generate_pkce_code_verifier();
         $this->assertNotEquals($verifier, $different_verifier);
 
-        $this->assertFalse(\aad_sso_validate_pkce_code_verifier($different_verifier, $challenge));
+        $this->assertFalse(aad_sso_validate_pkce_code_verifier($different_verifier, $challenge));
     }
 
     /**
@@ -851,14 +851,14 @@ class AuthorizationHelperTest extends TestCase
     public function testPkceCodeVerifierValidationRejectsInvalidFormat(): void
     {
         // Too short (less than 43 characters)
-        $this->assertFalse(\aad_sso_validate_pkce_code_verifier('abc', 'challenge'));
+        $this->assertFalse(aad_sso_validate_pkce_code_verifier('abc', 'challenge'));
 
         // Too long (more than 128 characters)
         $long_string = str_repeat('a', 129);
-        $this->assertFalse(\aad_sso_validate_pkce_code_verifier($long_string, 'challenge'));
+        $this->assertFalse(aad_sso_validate_pkce_code_verifier($long_string, 'challenge'));
 
         // Contains invalid characters (space)
-        $this->assertFalse(\aad_sso_validate_pkce_code_verifier('abc def', 'challenge'));
+        $this->assertFalse(aad_sso_validate_pkce_code_verifier('abc def', 'challenge'));
     }
 
     /**
@@ -869,14 +869,14 @@ class AuthorizationHelperTest extends TestCase
         // This test documents that hash_equals is used
         // We can't directly test timing, but we verify the function works correctly
         $verifier1 = 'aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789-_.~aaaa';
-        $challenge1 = \aad_sso_generate_pkce_code_challenge($verifier1);
+        $challenge1 = aad_sso_generate_pkce_code_challenge($verifier1);
 
         // Should be valid
-        $this->assertTrue(\aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
+        $this->assertTrue(aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
 
         // Same verifier should always validate
-        $this->assertTrue(\aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
-        $this->assertTrue(\aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
+        $this->assertTrue(aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
+        $this->assertTrue(aad_sso_validate_pkce_code_verifier($verifier1, $challenge1));
     }
 
     /**
@@ -885,14 +885,14 @@ class AuthorizationHelperTest extends TestCase
     public function testPkceRoundtrip(): void
     {
         // Simulate the full PKCE flow
-        $verifier = \aad_sso_generate_pkce_code_verifier();
-        $challenge = \aad_sso_generate_pkce_code_challenge($verifier);
+        $verifier = aad_sso_generate_pkce_code_verifier();
+        $challenge = aad_sso_generate_pkce_code_challenge($verifier);
 
         // Verify the challenge is valid base64url
         $this->assertMatchesRegularExpression('/^[A-Za-z0-9-_]+$/', $challenge);
 
         // Validate that verifier produces the stored challenge
-        $this->assertTrue(\aad_sso_validate_pkce_code_verifier($verifier, $challenge));
+        $this->assertTrue(aad_sso_validate_pkce_code_verifier($verifier, $challenge));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
