@@ -110,7 +110,7 @@ class Settings
      */
     public static function get_defaults(?string $key = null): mixed
     {
-        /** @var array<string, mixed> $defaults */
+        /** @var array<string, mixed> */
         static $defaults = null;
 
         if (null === $defaults) {
@@ -657,7 +657,7 @@ class Settings
         );
 
         if (!empty($remote_response)) {
-            /** @var mixed $decoded */
+            /** @var mixed */
             $openid_configuration = json_decode($remote_response, true);
 
             if (\JSON_ERROR_NONE !== json_last_error()) {
