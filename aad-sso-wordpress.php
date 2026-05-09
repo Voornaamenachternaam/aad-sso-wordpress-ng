@@ -1091,7 +1091,7 @@ class AADSSO
 
         $user = new WP_User((int) $user_id);
 
-        return $user instanceof WP_User && $user->exists() ? $user : null;
+        return $user->exists() ? $user : null;
     }
 
     /**

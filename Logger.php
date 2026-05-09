@@ -23,9 +23,9 @@ class Logger
     private const MIN_TOKEN_LENGTH = 40;
 
     private const REDACT_PATTERNS = [
-        '/\bBearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]*/i',
-        '/\beyJ[Aa-zA-Z0-9\-_]+\.[Aa-zA-Z0-9\-_]+\.[Aa-zA-Z0-9\-_]*/',
-        '/\b[A-Za-z0-9+/]{' . self::MIN_TOKEN_LENGTH . ',}[=]{0,2}\b/',
+        '~\\bBearer\\s+[A-Za-z0-9\\-_]+\\.[A-Za-z0-9\\-_]+\\.[A-Za-z0-9\\-_]*~i',
+        '~\\beyJ[Aa-zA-Z0-9\\-_]+\\.[Aa-zA-Z0-9\\-_]+\\.[Aa-zA-Z0-9\\-_]*~',
+        '~\\b[A-Za-z0-9+/]{' . self::MIN_TOKEN_LENGTH . ',}[=]{0,2}\\b~',
     ];
 
     private const SENSITIVE_KEYS = [
