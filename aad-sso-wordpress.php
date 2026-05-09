@@ -148,11 +148,12 @@ class AADSSO
 
         if ($this->wants_to_login()) {
             if (isset($_GET['redirect_to']) && \is_string($_GET['redirect_to'])) {
-                // Validate redirect URL against configured security policies
-                // This provides defense-in-depth against open redirect attacks
+                // First validate against configured security policies
+                // Then sanitize as defense-in-depth before storing in session
                 $validated_redirect = AADSSO_Settings::validate_redirect_url($_GET['redirect_to']);
                 if ('' !== $validated_redirect) {
-                    $_SESSION['aadsso_redirect_to'] = $validated_redirect;
+                    // Apply WordPress sanitization as additional defense-in-depth
+                    $_SESSION['aadsso_redirect_to'] = sanitize_url($validated_redirect);
                 }
             }
 
