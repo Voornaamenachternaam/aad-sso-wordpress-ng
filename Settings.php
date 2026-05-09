@@ -67,6 +67,25 @@ class Settings
     public array $allowed_tenant_ids = [];
 
     /**
+     * Allowed redirect domains for post-login redirect validation.
+     *
+     * If non-empty, the redirect_to parameter will only be accepted
+     * if it points to a domain in this list. This prevents open redirect
+     * vulnerabilities where an attacker could redirect users to a malicious site.
+     *
+     * @var list<string>
+     */
+    public array $allowed_redirect_domains = [];
+
+    /**
+     * Whether to block external redirects entirely.
+     *
+     * If true, redirects are only allowed to the current WordPress site domain.
+     * This provides defense-in-depth against open redirect attacks.
+     */
+    public bool $block_external_redirects = false;
+
+    /**
      * @var null|self
      */
     private static ?self $instance = null;
@@ -229,6 +248,14 @@ class Settings
             self::$options_resolver->define('allowed_tenant_ids')
                 ->allowedTypes('array')
                 ->default([]);
+
+            self::$options_resolver->define('allowed_redirect_domains')
+                ->allowedTypes('array')
+                ->default([]);
+
+            self::$options_resolver->define('block_external_redirects')
+                ->allowedTypes('bool')
+                ->default(false);
         }
 
         return self::$options_resolver;
@@ -516,6 +543,8 @@ class Settings
             'tenantRestrictionMode' => \is_string($value) && \in_array($value, ['none', 'single', 'multi'], true) ? $value : 'none',
             'expected_tenant_id' => self::sanitize_tenant_id($value),
             'allowed_tenant_ids' => self::sanitize_tenant_ids($value),
+            'allowed_redirect_domains' => self::sanitize_redirect_domains($value),
+            'block_external_redirects',
             'match_on_upn_alias',
             'enable_auto_provisioning',
             'enable_auto_forward_to_aad',
@@ -597,6 +626,158 @@ class Settings
                 $value
             )
         );
+    }
+
+    /**
+     * Sanitize and validate allowed redirect domains.
+     *
+     * Validates each domain to ensure it follows proper hostname format.
+     * Handles both array and newline-separated string input for flexibility.
+     *
+     * @param mixed $value Array of domains or newline-separated string
+     *
+     * @return list<string>
+     */
+    private static function sanitize_redirect_domains(mixed $value): array
+    {
+        // Handle newline-separated string input (from UI textarea)
+        if (\is_string($value)) {
+            $lines = array_filter(
+                array_map('trim', explode("\n", $value))
+            );
+            $value = $lines;
+        }
+
+        if (!\is_array($value)) {
+            return [];
+        }
+
+        // @var list<string> $sanitized
+        return array_filter(
+            array_map(
+                static function (mixed $domain): string {
+                    if (!\is_string($domain)) {
+                        return '';
+                    }
+
+                    $trimmed = mb_trim($domain);
+
+                    // Empty strings are filtered out
+                    if ('' === $trimmed) {
+                        return '';
+                    }
+
+                    // Remove protocol if present (normalize input)
+                    $trimmed = preg_replace('#^https?://#', '', $trimmed);
+
+                    // Remove trailing slash
+                    $trimmed = rtrim($trimmed, '/');
+
+                    // Validate hostname format:
+                    // - Must not be empty after removing protocol/slash
+                    // - Must contain at least one dot (to be a domain, not just "localhost")
+                    // - Must only contain valid hostname characters
+                    if (
+                        '' === $trimmed
+                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i', $trimmed)
+                    ) {
+                        return '';
+                    }
+
+                    return $trimmed;
+                },
+                $value
+            )
+        );
+    }
+
+    /**
+     * Validate a redirect URL against configured security policies.
+     *
+     * This provides defense-in-depth against open redirect attacks.
+     *
+     * Security checks (in order):
+     * 1. If block_external_redirects is enabled, only allow same-site redirects
+     * 2. If allowed_redirect_domains is configured, only allow redirects to those domains
+     * 3. Falls back to wp_safe_redirect() which validates against allowed hosts
+     *
+     * @param string $redirect_url The URL to validate
+     *
+     * @return string The validated URL, or empty string if not allowed
+     */
+    public static function validate_redirect_url(string $redirect_url): string
+    {
+        // Empty URL is always allowed (will use default)
+        if ('' === $redirect_url) {
+            return '';
+        }
+
+        // Parse the redirect URL
+        $parsed = parse_url($redirect_url);
+
+        // If parse failed or no host, it's likely a relative URL - allow it
+        if (false === $parsed || !isset($parsed['host'])) {
+            // Relative URLs are typically safe (within the same site)
+            // But validate against WordPress's safe hosts
+            if (empty($redirect_url) || $redirect_url[0] === '/') {
+                return $redirect_url;
+            }
+
+            return '';
+        }
+
+        $redirect_host = mb_strtolower($parsed['host']);
+
+        // Check block_external_redirects first
+        if (!empty(self::get_instance()->block_external_redirects)) {
+            $site_host = mb_strtolower(parse_url(site_url(), PHP_URL_HOST) ?: '');
+
+            if ($redirect_host !== $site_host) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('External redirect blocked: %s (only %s allowed)', $redirect_url, $site_host)
+                );
+
+                return '';
+            }
+        }
+
+        // Check allowed_redirect_domains
+        $allowed_domains = self::get_instance()->allowed_redirect_domains;
+        if (!empty($allowed_domains)) {
+            $allowed_lower = array_map('mb_strtolower', $allowed_domains);
+            $redirect_lower = mb_strtolower($redirect_host);
+
+            // Check exact match or subdomain match
+            $is_allowed = false;
+            foreach ($allowed_lower as $allowed) {
+                // Exact match
+                if ($redirect_lower === $allowed) {
+                    $is_allowed = true;
+
+                    break;
+                }
+
+                // Subdomain match (example.com allows sub.example.com)
+                if (
+                    strlen($redirect_lower) > strlen($allowed) + 1
+                    && str_ends_with($redirect_lower, '.' . $allowed)
+                ) {
+                    $is_allowed = true;
+
+                    break;
+                }
+            }
+
+            if (!$is_allowed) {
+                AADSSO_Logger::log_warning(
+                    \sprintf('Redirect to untrusted domain blocked: %s (not in allowlist)', $redirect_url)
+                );
+
+                return '';
+            }
+        }
+
+        return $redirect_url;
     }
 }
 

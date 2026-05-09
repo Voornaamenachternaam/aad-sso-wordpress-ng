@@ -5,6 +5,81 @@ declare(strict_types=1);
 use Firebase\JWT\{BeforeValidException, ExpiredException, JWK, JWT, SignatureInvalidException};
 use Psr\Http\Message\ResponseInterface;
 
+/**
+ * PKCE (Proof Key for Code Exchange) implementation per RFC 7636.
+ *
+ * References:
+ * - https://datatracker.ietf.org/doc/html/rfc7636
+ * - https://www.rfc-editor.org/rfc/rfc7636
+ * - https://oauth.com/oauth2-servers/pkce/
+ *
+ * PKCE is mandatory for all OAuth 2.0 clients per OAuth 2.1 and provides
+ * protection against authorization code interception attacks.
+ */
+
+/**
+ * Generate a standards-compliant PKCE code_verifier.
+ *
+ * Per RFC 7636:
+ * - MUST be between 43 and 128 characters (inclusive)
+ * - MUST use only unreserved characters: [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~"
+ * - RECOMMEND 256 bits of entropy (32 bytes → 43 chars when base64url-encoded)
+ *
+ * @return string The generated code_verifier
+ */
+function aad_sso_generate_pkce_code_verifier(): string
+{
+    // Generate 32 bytes of cryptographically secure random data
+    // This produces 43 characters when base64url-encoded without padding
+    $random_bytes = random_bytes(32);
+
+    // Base64url encode (RFC 4648 Section 5 with URL-safe alphabet)
+    return rtrim(strtr(base64_encode($random_bytes), '+/', '-_'), '=');
+}
+
+/**
+ * Generate a PKCE code_challenge using S256 method.
+ *
+ * Per RFC 7636:
+ * - code_challenge = BASE64URL(SHA256(ASCII(code_verifier)))
+ * - S256 method is REQUIRED (plaintext method is deprecated)
+ *
+ * @param string $code_verifier The code_verifier string
+ *
+ * @return string The S256 code_challenge
+ */
+function aad_sso_generate_pkce_code_challenge(string $code_verifier): string
+{
+    // Compute SHA-256 hash of the verifier string (using binary output)
+    $hash = hash('sha256', $code_verifier, true);
+
+    // Base64url encode the hash without padding
+    return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+}
+
+/**
+ * Validate a PKCE code_verifier against an expected code_challenge.
+ *
+ * @param string $code_verifier The verifier to validate
+ * @param string $expected_challenge The expected code_challenge from the authorization request
+ *
+ * @return bool True if the verifier produces the expected challenge
+ */
+function aad_sso_validate_pkce_code_verifier(string $code_verifier, string $expected_challenge): bool
+{
+    // Validate code_verifier format per RFC 7636
+    // Must be 43-128 characters, using only unreserved characters
+    if (!preg_match('/^[A-Za-z0-9\-._~]{43,128}$/', $code_verifier)) {
+        return false;
+    }
+
+    // Compute the challenge from the verifier and compare
+    $computed_challenge = aad_sso_generate_pkce_code_challenge($code_verifier);
+
+    // Use constant-time comparison to prevent timing attacks
+    return hash_equals($expected_challenge, $computed_challenge);
+}
+
 class AuthorizationHelper
 {
     /**
@@ -71,9 +146,28 @@ class AuthorizationHelper
         return implode(' ', $scopes);
     }
 
-    public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id): string
+    /**
+     * Build the authorization URL with PKCE.
+     *
+     * Per RFC 7636 (PKCE) and Microsoft identity platform:
+     * - Include code_challenge and code_challenge_method in authorization request
+     * - S256 is the only supported method (plain is deprecated)
+     *
+     * @see https://datatracker.ietf.org/doc/html/rfc7636
+     * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow
+     *
+     * @param AADSSO_Settings $settings
+     * @param string          $antiforgery_id
+     * @param string          $code_verifier The PKCE code_verifier (stored in session for token exchange)
+     *
+     * @return string The authorization URL
+     */
+    public static function get_authorization_url(AADSSO_Settings $settings, string $antiforgery_id, string $code_verifier): string
     {
         $scope_string = self::build_scope_string($settings);
+
+        // Generate the S256 code_challenge from the verifier
+        $code_challenge = aad_sso_generate_pkce_code_challenge($code_verifier);
 
         // Use V2.0 endpoint query parameters for scope-based authorization
         return $settings->authorization_endpoint . '?'
@@ -85,14 +179,43 @@ class AuthorizationHelper
                 'redirect_uri' => $settings->redirect_uri,
                 'state' => $antiforgery_id,
                 'nonce' => $antiforgery_id,
+                // PKCE parameters (RFC 7636)
+                'code_challenge' => $code_challenge,
+                'code_challenge_method' => 'S256',
             ]);
     }
 
-    public static function get_access_token(string $code, AADSSO_Settings $settings): mixed
+    /**
+     * Get access token from authorization code with PKCE verification.
+     *
+     * Per RFC 7636 (PKCE):
+     * - The code_verifier must be sent during token exchange
+     * - The authorization server verifies that the code_verifier matches the code_challenge
+     *
+     * @see https://datatracker.ietf.org/doc/html/rfc7636
+     *
+     * @param string          $code         The authorization code
+     * @param AADSSO_Settings $settings
+     * @param string          $code_verifier The PKCE code_verifier (previously generated and stored)
+     *
+     * @return mixed
+     */
+    public static function get_access_token(string $code, AADSSO_Settings $settings, string $code_verifier): mixed
     {
         $scope_string = self::build_scope_string($settings);
 
+        // Validate the code_verifier format before using it
+        if (!preg_match('/^[A-Za-z0-9\-._~]{43,128}$/', $code_verifier)) {
+            AADSSO_Logger::log_error('Invalid PKCE code_verifier format received');
+
+            return new WP_Error(
+                'invalid_pkce_verifier',
+                'Invalid PKCE code_verifier format. The verifier must be 43-128 characters using unreserved characters.'
+            );
+        }
+
         // Use V2.0 token request with scope parameter instead of resource parameter
+        // Include code_verifier for PKCE (RFC 7636)
         $authentication_request_body = http_build_query([
             'grant_type' => 'authorization_code',
             'code' => $code,
@@ -100,6 +223,7 @@ class AuthorizationHelper
             'scope' => $scope_string,
             'client_id' => $settings->client_id,
             'client_secret' => $settings->client_secret,
+            'code_verifier' => $code_verifier,
         ]);
 
         return self::get_and_process_access_token($authentication_request_body, $settings);
