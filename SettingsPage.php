@@ -720,7 +720,7 @@ class SettingsPage
 
         // Parse allowed_tenant_ids - centralized in Settings::sanitize_tenant_ids()
         $allowed_tenant_ids_raw = $input['allowed_tenant_ids'] ?? '';
-        $sanitized['allowed_tenant_ids'] = \AADSSO_Settings::sanitize_tenant_ids($allowed_tenant_ids_raw);
+        $sanitized['allowed_tenant_ids'] = AADSSO_Settings::sanitize_tenant_ids($allowed_tenant_ids_raw);
 
         return $sanitized;
     }
