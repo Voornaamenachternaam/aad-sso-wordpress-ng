@@ -302,21 +302,45 @@ class SettingsTest extends TestCase
     }
 
     /**
-     * Test sanitize_redirect_domains rejects invalid hostnames.
+     * Test sanitize_redirect_domains accepts single-label hostnames like localhost.
+     */
+    public function testSanitizeRedirectDomainsAcceptsSingleLabelHostnames(): void
+    {
+        // Single label hostnames should now be accepted
+        $result = \AADSSO_Settings::sanitize_redirect_domains('localhost');
+        $this->assertContains('localhost', $result);
+
+        $result2 = \AADSSO_Settings::sanitize_redirect_domains('devserver');
+        $this->assertContains('devserver', $result2);
+
+        $result3 = \AADSSO_Settings::sanitize_redirect_domains('my-server');
+        $this->assertContains('my-server', $result3);
+    }
+
+    /**
+     * Test sanitize_redirect_domains rejects truly invalid hostnames.
      */
     public function testSanitizeRedirectDomainsRejectsInvalidHostnames(): void
     {
-        // Single label without dot is not a valid domain
-        $result = \AADSSO_Settings::sanitize_redirect_domains('localhost');
-        $this->assertNotContains('localhost', $result);
-
         // Empty string
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains('');
-        $this->assertEquals([], $result2);
+        $result = \AADSSO_Settings::sanitize_redirect_domains('');
+        $this->assertEquals([], $result);
 
         // Only whitespace
-        $result3 = \AADSSO_Settings::sanitize_redirect_domains('   ');
+        $result2 = \AADSSO_Settings::sanitize_redirect_domains('   ');
+        $this->assertEquals([], $result2);
+
+        // Contains spaces
+        $result3 = \AADSSO_Settings::sanitize_redirect_domains('has space.com');
         $this->assertEquals([], $result3);
+
+        // Starts with dash
+        $result4 = \AADSSO_Settings::sanitize_redirect_domains('-startswithdash.com');
+        $this->assertEquals([], $result4);
+
+        // Ends with dash
+        $result5 = \AADSSO_Settings::sanitize_redirect_domains('endswithdash-.com');
+        $this->assertEquals([], $result5);
     }
 
     /**

@@ -721,6 +721,9 @@ class Settings
      * Sanitize and validate allowed redirect domains.
      *
      * Validates each domain to ensure it follows proper hostname format.
+     * Accepts both single-label hostnames (e.g., "localhost") and multi-label
+     * domain names (e.g., "example.com", "sub.example.org").
+     *
      * Handles both array and newline-separated string input for flexibility.
      *
      * @param mixed $value Array of domains or newline-separated string
@@ -764,11 +767,24 @@ class Settings
 
                     // Validate hostname format:
                     // - Must not be empty after removing protocol/slash
-                    // - Must contain at least one dot (to be a domain, not just "localhost")
-                    // - Must only contain valid hostname characters
+                    // - Must contain only valid hostname characters
+                    // - Supports single-label (localhost, devserver) and multi-label (example.com)
+                    //
+                    // Valid patterns:
+                    //   localhost
+                    //   devserver
+                    //   example.com
+                    //   sub.example.com
+                    //   my-server.local
+                    //
+                    // Invalid:
+                    //   (empty string)
+                    //   host-
+                    //   -host
+                    //   contains spaces
                     if (
                         '' === $trimmed
-                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i', $trimmed)
+                        || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i', $trimmed)
                     ) {
                         return '';
                     }
