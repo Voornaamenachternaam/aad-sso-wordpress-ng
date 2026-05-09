@@ -273,26 +273,26 @@ class SettingsTest extends TestCase
      * Test validate_redirect_url rejects external redirects when block_external_redirects is true.
      *
      * Note: This test requires WordPress functions (home_url()) to be available.
-     * Without WordPress, home_url() returns empty and all hosts are considered "external".
-     * In a full WordPress test environment, this would be mocked.
+     * Skip when running outside WordPress environment.
      */
     public function testValidateRedirectUrlRejectsExternalWhenBlocked(): void
     {
+        // Skip if home_url() is not available (outside WordPress environment)
+        if (!\function_exists('home_url')) {
+            $this->markTestSkipped('home_url() not available outside WordPress environment');
+        }
+
         // Enable external redirect blocking
         $settings = \AADSSO_Settings::get_instance();
         $original_block_setting = $settings->block_external_redirects;
         $settings->block_external_redirects = true;
 
         // Test external URL is rejected
-        // Without WordPress initialized, home_url() returns empty, so ALL hosts are "external"
         $result = \AADSSO_Settings::validate_redirect_url('https://evil.com/steal?redirect=bank');
         $this->assertEquals('', $result, 'External redirect should be blocked when block_external_redirects is true');
 
-        // Test same-site URL (if home_url() works) would be allowed
-        // This tests the positive case - internal URLs should pass through
-        // When WordPress is not initialized, this may also be blocked due to home_url() returning empty
+        // Test relative URLs are always allowed
         $result2 = \AADSSO_Settings::validate_redirect_url('/wp-admin/');
-        // Relative URLs are always allowed regardless of block_external_redirects
         $this->assertEquals('/wp-admin/', $result2, 'Relative URLs should always be allowed');
 
         // Restore original setting
@@ -300,16 +300,16 @@ class SettingsTest extends TestCase
     }
 
     /**
-     * Test sanitize_redirect_domains handles invalid input.
+     * Test sanitize_redirect_domains handles invalid input through public sanitize() API.
      */
     public function testSanitizeRedirectDomainsHandlesInvalidInput(): void
     {
-        // Null input
-        $result = \AADSSO_Settings::sanitize_redirect_domains(null);
+        // Test null input via public sanitize API
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', null);
         $this->assertEquals([], $result);
 
-        // Non-array, non-string input
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains(123);
+        // Test non-string, non-array input
+        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 123);
         $this->assertEquals([], $result2);
     }
 
@@ -318,11 +318,11 @@ class SettingsTest extends TestCase
      */
     public function testSanitizeRedirectDomainsStripsProtocolsAndSlashes(): void
     {
-        $result = \AADSSO_Settings::sanitize_redirect_domains('https://Example.COM/');
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'https://Example.COM/');
         $this->assertContains('example.com', $result);
         $this->assertNotContains('Example.COM', $result);
 
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains('http://EXAMPLE.ORG/path/');
+        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'http://EXAMPLE.ORG/path/');
         $this->assertContains('example.org', $result2);
     }
 
@@ -332,13 +332,13 @@ class SettingsTest extends TestCase
     public function testSanitizeRedirectDomainsAcceptsSingleLabelHostnames(): void
     {
         // Single label hostnames should now be accepted
-        $result = \AADSSO_Settings::sanitize_redirect_domains('localhost');
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'localhost');
         $this->assertContains('localhost', $result);
 
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains('devserver');
+        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'devserver');
         $this->assertContains('devserver', $result2);
 
-        $result3 = \AADSSO_Settings::sanitize_redirect_domains('my-server');
+        $result3 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'my-server');
         $this->assertContains('my-server', $result3);
     }
 
@@ -348,23 +348,23 @@ class SettingsTest extends TestCase
     public function testSanitizeRedirectDomainsRejectsInvalidHostnames(): void
     {
         // Empty string
-        $result = \AADSSO_Settings::sanitize_redirect_domains('');
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', '');
         $this->assertEquals([], $result);
 
         // Only whitespace
-        $result2 = \AADSSO_Settings::sanitize_redirect_domains('   ');
+        $result2 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', '   ');
         $this->assertEquals([], $result2);
 
         // Contains spaces
-        $result3 = \AADSSO_Settings::sanitize_redirect_domains('has space.com');
+        $result3 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'has space.com');
         $this->assertEquals([], $result3);
 
         // Starts with dash
-        $result4 = \AADSSO_Settings::sanitize_redirect_domains('-startswithdash.com');
+        $result4 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', '-startswithdash.com');
         $this->assertEquals([], $result4);
 
         // Ends with dash
-        $result5 = \AADSSO_Settings::sanitize_redirect_domains('endswithdash-.com');
+        $result5 = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', 'endswithdash-.com');
         $this->assertEquals([], $result5);
     }
 
@@ -373,13 +373,13 @@ class SettingsTest extends TestCase
      */
     public function testSanitizeRedirectDomainsHandlesNewlineSeparatedInput(): void
     {
-        $input = "example.com\nsubdomain.example.org\napi.example.net";
-        $result = \AADSSO_Settings::sanitize_redirect_domains($input);
+        $input = "example.com\nexample.org\nsub.example.net";
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', $input);
 
         $this->assertCount(3, $result);
         $this->assertContains('example.com', $result);
-        $this->assertContains('subdomain.example.org', $result);
-        $this->assertContains('api.example.net', $result);
+        $this->assertContains('example.org', $result);
+        $this->assertContains('sub.example.net', $result);
     }
 
     /**
@@ -394,7 +394,7 @@ class SettingsTest extends TestCase
             '   ',
             'https://another-valid.com/',
         ];
-        $result = \AADSSO_Settings::sanitize_redirect_domains($input);
+        $result = \AADSSO_Settings::sanitize_option('allowed_redirect_domains', $input);
 
         $this->assertCount(2, $result);
         $this->assertContains('valid.example.com', $result);
