@@ -803,7 +803,31 @@ class AADSSO
     public function register_session(): void
     {
         if (!session_id()) {
-            // Set hardened session cookie parameters before starting the session
+            // ─────────────────────────────────────────────────────────────────
+            // Session security hardening - MUST be set BEFORE session_start()
+            //
+            // Per PHP security best practices:
+            // - session.use_strict_mode: Reject uninitialized session IDs
+            // - session.use_only_cookies: Prevent URL-based session IDs
+            //
+            // References:
+            // - https://php.net/manual/en/features.session.security.ini.php
+            // - https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions
+            // ─────────────────────────────────────────────────────────────────
+
+            // Enable strict session mode to reject uninitialized session IDs
+            // This must be set BEFORE session_start() to take effect
+            if (\ini_get('session.use_strict_mode') === '0') {
+                \ini_set('session.use_strict_mode', '1');
+            }
+
+            // Force cookie-only sessions (no URL-based session IDs)
+            // This must be set BEFORE session_start() to take effect
+            if (\ini_get('session.use_only_cookies') === '0') {
+                \ini_set('session.use_only_cookies', '1');
+            }
+
+            // Set hardened session cookie parameters BEFORE starting the session
             // Per PHP session security best practices:
             // - Secure: Only send cookie over HTTPS
             // - HttpOnly: Prevent JavaScript access to session cookie
@@ -833,18 +857,8 @@ class AADSSO
                 );
             }
 
+            // NOW start the session - all settings above will take effect
             session_start();
-
-            // Enable strict session mode to reject uninitialized session IDs
-            // This helps prevent session fixation attacks
-            if ('0' === \ini_get('session.use_strict_mode')) {
-                ini_set('session.use_strict_mode', '1');
-            }
-
-            // Force cookie-only sessions (no URL-based session IDs)
-            if ('0' === \ini_get('session.use_only_cookies')) {
-                ini_set('session.use_only_cookies', '1');
-            }
         }
     }
 
