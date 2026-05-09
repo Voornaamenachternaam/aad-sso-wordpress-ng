@@ -13,7 +13,7 @@
  * Domain Path: /languages
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
- * Requires PHP: 8.5.5
+ * Requires PHP: 8.2.0
  */
 
 declare(strict_types=1);
