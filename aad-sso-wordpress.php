@@ -99,7 +99,7 @@ if (!\function_exists('mb_rtrim')) {
      * Uses regex for correct multibyte character boundary handling.
      *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: Unicode whitespace)
+     * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
      *
      * @return string The trimmed string
      */
@@ -138,7 +138,7 @@ if (!\function_exists('mb_trim')) {
      * Uses regex for correct multibyte character boundary handling.
      *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: Unicode whitespace)
+     * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
      *
      * @return string The trimmed string
      */
