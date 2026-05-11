@@ -80,7 +80,6 @@ class AADSSO
         add_action('wp_logout', [$this, 'logout']);
         add_action('login_init', [$this, 'save_redirect_and_maybe_bypass_login'], 20);
         add_filter('login_redirect', [$this, 'redirect_after_login'], 20, 3);
-        add_action('plugins_loaded', [$this, 'load_textdomain']);
 
         if (isset($this->settings->enable_safe_debug_mode)) {
             AADSSO_Logger::set_safe_debug_mode($this->settings->enable_safe_debug_mode);
@@ -1211,5 +1210,6 @@ register_deactivation_hook(__FILE__, [AADSSO::class, 'deactivate']);
  */
 add_action('plugins_loaded', static function (): void {
     $aadsso_settings_instance = AADSSO_Settings::init();
-    AADSSO::get_instance($aadsso_settings_instance);
+    $aadsso = AADSSO::get_instance($aadsso_settings_instance);
+    $aadsso->load_textdomain();
 }, 1);
