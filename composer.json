@@ -4,7 +4,7 @@
   "type": "wordpress-plugin",
   "license": "MIT",
   "require": {
-    "php": ">=8.2.0",
+    "php": ">=8.4.0",
     "psr/simple-cache": "^3.0",
     "firebase/php-jwt": "^7.0.5",
     "symfony/options-resolver": "^8.0.8",
