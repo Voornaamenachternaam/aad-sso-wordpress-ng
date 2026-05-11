@@ -31,8 +31,8 @@ declare(strict_types=1);
 // ─────────────────────────────────────────────────────────────────────────────
 const AADSSO_MIN_PHP_VERSION = '8.4.0';
 
-if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
-    /**
+if (version_compare(\PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
+    /*
      * Fires before the plugin is loaded for displaying PHP version error.
      * Using add_action ensures WordPress is initialized enough for wp_die().
      */
@@ -44,7 +44,7 @@ if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
                     'Single Sign-on with Microsoft Entra ID requires PHP '
                     . AADSSO_MIN_PHP_VERSION
                     . ' or higher. You are running PHP '
-                    . PHP_VERSION
+                    . \PHP_VERSION
                     . '.',
                     'aad-sso-wordpress'
                 ) . '</p>'
