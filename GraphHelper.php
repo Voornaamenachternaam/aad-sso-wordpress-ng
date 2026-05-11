@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use Psr\Http\Message\ResponseInterface;
 
+if (!\defined('ABSPATH')) {
+    exit;
+}
+
 class GraphHelper
 {
     public const GRAPH_VERSION = 'v1.0';

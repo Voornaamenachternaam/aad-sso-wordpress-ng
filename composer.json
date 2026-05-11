@@ -4,7 +4,7 @@
   "type": "wordpress-plugin",
   "license": "MIT",
   "require": {
-    "php": ">=8.5.5",
+    "php": ">=8.2.0",
     "psr/simple-cache": "^3.0",
     "firebase/php-jwt": "^7.0.5",
     "symfony/options-resolver": "^8.0.8",
@@ -26,8 +26,17 @@
     "wp-coding-standards/wpcs": "^3.3.0"
   },
   "autoload": {
+    "classmap": [
+      "aad-sso-wordpress.php",
+      "Logger.php",
+      "HttpClient.php",
+      "Settings.php",
+      "SettingsPage.php",
+      "AuthorizationHelper.php",
+      "GraphHelper.php"
+    ],
     "psr-4": {
-      "Firebase\\JWT\\": "lib/vendor/firebase/php-jwt/src/"
+      "Firebase\\JWT\\": "vendor/firebase/php-jwt/src/"
     }
   },
   "config": {

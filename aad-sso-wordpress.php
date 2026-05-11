@@ -14,6 +14,7 @@
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
  * Requires PHP: 8.2.0
+ * Tested up to PHP: 8.4
  */
 
 declare(strict_types=1);
@@ -1169,6 +1170,11 @@ class AADSSO
 }
 
 if (!\function_exists('aad_sso_create_uuid')) {
+    /**
+     * Generate a cryptographically secure UUID v4.
+     *
+     * @return string RFC 4122 compliant UUID v4
+     */
     function aad_sso_create_uuid(): string
     {
         $random_bytes = random_bytes(16);
@@ -1183,5 +1189,17 @@ if (!\function_exists('aad_sso_create_uuid')) {
     }
 }
 
-$aadsso_settings_instance = AADSSO_Settings::init();
-$aadsso = AADSSO::get_instance($aadsso_settings_instance);
+/**
+ * Initialize the plugin on plugins_loaded hook.
+ *
+ * Deferred initialization ensures WordPress is fully loaded before:
+ * - Loading settings from database
+ * - Making HTTP requests for OpenID configuration
+ * - Registering hooks and filters
+ *
+ * Priority 1 ensures this runs early enough for other plugins to interact.
+ */
+add_action('plugins_loaded', static function (): void {
+    $aadsso_settings_instance = AADSSO_Settings::init();
+    $aadsso = AADSSO::get_instance($aadsso_settings_instance);
+}, 1);
