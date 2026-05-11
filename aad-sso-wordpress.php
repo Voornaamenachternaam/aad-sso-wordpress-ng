@@ -13,12 +13,126 @@
  * Domain Path: /languages
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
- * Requires PHP: 8.4.0
+ * Requires PHP: 8.4
  */
 
 declare(strict_types=1);
 
 \defined('ABSPATH') || exit;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHP Version Requirement Check
+//
+// This plugin requires PHP 8.4.0 or higher. This check must run before any
+// other plugin code to prevent fatal errors on incompatible PHP versions.
+//
+// Note: WordPress plugin headers alone may not prevent activation on older PHP
+// versions in all configurations. A runtime check provides defense-in-depth.
+// ─────────────────────────────────────────────────────────────────────────────
+const AADSSO_MIN_PHP_VERSION = '8.4.0';
+
+if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
+    /**
+     * Fires before the plugin is loaded for displaying PHP version error.
+     * Using add_action ensures WordPress is initialized enough for wp_die().
+     */
+    add_action('init', static function (): void {
+        if (!\defined('AADSSO_VERSION_CHECK_FAILED')) {
+            \define('AADSSO_VERSION_CHECK_FAILED', true);
+            wp_die(
+                '<p>' . esc_html__(
+                    'Single Sign-on with Microsoft Entra ID requires PHP '
+                    . AADSSO_MIN_PHP_VERSION
+                    . ' or higher. You are running PHP '
+                    . PHP_VERSION
+                    . '.',
+                    'aad-sso-wordpress'
+                ) . '</p>'
+                . '<p>' . esc_html__(
+                    'Please contact your hosting provider to upgrade PHP.',
+                    'aad-sso-wordpress'
+                ) . '</p>',
+                esc_html__('PHP Version Error', 'aad-sso-wordpress'),
+                ['response' => 500, 'back_link' => true]
+            );
+        }
+    }, 1);
+
+    return;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// mb_rtrim() and mb_trim() Polyfills
+//
+// Both mb_rtrim() and mb_trim() were introduced in PHP 8.4.0. These polyfills
+// provide compatibility for environments where they may not be available
+// (e.g., custom mbstring builds, embedded PHP, or future PHP versions).
+//
+// mb_trim() is a multibyte-aware version of trim() that removes:
+// - Leading and trailing whitespace (when $characters is null)
+// - Leading and trailing characters specified in $characters
+//
+// References:
+// - https://www.php.net/manual/en/function.mb-trim.php
+// - https://wiki.php.net/rfc/mb_trim
+// ─────────────────────────────────────────────────────────────────────────────
+if (!\function_exists('mb_rtrim')) {
+    /**
+     * Multibyte-safe right trim.
+     *
+     * @param string      $string     The string to trim
+     * @param string|null $characters Optional characters to trim (default: whitespace)
+     *
+     * @return string The trimmed string
+     */
+    function mb_rtrim(string $string, ?string $characters = null): string
+    {
+        if ('' === $string) {
+            return '';
+        }
+
+        if (null === $characters) {
+            return rtrim($string);
+        }
+
+        // Handle the case where $characters is an empty string (no trimming)
+        if ('' === $characters) {
+            return $string;
+        }
+
+        // Use rtrim with the specified characters
+        return rtrim($string, $characters);
+    }
+}
+
+if (!\function_exists('mb_trim')) {
+    /**
+     * Multibyte-safe trim.
+     *
+     * @param string      $string     The string to trim
+     * @param string|null $characters Optional characters to trim (default: whitespace)
+     *
+     * @return string The trimmed string
+     */
+    function mb_trim(string $string, ?string $characters = null): string
+    {
+        if ('' === $string) {
+            return '';
+        }
+
+        if (null === $characters) {
+            return trim($string);
+        }
+
+        // Handle the case where $characters is an empty string (no trimming)
+        if ('' === $characters) {
+            return $string;
+        }
+
+        // Use trim with the specified characters
+        return trim($string, $characters);
+    }
+}
 
 $autoloader = __DIR__ . '/vendor/autoload.php';
 if (file_exists($autoloader)) {
