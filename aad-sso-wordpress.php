@@ -154,7 +154,7 @@ if (!\function_exists('mb_trim')) {
      *
      * @param string      $string     The string to trim
      * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
-     * @param null|string $encoding  Optional character encoding (default: internal encoding)
+     * @param null|string $encoding   Optional character encoding (default: internal encoding)
      *
      * @return string The trimmed string
      */
