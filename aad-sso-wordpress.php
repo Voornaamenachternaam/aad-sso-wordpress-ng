@@ -35,6 +35,9 @@ if (file_exists($autoloader)) {
 \defined('AADSSO_DEBUG_LEVEL') || \define('AADSSO_DEBUG_LEVEL', 0);
 
 // Load core dependencies first (order matters: Logger has no deps, HttpClient depends on Logger, Settings depends on both)
+// Note: These files use class_alias to provide prefixed names (e.g., AADSSO_Settings). The Composer autoloader
+// cannot resolve these aliased names until the corresponding files are loaded, so manual require_once is used
+// to ensure correct initialization order and avoid autoloader conflicts with the class_alias pattern.
 require_once AADSSO_PLUGIN_DIR . '/Logger.php';
 require_once AADSSO_PLUGIN_DIR . '/HttpClient.php';
 

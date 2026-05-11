@@ -25,20 +25,6 @@
     "phpunit/phpunit": "^13.1.8",
     "wp-coding-standards/wpcs": "^3.3.0"
   },
-  "autoload": {
-    "classmap": [
-      "aad-sso-wordpress.php",
-      "Logger.php",
-      "HttpClient.php",
-      "Settings.php",
-      "SettingsPage.php",
-      "AuthorizationHelper.php",
-      "GraphHelper.php"
-    ],
-    "psr-4": {
-      "Firebase\\JWT\\": "vendor/firebase/php-jwt/src/"
-    }
-  },
   "config": {
     "allow-plugins": {
       "php-http/discovery": true,
