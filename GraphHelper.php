@@ -165,3 +165,5 @@ class GraphHelper
         ];
     }
 }
+
+class_alias(GraphHelper::class, 'AADSSO_GraphHelper');
