@@ -67,9 +67,6 @@ class AADSSO
             [$this, 'add_settings_link']
         );
 
-        register_activation_hook(__FILE__, [self::class, 'activate']);
-        register_deactivation_hook(__FILE__, [self::class, 'deactivate']);
-
         if (!$this->plugin_is_configured()) {
             add_action('all_admin_notices', [$this, 'print_plugin_not_configured']);
 
@@ -1193,6 +1190,16 @@ if (!\function_exists('aad_sso_create_uuid')) {
 }
 
 /*
+ * Register activation and deactivation hooks at plugin load time.
+ *
+ * These hooks must be registered before plugins_loaded runs, otherwise they
+ * will never fire. WordPress requires activation/deactivation hooks to be
+ * registered at plugin load time, not inside plugins_loaded callbacks.
+ */
+register_activation_hook(__FILE__, [AADSSO::class, 'activate']);
+register_deactivation_hook(__FILE__, [AADSSO::class, 'deactivate']);
+
+/*
  * Initialize the plugin on plugins_loaded hook.
  *
  * Deferred initialization ensures WordPress is fully loaded before:
@@ -1204,5 +1211,5 @@ if (!\function_exists('aad_sso_create_uuid')) {
  */
 add_action('plugins_loaded', static function (): void {
     $aadsso_settings_instance = AADSSO_Settings::init();
-    $aadsso = AADSSO::get_instance($aadsso_settings_instance);
+    AADSSO::get_instance($aadsso_settings_instance);
 }, 1);
