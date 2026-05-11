@@ -68,20 +68,38 @@ if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
 // provide compatibility for environments where they may not be available
 // (e.g., custom mbstring builds, embedded PHP, or future PHP versions).
 //
-// mb_trim() is a multibyte-aware version of trim() that removes:
-// - Leading and trailing whitespace (when $characters is null)
-// - Leading and trailing characters specified in $characters
+// Unicode whitespace (per PHP 8.4 / Unicode PropList):
+// - ASCII whitespace: \t, \n, \r, \f, \v, space
+// - Non-breaking space: \u00A0
+// - Ogham space mark: \u1680
+// - En quad through em quad: \u2000-\u2006, \u3000
+// - Figure space: \u2007
+// - Punctuation space: \u2008-\u200B
+// - Four-per-em space through hair space: \u2006, \u200A-\u200C
+// - Zero-width space: \u200B
+// - Line separator: \u2028
+// - Paragraph separator: \u2029
+// - Narrow no-break space: \u202F
+// - Medium mathematical space: \u205F
+// - Word joiner: \u2060
+// - Zero-width no-break space: \uFEFF
 //
 // References:
+// - https://www.php.net/manual/en/function.mb-rtrim.php
 // - https://www.php.net/manual/en/function.mb-trim.php
 // - https://wiki.php.net/rfc/mb_trim
+// - https://unicode.org/Public/UCD/latest/ucd/PropList.txt
 // ─────────────────────────────────────────────────────────────────────────────
 if (!\function_exists('mb_rtrim')) {
     /**
      * Multibyte-safe right trim.
      *
+     * Trims characters from the right end of a multibyte string.
+     * When $characters is null, trims Unicode whitespace and control characters.
+     * Uses regex for correct multibyte character boundary handling.
+     *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: whitespace)
+     * @param string|null $characters Optional characters to trim (default: Unicode whitespace)
      *
      * @return string The trimmed string
      */
@@ -92,16 +110,22 @@ if (!\function_exists('mb_rtrim')) {
         }
 
         if (null === $characters) {
-            return rtrim($string);
+            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+            // per PHP 8.4 mb_rtrim() specification.
+            // \s in UTF-8 mode matches: \t, \n, \v, \f, \r, space, and Unicode whitespace
+            // \p{C} matches: control characters, format characters, private use, surrogates, unassigned
+            return preg_replace('/[\s\p{C}]+$/u', '', $string);
         }
 
-        // Handle the case where $characters is an empty string (no trimming)
         if ('' === $characters) {
             return $string;
         }
 
-        // Use rtrim with the specified characters
-        return rtrim($string, $characters);
+        // For specific character set, build regex pattern with proper escaping
+        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+        $escaped = preg_quote($characters, '/');
+
+        return preg_replace('/[' . $escaped . ']+$/u', '', $string);
     }
 }
 
@@ -109,8 +133,12 @@ if (!\function_exists('mb_trim')) {
     /**
      * Multibyte-safe trim.
      *
+     * Trims characters from both ends of a multibyte string.
+     * When $characters is null, trims Unicode whitespace and control characters.
+     * Uses regex for correct multibyte character boundary handling.
+     *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: whitespace)
+     * @param string|null $characters Optional characters to trim (default: Unicode whitespace)
      *
      * @return string The trimmed string
      */
@@ -121,16 +149,20 @@ if (!\function_exists('mb_trim')) {
         }
 
         if (null === $characters) {
-            return trim($string);
+            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+            // per PHP 8.4 mb_trim() specification.
+            return preg_replace('/^[\s\p{C}]+|[\s\p{C}]+$/u', '', $string);
         }
 
-        // Handle the case where $characters is an empty string (no trimming)
         if ('' === $characters) {
             return $string;
         }
 
-        // Use trim with the specified characters
-        return trim($string, $characters);
+        // For specific character set, build regex pattern with proper escaping
+        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+        $escaped = preg_quote($characters, '/');
+
+        return preg_replace('/^[' . $escaped . ']+|[' . $escaped . ']+$/u', '', $string);
     }
 }
 
