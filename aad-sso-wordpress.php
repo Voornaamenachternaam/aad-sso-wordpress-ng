@@ -33,12 +33,19 @@ if (file_exists($autoloader)) {
 \defined('AADSSO_DEBUG') || \define('AADSSO_DEBUG', false);
 \defined('AADSSO_DEBUG_LEVEL') || \define('AADSSO_DEBUG_LEVEL', 0);
 
-require_once AADSSO_PLUGIN_DIR . '/Settings.php';
-require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
-require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
-require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
+// Load core dependencies first (order matters: Logger has no deps, HttpClient depends on Logger, Settings depends on both)
 require_once AADSSO_PLUGIN_DIR . '/Logger.php';
 require_once AADSSO_PLUGIN_DIR . '/HttpClient.php';
+
+// Settings depends on Logger and HttpClient
+require_once AADSSO_PLUGIN_DIR . '/Settings.php';
+
+// SettingsPage depends on Settings and Logger
+require_once AADSSO_PLUGIN_DIR . '/SettingsPage.php';
+
+// OAuth helpers depend on Logger and HttpClient
+require_once AADSSO_PLUGIN_DIR . '/AuthorizationHelper.php';
+require_once AADSSO_PLUGIN_DIR . '/GraphHelper.php';
 
 class AADSSO
 {
