@@ -92,7 +92,7 @@ if (version_compare(\PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
 // ─────────────────────────────────────────────────────────────────────────────
 if (!\function_exists('mb_rtrim')) {
     /**
-     * Multibyte-safe right trim.
+     * Multibyte-safe right trim (PHP 8.4 API polyfill).
      *
      * Trims characters from the right end of a multibyte string.
      * When $characters is null, trims Unicode whitespace and control characters.
@@ -100,38 +100,53 @@ if (!\function_exists('mb_rtrim')) {
      *
      * @param string      $string     The string to trim
      * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
+     * @param null|string $encoding   Optional character encoding (default: internal encoding)
      *
      * @return string The trimmed string
      */
-    function mb_rtrim(string $string, ?string $characters = null): string
+    function mb_rtrim(string $string, ?string $characters = null, ?string $encoding = null): string
     {
         if ('' === $string) {
             return '';
         }
 
-        if (null === $characters) {
-            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
-            // per PHP 8.4 mb_rtrim() specification.
-            // \s in UTF-8 mode matches: \t, \n, \v, \f, \r, space, and Unicode whitespace
-            // \p{C} matches: control characters, format characters, private use, surrogates, unassigned
-            return preg_replace('/[\s\p{C}]+$/u', '', $string);
+        // Set regex encoding for preg_* functions
+        $previous_encoding = null;
+        if (null !== $encoding && \function_exists('mb_regex_encoding')) {
+            $previous_encoding = mb_regex_encoding();
+            mb_regex_encoding($encoding);
         }
 
-        if ('' === $characters) {
-            return $string;
+        try {
+            if (null === $characters) {
+                // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+                // per PHP 8.4 mb_rtrim() specification.
+                // \s in UTF-8 mode matches: \t, \n, \v, \f, \r, space, and Unicode whitespace
+                // \p{C} matches: control characters, format characters, private use, surrogates, unassigned
+                return preg_replace('/[\s\p{C}]+$/u', '', $string);
+            }
+
+            if ('' === $characters) {
+                return $string;
+            }
+
+            // For specific character set, build regex pattern with proper escaping
+            // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+            $escaped = preg_quote($characters, '/');
+
+            return preg_replace('/[' . $escaped . ']+$/u', '', $string);
+        } finally {
+            // Restore previous regex encoding
+            if (null !== $previous_encoding && \function_exists('mb_regex_encoding')) {
+                mb_regex_encoding($previous_encoding);
+            }
         }
-
-        // For specific character set, build regex pattern with proper escaping
-        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
-        $escaped = preg_quote($characters, '/');
-
-        return preg_replace('/[' . $escaped . ']+$/u', '', $string);
     }
 }
 
 if (!\function_exists('mb_trim')) {
     /**
-     * Multibyte-safe trim.
+     * Multibyte-safe trim (PHP 8.4 API polyfill).
      *
      * Trims characters from both ends of a multibyte string.
      * When $characters is null, trims Unicode whitespace and control characters.
@@ -139,30 +154,45 @@ if (!\function_exists('mb_trim')) {
      *
      * @param string      $string     The string to trim
      * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
+     * @param null|string $encoding  Optional character encoding (default: internal encoding)
      *
      * @return string The trimmed string
      */
-    function mb_trim(string $string, ?string $characters = null): string
+    function mb_trim(string $string, ?string $characters = null, ?string $encoding = null): string
     {
         if ('' === $string) {
             return '';
         }
 
-        if (null === $characters) {
-            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
-            // per PHP 8.4 mb_trim() specification.
-            return preg_replace('/^[\s\p{C}]+|[\s\p{C}]+$/u', '', $string);
+        // Set regex encoding for preg_* functions
+        $previous_encoding = null;
+        if (null !== $encoding && \function_exists('mb_regex_encoding')) {
+            $previous_encoding = mb_regex_encoding();
+            mb_regex_encoding($encoding);
         }
 
-        if ('' === $characters) {
-            return $string;
+        try {
+            if (null === $characters) {
+                // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+                // per PHP 8.4 mb_trim() specification.
+                return preg_replace('/^[\s\p{C}]+|[\s\p{C}]+$/u', '', $string);
+            }
+
+            if ('' === $characters) {
+                return $string;
+            }
+
+            // For specific character set, build regex pattern with proper escaping
+            // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+            $escaped = preg_quote($characters, '/');
+
+            return preg_replace('/^[' . $escaped . ']+|[' . $escaped . ']+$/u', '', $string);
+        } finally {
+            // Restore previous regex encoding
+            if (null !== $previous_encoding && \function_exists('mb_regex_encoding')) {
+                mb_regex_encoding($previous_encoding);
+            }
         }
-
-        // For specific character set, build regex pattern with proper escaping
-        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
-        $escaped = preg_quote($characters, '/');
-
-        return preg_replace('/^[' . $escaped . ']+|[' . $escaped . ']+$/u', '', $string);
     }
 }
 
