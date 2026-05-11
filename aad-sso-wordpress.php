@@ -31,8 +31,8 @@ declare(strict_types=1);
 // ─────────────────────────────────────────────────────────────────────────────
 const AADSSO_MIN_PHP_VERSION = '8.4.0';
 
-if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
-    /**
+if (version_compare(\PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
+    /*
      * Fires before the plugin is loaded for displaying PHP version error.
      * Using add_action ensures WordPress is initialized enough for wp_die().
      */
@@ -44,7 +44,7 @@ if (\version_compare(PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
                     'Single Sign-on with Microsoft Entra ID requires PHP '
                     . AADSSO_MIN_PHP_VERSION
                     . ' or higher. You are running PHP '
-                    . PHP_VERSION
+                    . \PHP_VERSION
                     . '.',
                     'aad-sso-wordpress'
                 ) . '</p>'
@@ -81,7 +81,7 @@ if (!\function_exists('mb_rtrim')) {
      * Multibyte-safe right trim.
      *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: whitespace)
+     * @param null|string $characters Optional characters to trim (default: whitespace)
      *
      * @return string The trimmed string
      */
@@ -92,7 +92,7 @@ if (!\function_exists('mb_rtrim')) {
         }
 
         if (null === $characters) {
-            return rtrim($string);
+            return mb_rtrim($string);
         }
 
         // Handle the case where $characters is an empty string (no trimming)
@@ -101,7 +101,7 @@ if (!\function_exists('mb_rtrim')) {
         }
 
         // Use rtrim with the specified characters
-        return rtrim($string, $characters);
+        return mb_rtrim($string, $characters);
     }
 }
 
@@ -110,7 +110,7 @@ if (!\function_exists('mb_trim')) {
      * Multibyte-safe trim.
      *
      * @param string      $string     The string to trim
-     * @param string|null $characters Optional characters to trim (default: whitespace)
+     * @param null|string $characters Optional characters to trim (default: whitespace)
      *
      * @return string The trimmed string
      */
@@ -121,7 +121,7 @@ if (!\function_exists('mb_trim')) {
         }
 
         if (null === $characters) {
-            return trim($string);
+            return mb_trim($string);
         }
 
         // Handle the case where $characters is an empty string (no trimming)
@@ -130,7 +130,7 @@ if (!\function_exists('mb_trim')) {
         }
 
         // Use trim with the specified characters
-        return trim($string, $characters);
+        return mb_trim($string, $characters);
     }
 }
 
