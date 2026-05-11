@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+if (!\defined('ABSPATH')) {
+    exit;
+}
+
 class Settings
 {
     public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
@@ -104,6 +108,11 @@ class Settings
      * @var null|OptionsResolver
      */
     private static ?OptionsResolver $options_resolver = null;
+
+    /**
+     * @var null|array<string> Cached defined options for filtering
+     */
+    private static ?array $defined_options_cache = null;
 
     /**
      * @return array<string, mixed>|mixed
@@ -579,13 +588,16 @@ class Settings
      */
     private static function filter_to_known_settings(array $settings): array
     {
-        $resolver = self::get_options_resolver();
-        $defined_options = array_keys($resolver->resolve([]));
+        // Cache defined options to avoid repeated resolve() calls
+        if (null === self::$defined_options_cache) {
+            $resolver = self::get_options_resolver();
+            self::$defined_options_cache = array_keys($resolver->resolve([]));
+        }
 
         /** @var array<string, mixed> */
         $filtered = array_filter(
             $settings,
-            static fn ($value, string $key): bool => \in_array($key, $defined_options, true),
+            static fn ($value, string $key): bool => \in_array($key, self::$defined_options_cache, true),
             \ARRAY_FILTER_USE_BOTH
         );
 

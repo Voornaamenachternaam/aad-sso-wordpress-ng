@@ -276,8 +276,7 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         ),
         'Firebase\\JWT\\' =>
         array (
-            0 => __DIR__ . '/../..' . '/lib/vendor/firebase/php-jwt/src',
-            1 => __DIR__ . '/..' . '/firebase/php-jwt/src',
+            0 => __DIR__ . '/..' . '/firebase/php-jwt/src',
         ),
         'Fidry\\CpuCoreCounter\\' =>
         array (

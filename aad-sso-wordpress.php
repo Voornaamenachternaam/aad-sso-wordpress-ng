@@ -13,7 +13,7 @@
  * Domain Path: /languages
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
- * Requires PHP: 8.2.0
+ * Requires PHP: 8.4.0
  */
 
 declare(strict_types=1);
@@ -34,6 +34,9 @@ if (file_exists($autoloader)) {
 \defined('AADSSO_DEBUG_LEVEL') || \define('AADSSO_DEBUG_LEVEL', 0);
 
 // Load core dependencies first (order matters: Logger has no deps, HttpClient depends on Logger, Settings depends on both)
+// Note: These files use class_alias to provide prefixed names (e.g., AADSSO_Settings). The Composer autoloader
+// cannot resolve these aliased names until the corresponding files are loaded, so manual require_once is used
+// to ensure correct initialization order and avoid autoloader conflicts with the class_alias pattern.
 require_once AADSSO_PLUGIN_DIR . '/Logger.php';
 require_once AADSSO_PLUGIN_DIR . '/HttpClient.php';
 
@@ -63,9 +66,6 @@ class AADSSO
             [$this, 'add_settings_link']
         );
 
-        register_activation_hook(__FILE__, [self::class, 'activate']);
-        register_deactivation_hook(__FILE__, [self::class, 'deactivate']);
-
         if (!$this->plugin_is_configured()) {
             add_action('all_admin_notices', [$this, 'print_plugin_not_configured']);
 
@@ -79,7 +79,6 @@ class AADSSO
         add_action('wp_logout', [$this, 'logout']);
         add_action('login_init', [$this, 'save_redirect_and_maybe_bypass_login'], 20);
         add_filter('login_redirect', [$this, 'redirect_after_login'], 20, 3);
-        add_action('plugins_loaded', [$this, 'load_textdomain']);
 
         if (isset($this->settings->enable_safe_debug_mode)) {
             AADSSO_Logger::set_safe_debug_mode($this->settings->enable_safe_debug_mode);
@@ -1169,6 +1168,11 @@ class AADSSO
 }
 
 if (!\function_exists('aad_sso_create_uuid')) {
+    /**
+     * Generate a cryptographically secure UUID v4.
+     *
+     * @return string RFC 4122 compliant UUID v4
+     */
     function aad_sso_create_uuid(): string
     {
         $random_bytes = random_bytes(16);
@@ -1183,5 +1187,28 @@ if (!\function_exists('aad_sso_create_uuid')) {
     }
 }
 
-$aadsso_settings_instance = AADSSO_Settings::init();
-$aadsso = AADSSO::get_instance($aadsso_settings_instance);
+/*
+ * Register activation and deactivation hooks at plugin load time.
+ *
+ * These hooks must be registered before plugins_loaded runs, otherwise they
+ * will never fire. WordPress requires activation/deactivation hooks to be
+ * registered at plugin load time, not inside plugins_loaded callbacks.
+ */
+register_activation_hook(__FILE__, [AADSSO::class, 'activate']);
+register_deactivation_hook(__FILE__, [AADSSO::class, 'deactivate']);
+
+/*
+ * Initialize the plugin on plugins_loaded hook.
+ *
+ * Deferred initialization ensures WordPress is fully loaded before:
+ * - Loading settings from database
+ * - Making HTTP requests for OpenID configuration
+ * - Registering hooks and filters
+ *
+ * Priority 1 ensures this runs early enough for other plugins to interact.
+ */
+add_action('plugins_loaded', static function (): void {
+    $aadsso_settings_instance = AADSSO_Settings::init();
+    $aadsso = AADSSO::get_instance($aadsso_settings_instance);
+    $aadsso->load_textdomain();
+}, 1);

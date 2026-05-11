@@ -5,6 +5,10 @@ declare(strict_types=1);
 use Firebase\JWT\{BeforeValidException, ExpiredException, JWK, JWT, SignatureInvalidException};
 use Psr\Http\Message\ResponseInterface;
 
+if (!\defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * PKCE (Proof Key for Code Exchange) implementation per RFC 7636.
  *
