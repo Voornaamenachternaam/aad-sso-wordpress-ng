@@ -1189,7 +1189,7 @@ if (!\function_exists('aad_sso_create_uuid')) {
     }
 }
 
-/**
+/*
  * Initialize the plugin on plugins_loaded hook.
  *
  * Deferred initialization ensures WordPress is fully loaded before:

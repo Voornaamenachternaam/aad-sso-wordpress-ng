@@ -110,6 +110,11 @@ class Settings
     private static ?OptionsResolver $options_resolver = null;
 
     /**
+     * @var null|array<string> Cached defined options for filtering
+     */
+    private static ?array $defined_options_cache = null;
+
+    /**
      * @return array<string, mixed>|mixed
      */
     public static function get_defaults(?string $key = null): mixed
@@ -575,11 +580,6 @@ class Settings
 
         return '';
     }
-
-    /**
-     * @var array<string>|null Cached defined options for filtering
-     */
-    private static ?array $defined_options_cache = null;
 
     /**
      * @param array<string, mixed> $settings

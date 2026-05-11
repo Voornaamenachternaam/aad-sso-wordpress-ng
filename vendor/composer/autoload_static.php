@@ -276,7 +276,7 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         ),
         'Firebase\\JWT\\' =>
         array (
-            0 => __DIR__ . '/../..' . '/lib/vendor/firebase/php-jwt/src',
+            0 => __DIR__ . '/..' . '/firebase/php-jwt/src',
             1 => __DIR__ . '/..' . '/firebase/php-jwt/src',
         ),
         'Fidry\\CpuCoreCounter\\' =>
@@ -314,10 +314,16 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
     );
 
     public static $classMap = array (
+        'AADSSO' => __DIR__ . '/../..' . '/aad-sso-wordpress.php',
+        'AADSSO_HttpClient' => __DIR__ . '/../..' . '/HttpClient.php',
+        'AADSSO_HttpClientNetworkException' => __DIR__ . '/../..' . '/HttpClient.php',
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
+        'AuthorizationHelper' => __DIR__ . '/../..' . '/AuthorizationHelper.php',
         'CURLStringFile' => __DIR__ . '/..' . '/symfony/polyfill-php81/Resources/stubs/CURLStringFile.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
         'Deprecated' => __DIR__ . '/..' . '/symfony/polyfill-php84/Resources/stubs/Deprecated.php',
+        'GraphHelper' => __DIR__ . '/../..' . '/GraphHelper.php',
+        'Logger' => __DIR__ . '/../..' . '/Logger.php',
         'Normalizer' => __DIR__ . '/..' . '/symfony/polyfill-intl-normalizer/Resources/stubs/Normalizer.php',
         'PHPCSUtils\\AbstractSniffs\\AbstractArrayDeclarationSniff' => __DIR__ . '/..' . '/phpcsstandards/phpcsutils/PHPCSUtils/AbstractSniffs/AbstractArrayDeclarationSniff.php',
         'PHPCSUtils\\BackCompat\\BCFile' => __DIR__ . '/..' . '/phpcsstandards/phpcsutils/PHPCSUtils/BackCompat/BCFile.php',
@@ -1727,6 +1733,8 @@ class ComposerStaticInit2375ddc2217fd8bcfae9ce054a180f5c
         'SebastianBergmann\\Type\\UnknownType' => __DIR__ . '/..' . '/sebastian/type/src/type/UnknownType.php',
         'SebastianBergmann\\Type\\VoidType' => __DIR__ . '/..' . '/sebastian/type/src/type/VoidType.php',
         'SebastianBergmann\\Version' => __DIR__ . '/..' . '/sebastian/version/src/Version.php',
+        'Settings' => __DIR__ . '/../..' . '/Settings.php',
+        'SettingsPage' => __DIR__ . '/../..' . '/SettingsPage.php',
         'Stringable' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Stringable.php',
         'TheSeer\\Tokenizer\\Exception' => __DIR__ . '/..' . '/theseer/tokenizer/src/Exception.php',
         'TheSeer\\Tokenizer\\NamespaceUri' => __DIR__ . '/..' . '/theseer/tokenizer/src/NamespaceUri.php',
