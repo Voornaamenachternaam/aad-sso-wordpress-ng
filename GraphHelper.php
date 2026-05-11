@@ -26,15 +26,19 @@ class GraphHelper
 
     /**
      * @param list<string> $group_ids
+     * @return object|WP_Error
      */
-    public static function user_check_member_groups(string $user_id, array $group_ids): object|WP_Error
+    public static function user_check_member_groups(string $user_id, array $group_ids): object
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id) . '/checkMemberGroups';
 
         return self::post_request($url, [], ['groupIds' => $group_ids]);
     }
 
-    public static function get_user(string $user_id): object|WP_Error
+    /**
+     * @return object|WP_Error
+     */
+    public static function get_user(string $user_id): object
     {
         $url = self::get_base_url() . '/users/' . rawurlencode($user_id);
 
@@ -43,8 +47,9 @@ class GraphHelper
 
     /**
      * @param array<string, mixed> $query_params
+     * @return object|WP_Error
      */
-    public static function get_request(string $url, array $query_params = []): object|WP_Error
+    public static function get_request(string $url, array $query_params = []): object
     {
         if (\PHP_SESSION_ACTIVE === session_status()) {
             $_SESSION['aadsso_last_request'] = [
@@ -77,8 +82,9 @@ class GraphHelper
     /**
      * @param array<string, mixed> $query_params
      * @param array<string, mixed> $data
+     * @return object|WP_Error
      */
-    public static function post_request(string $url, array $query_params = [], array $data = []): object|WP_Error
+    public static function post_request(string $url, array $query_params = [], array $data = []): object
     {
         $payload = (string) wp_json_encode($data);
 
@@ -114,7 +120,10 @@ class GraphHelper
         return self::$http_client;
     }
 
-    private static function parse_and_log_response(ResponseInterface $response): object|WP_Error
+    /**
+     * @return object|WP_Error
+     */
+    private static function parse_and_log_response(ResponseInterface $response): object
     {
         $status_code = $response->getStatusCode();
         $response_headers = [];
