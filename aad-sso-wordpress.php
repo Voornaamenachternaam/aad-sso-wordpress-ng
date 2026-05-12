@@ -79,7 +79,7 @@ function aad_sso_check_required_extensions(): bool
     $missing = [];
 
     foreach ($required_extensions as $extension => $description) {
-        if (!extension_loaded($extension)) {
+        if (!\extension_loaded($extension)) {
             $missing[$extension] = $description;
         }
     }
@@ -87,7 +87,7 @@ function aad_sso_check_required_extensions(): bool
     if (!empty($missing)) {
         $messages = [];
         foreach ($missing as $ext => $desc) {
-            $messages[] = sprintf('%s - %s', $ext, $desc);
+            $messages[] = \sprintf('%s - %s', $ext, $desc);
         }
 
         add_action('init', static function () use ($messages): void {
