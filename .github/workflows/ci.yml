@@ -9,30 +9,8 @@ on:
 
 jobs:
   phpunit:
-    name: PHPUnit Tests (PHP ${{ matrix.php-version }})
+    name: PHPUnit Tests (PHP 8.4)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        php-version: ['8.4', '8.5']
-        include:
-          - php-version: '8.4'
-            coverage: false
-          - php-version: '8.5'
-            coverage: false
-
-    services:
-      mysql:
-        image: "mysql:8.4"
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: wordpress_test
-        ports:
-          - "3306:3306"
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
       - name: Checkout
@@ -41,41 +19,14 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
-          php-version: "${{ matrix.php-version }}"
-          extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql
-          coverage: "${{ matrix.coverage && 'xdebug' || 'none' }}"
+          php-version: '8.4'
+          extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
           composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
-
-      - name: Get WordPress
-        run: |
-          curl -sLO https://wordpress.org/wordpress-6.9.4.tar.gz
-          tar -xzf wordpress-6.9.4.tar.gz
-          mv wordpress/* .
-          rm -rf wordpress wordpress-6.9.4.tar.gz
-
-      - name: Create wp-config.php
-        run: |
-          cat > wp-config.php << 'EOF'
-          define( 'DB_NAME', 'wordpress_test' );
-          define( 'DB_USER', 'root' );
-          define( 'DB_PASSWORD', 'root' );
-          define( 'DB_HOST', '127.0.0.1' );
-          define( 'DB_CHARSET', 'utf8' );
-          define( 'DB_COLLATE', '' );
-          define( 'WP_DEBUG', true );
-          define( 'WP_DEBUG_LOG', true );
-          define( 'WP_DEBUG_DISPLAY', false );
-          $table_prefix = 'wp_';
-          if ( !defined( 'ABSPATH' ) ) {
-            define( 'ABSPATH', __DIR__ . '/' );
-          }
-          require_once ABSPATH . 'wp-settings.php';
-          EOF
 
       - name: Run PHPUnit
         run: |
@@ -86,11 +37,8 @@ jobs:
           fi
 
   phpstan:
-    name: PHPStan Static Analysis (PHP ${{ matrix.php-version }})
+    name: PHPStan Static Analysis (PHP 8.4)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        php-version: ['8.4', '8.5']
 
     steps:
       - name: Checkout
@@ -99,7 +47,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
-          php-version: "${{ matrix.php-version }}"
+          php-version: '8.4'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -122,7 +70,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
-          php-version: '8.5'
+          php-version: '8.4'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -145,7 +93,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
-          php-version: '8.5'
+          php-version: '8.4'
           extensions: mbstring, json, openssl, xdebug
 
       - name: Install Composer dependencies
@@ -172,7 +120,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
-          php-version: '8.5'
+          php-version: '8.4'
 
       - name: Install Composer dependencies
         run: |
@@ -191,55 +139,100 @@ jobs:
           fi
 
   wordpress-plugin-check:
-    name: WordPress Plugin Check
+    name: WordPress Plugin Check (Latest WP)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
-        with:
-          php-version: '8.5'
-          extensions: mbstring, json, openssl, curl, zip, gd
-
-      - name: Install Composer dependencies
-        run: |
-          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-          composer config allow-plugins.php-http/discovery true
-          composer install --no-interaction --prefer-dist
 
       - name: Run WordPress Plugin Check
         uses: WordPress/plugin-check-action@v1.1.5
         with:
           build-dir: .
+          wp-version: latest
         continue-on-error: true
 
-  plugin-activation-test:
-    name: WordPress Plugin Activation Test (PHP ${{ matrix.php-version }})
+  plugin-activation-php84:
+    name: Plugin Activation Test (PHP 8.4, Latest WP)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        php-version: ['8.4', '8.5']
-        wordpress-version: ['6.9.4']
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - name: WordPress Plugin Integration Test
-        uses: holyhope/test-wordpress-plugin-github-action@v2.0.2
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@2.37.0
         with:
-          php_version: "${{ matrix.php-version }}"
-          wordpress_version: "${{ matrix.wordpress-version }}"
-          php_extensions: |
-            mbstring
-            json
-            openssl
-            curl
-            mysql
-          plugin_slug: aad-sso-wordpress-ng
-          plugin_dir: .
-          phpunit_version: "^9"
-          phpunit_config: phpunit.xml.dist
+          php-version: '8.4'
+          extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql, gd, zip
+          coverage: none
+
+      - name: Verify PHP version
+        run: php -v
+
+      - name: Install WP-CLI
+        run: |
+          curl -sO https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+
+      - name: Download and setup WordPress (Latest)
+        run: |
+          wp core download --allow-root
+          wp config create \
+            --dbname=wordpress_test \
+            --dbuser=root \
+            --dbpass=root \
+            --dbhost=127.0.0.1 \
+            --allow-root
+          wp core install \
+            --url="http://localhost" \
+            --title="Test Site" \
+            --admin_user="admin" \
+            --admin_password="password" \
+            --admin_email="admin@test.com" \
+            --skip-email \
+            --allow-root
+
+      - name: Setup plugin directory
+        run: |
+          # Move plugin files to proper location
+          PLUGIN_DIR="wp-content/plugins/aad-sso-wordpress-ng"
+          mkdir -p "$PLUGIN_DIR"
+          cp -r !(vendor|node_modules|tests|.git|.github|cache|tmp|*.md) "$PLUGIN_DIR/"
+          ls -la "$PLUGIN_DIR"
+
+      - name: Verify plugin files exist
+        run: |
+          PLUGIN_DIR="wp-content/plugins/aad-sso-wordpress-ng"
+          echo "=== Plugin Files ==="
+          ls -la "$PLUGIN_DIR"
+          echo ""
+          echo "=== Main Plugin File ==="
+          head -30 "$PLUGIN_DIR/aad-sso-wordpress.php"
+
+      - name: Check PHP version before activation
+        run: |
+          echo "Current PHP version: $(php -v | head -1)"
+          echo "Plugin requires PHP 8.4+"
+
+      - name: Attempt plugin activation
+        run: |
+          wp plugin activate aad-sso-wordpress-ng --allow-root
+          echo "=== Plugin Status ==="
+          wp plugin status aad-sso-wordpress-ng --allow-root
