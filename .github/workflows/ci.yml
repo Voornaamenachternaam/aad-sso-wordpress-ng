@@ -228,59 +228,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: WordPress Plugin Test Setup
-        uses: deliciousbrains/wp-tes@latest
+      - name: WordPress Plugin Integration Test
+        uses: holyhope/wordpress-plugin-integration-test@v1
         with:
-          php-version: "${{ matrix.php-version }}"
-          wordpress-version: "${{ matrix.wordpress-version }}"
-          plugin-slug: aad-sso-wordpress
-          plugin-file: aad-sso-wordpress.php
-          # Use MariaDB instead of MySQL for better compatibility
-          mysql-version: '10.6'
-
-      - name: Test Plugin Activation
-        run: |
-          # Verify plugin is installed
-          wp plugin list --status=active --format=count || true
-          
-          # Check if our plugin is installed
-          wp plugin list | grep aad-sso-wordpress || echo "Plugin not found"
-          
-          # Activate the plugin and capture output
-          wp plugin activate aad-sso-wordpress 2>&1
-          
-          # Verify plugin is active
-          if wp plugin is-active aad-sso-wordpress; then
-            echo "✅ Plugin activated successfully!"
-          else
-            echo "❌ Plugin activation failed!"
-            wp plugin status aad-sso-wordpress
-            exit 1
-          fi
-
-      - name: Test Plugin Deactivation
-        run: |
-          wp plugin deactivate aad-sso-wordpress 2>&1
-          if ! wp plugin is-active aad-sso-wordpress; then
-            echo "✅ Plugin deactivated successfully!"
-          else
-            echo "❌ Plugin deactivation failed!"
-            exit 1
-          fi
-
-      - name: Run PHPUnit Tests
-        run: |
-          # Run the plugin's unit tests
-          if [ -f vendor/bin/phpunit ]; then
-            vendor/bin/phpunit --colors=never --no-coverage || true
-          fi
-
-      - name: Debug (on failure)
-        if: failure()
-        run: |
-          echo "=== PHP Error Log ==="
-          cat /tmp/php_errors.log 2>/dev/null || echo "No PHP errors"
-          echo "=== WordPress Debug Log ==="
-          cat wp-content/debug.log 2>/dev/null || echo "No WP debug log"
-          echo "=== Plugin Status ==="
-          wp plugin status aad-sso-wordpress || true
+          php_version: "${{ matrix.php-version }}"
+          wordpress_version: "${{ matrix.wordpress-version }}"
+          php_extensions: |
+            mbstring
+            json
+            openssl
+            curl
+            mysql
+          plugin_slug: aad-sso-wordpress-ng
+          plugin_dir: .
+          phpunit_version: "^9"
+          phpunit_config: phpunit.xml.dist
