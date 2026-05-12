@@ -211,7 +211,7 @@ jobs:
           composer install --no-interaction --prefer-dist
 
       - name: Run WordPress Plugin Check
-        uses: WordPress/plugin-check-action@v1.3.1
+        uses: WordPress/plugin-check-action@v1.1.5
         with:
           build-dir: .
         continue-on-error: true
@@ -229,7 +229,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: WordPress Plugin Integration Test
-        uses: holyhope/wordpress-plugin-integration-test@v1
+        uses: holyhope/test-wordpress-plugin-github-action@v2.0.2
         with:
           php_version: "${{ matrix.php-version }}"
           wordpress_version: "${{ matrix.wordpress-version }}"
