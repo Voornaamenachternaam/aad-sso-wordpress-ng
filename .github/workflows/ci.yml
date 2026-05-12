@@ -211,10 +211,21 @@ jobs:
 
       - name: Setup plugin directory
         run: |
-          # Move plugin files to proper location
+          # Move plugin files to proper location (excluding vendor, tests, .git, etc.)
           PLUGIN_DIR="wp-content/plugins/aad-sso-wordpress-ng"
           mkdir -p "$PLUGIN_DIR"
-          cp -r !(vendor|node_modules|tests|.git|.github|cache|tmp|*.md) "$PLUGIN_DIR/"
+
+          # Copy files excluding vendor, tests, .git, .github, cache, tmp, and markdown files
+          for item in *; do
+            case "$item" in
+              vendor|node_modules|tests|.git|.github|cache|tmp) continue ;;
+              *.md) continue ;;
+            esac
+            if [ -e "$item" ]; then
+              cp -r "$item" "$PLUGIN_DIR/"
+            fi
+          done
+
           ls -la "$PLUGIN_DIR"
 
       - name: Verify plugin files exist
