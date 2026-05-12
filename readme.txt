@@ -1,13 +1,13 @@
 === Single Sign-on with Microsoft Entra ID (for WordPress) ===
-Contributors: psignoret, blobaugh, welcher, jtsternberg, christianhennen, hajekj
+Contributors: Voornaamenachternaam
 Tags: entra-id, azure-ad, sso, azure-active-directory, office-365, microsoft-entra, entra
 Requires at least: 6.9.4
 Tested up to: 6.9.4
-Requires PHP: 8.2.0
-Tested up to PHP: 8.4
+Requires PHP: 8.4
+Tested up to PHP: 8.5
 Stable tag: 0.9.0
 License: MIT
-License URI: https://github.com/psignoret/aad-sso-wordpress/blob/master/LICENSE.md
+License URI: https://github.com/Voornaamenachternaam/aad-sso-wordpress-ng/blob/master/LICENSE.md
 
 Sign in to WordPress using your organization's Microsoft Entra ID accounts (the same ones used to sign in to Office 365).
 
