@@ -9,18 +9,20 @@ on:
 
 jobs:
   phpunit:
-    name: Unit Tests
+    name: PHPUnit Tests (PHP ${{ matrix.php-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.5']
+        php-version: ['8.4', '8.5']
         include:
+          - php-version: '8.4'
+            coverage: false
           - php-version: '8.5'
-            coverage: true
-    
+            coverage: false
+
     services:
       mysql:
-        image: "mysql:9.7"
+        image: "mysql:8.4"
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_test
@@ -34,18 +36,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
           php-version: "${{ matrix.php-version }}"
-          extensions: mbstring, json, openssl, curl, mysql
+          extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql
           coverage: "${{ matrix.coverage && 'xdebug' || 'none' }}"
 
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
       - name: Get WordPress
@@ -77,21 +80,21 @@ jobs:
       - name: Run PHPUnit
         run: |
           if [ -f vendor/bin/phpunit ]; then
-            vendor/bin/phpunit
+            vendor/bin/phpunit --colors=never --no-coverage
           else
             echo "No PHPUnit tests found"
           fi
 
   phpstan:
-    name: PHPStan Static Analysis
+    name: PHPStan Static Analysis (PHP ${{ matrix.php-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.5']
-    
+        php-version: ['8.4', '8.5']
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
@@ -102,18 +105,19 @@ jobs:
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse --no-progress
+        run: vendor/bin/phpstan analyse --no-progress --no-error-summary
 
   php-cs-fixer:
     name: PHP Coding Standards
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
@@ -124,10 +128,11 @@ jobs:
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
-      - name: Run PHP-CS-Fixer
-        run: vendor/bin/php-cs-fixer fix --diff
+      - name: Run PHP-CS-Fixer (dry-run)
+        run: vendor/bin/php-cs-fixer fix --diff --dry-run --using-cache=no
 
   code-quality:
     name: Code Quality Check
@@ -135,7 +140,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
@@ -146,65 +151,23 @@ jobs:
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
       - name: Check PHP syntax
         run: |
-          find . -name "*.php" -not -path "./vendor/*" -not -path "./lib/php-jwt/tests/*" -exec php -l {} \;
+          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -v "No syntax errors" || true
 
       - name: Check Composer
-        run: composer validate
-
-  auto-fix-cs:
-    name: Auto-Fix Coding Standards
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
-        with:
-          php-version: '8.5'
-          extensions: mbstring, json, openssl
-
-      - name: Install Composer dependencies
-        run: |
-          composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-          composer install --no-interaction --prefer-dist
-
-      - name: Run PHP-CS-Fixer
-        id: cs-fixer
-        run: |
-          vendor/bin/php-cs-fixer fix --using-cache=no
-        continue-on-error: true
-
-      - name: Commit and push auto-fixes
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "style: apply PHP-CS-Fixer auto-fixes"
-            git push
-          else
-            echo "No changes to commit"
-          fi
+        run: composer validate --strict
 
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
@@ -214,6 +177,7 @@ jobs:
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
       - name: Audit Composer.lock
@@ -226,33 +190,28 @@ jobs:
             echo "Security checker not available, skipping"
           fi
 
-      - name: Run PHPStan Security Analysis
-        run: |
-          if [ -f vendor/bin/phpstan ]; then
-            vendor/bin/phpstan analyse --level=max --no-progress --configuration=phpstan.neon 2>/dev/null || true
-          fi
-
   wordpress-plugin-check:
     name: WordPress Plugin Check
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.0
         with:
           php-version: '8.5'
-          extensions: mbstring, json, openssl, curl, zip, gd, imagick
+          extensions: mbstring, json, openssl, curl, zip, gd
 
       - name: Install Composer dependencies
         run: |
           composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer config allow-plugins.php-http/discovery true
           composer install --no-interaction --prefer-dist
 
       - name: Run WordPress Plugin Check
-        uses: WordPress/plugin-check-action@v1.1.5
+        uses: WordPress/plugin-check-action@v1.3.1
         with:
           build-dir: .
         continue-on-error: true

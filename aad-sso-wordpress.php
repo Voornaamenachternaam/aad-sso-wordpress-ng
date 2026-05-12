@@ -14,6 +14,7 @@
  * Requires at least: 6.9.4
  * Tested up to: 6.9.4
  * Requires PHP: 8.4
+ * Tested up to PHP: 8.5
  */
 
 declare(strict_types=1);
@@ -62,11 +63,71 @@ if (version_compare(\PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PHP Extension Availability Check
+//
+// This plugin requires specific PHP extensions. This check ensures all
+// required extensions are loaded before any plugin code executes.
+// ─────────────────────────────────────────────────────────────────────────────
+function aad_sso_check_required_extensions(): bool
+{
+    $required_extensions = [
+        'mbstring' => 'Multibyte string support (used for Unicode operations)',
+        'json' => 'JSON encoding/decoding support',
+        'openssl' => 'OpenSSL support (used for cryptography)',
+    ];
+
+    $missing = [];
+
+    foreach ($required_extensions as $extension => $description) {
+        if (!extension_loaded($extension)) {
+            $missing[$extension] = $description;
+        }
+    }
+
+    if (!empty($missing)) {
+        $messages = [];
+        foreach ($missing as $ext => $desc) {
+            $messages[] = sprintf('%s - %s', $ext, $desc);
+        }
+
+        add_action('init', static function () use ($messages): void {
+            if (!\defined('AADSSO_EXTENSION_CHECK_FAILED')) {
+                \define('AADSSO_EXTENSION_CHECK_FAILED', true);
+                wp_die(
+                    '<p>' . esc_html__(
+                        'Single Sign-on with Microsoft Entra ID requires the following PHP extensions:',
+                        'aad-sso-wordpress'
+                    ) . '</p>'
+                    . '<ul style="list-style: disc; padding-left: 2em;">'
+                    . '<li>' . implode('</li><li>', array_map('esc_html', $messages)) . '</li>'
+                    . '</ul>'
+                    . '<p>' . esc_html__(
+                        'Please contact your hosting provider to enable the required extensions.',
+                        'aad-sso-wordpress'
+                    ) . '</p>',
+                    esc_html__('Missing PHP Extensions', 'aad-sso-wordpress'),
+                    ['response' => 500, 'back_link' => true]
+                );
+            }
+        }, 1);
+
+        return false;
+    }
+
+    return true;
+}
+
+// Run extension check immediately (before any plugin code that needs extensions)
+if (!aad_sso_check_required_extensions()) {
+    return;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // mb_rtrim() and mb_trim() Polyfills
 //
 // Both mb_rtrim() and mb_trim() were introduced in PHP 8.4.0. These polyfills
 // provide compatibility for environments where they may not be available
-// (e.g., custom mbstring builds, embedded PHP, or future PHP versions).
+// (e.g., PHP < 8.4 or custom builds without the mbstring extension).
 //
 // Unicode whitespace (per PHP 8.4 / Unicode PropList):
 // - ASCII whitespace: \t, \n, \r, \f, \v, space
@@ -84,6 +145,10 @@ if (version_compare(\PHP_VERSION, AADSSO_MIN_PHP_VERSION, '<')) {
 // - Word joiner: \u2060
 // - Zero-width no-break space: \uFEFF
 //
+// Note: mb_regex_encoding() is NOT used here because:
+// 1. The 'u' flag in preg_replace enables UTF-8 mode independently
+// 2. mb_regex_encoding() is deprecated in PHP 8.5
+//
 // References:
 // - https://www.php.net/manual/en/function.mb-rtrim.php
 // - https://www.php.net/manual/en/function.mb-trim.php
@@ -96,11 +161,11 @@ if (!\function_exists('mb_rtrim')) {
      *
      * Trims characters from the right end of a multibyte string.
      * When $characters is null, trims Unicode whitespace and control characters.
-     * Uses regex for correct multibyte character boundary handling.
+     * Uses preg_replace with 'u' flag for correct multibyte character boundary handling.
      *
      * @param string      $string     The string to trim
      * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
-     * @param null|string $encoding   Optional character encoding (default: internal encoding)
+     * @param null|string $encoding   Optional (ignored, for API compatibility only)
      *
      * @return string The trimmed string
      */
@@ -110,37 +175,23 @@ if (!\function_exists('mb_rtrim')) {
             return '';
         }
 
-        // Set regex encoding for preg_* functions
-        $previous_encoding = null;
-        if (null !== $encoding && \function_exists('mb_regex_encoding')) {
-            $previous_encoding = mb_regex_encoding();
-            mb_regex_encoding($encoding);
+        if (null === $characters) {
+            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+            // per PHP 8.4 mb_rtrim() specification.
+            // \s in UTF-8 mode matches: \t, \n, \v, \f, \r, space, and Unicode whitespace
+            // \p{C} matches: control characters, format characters, private use, surrogates, unassigned
+            return preg_replace('/[\s\p{C}]+$/u', '', $string);
         }
 
-        try {
-            if (null === $characters) {
-                // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
-                // per PHP 8.4 mb_rtrim() specification.
-                // \s in UTF-8 mode matches: \t, \n, \v, \f, \r, space, and Unicode whitespace
-                // \p{C} matches: control characters, format characters, private use, surrogates, unassigned
-                return preg_replace('/[\s\p{C}]+$/u', '', $string);
-            }
-
-            if ('' === $characters) {
-                return $string;
-            }
-
-            // For specific character set, build regex pattern with proper escaping
-            // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
-            $escaped = preg_quote($characters, '/');
-
-            return preg_replace('/[' . $escaped . ']+$/u', '', $string);
-        } finally {
-            // Restore previous regex encoding
-            if (null !== $previous_encoding && \function_exists('mb_regex_encoding')) {
-                mb_regex_encoding($previous_encoding);
-            }
+        if ('' === $characters) {
+            return $string;
         }
+
+        // For specific character set, build regex pattern with proper escaping
+        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+        $escaped = preg_quote($characters, '/');
+
+        return preg_replace('/[' . $escaped . ']+$/u', '', $string);
     }
 }
 
@@ -150,11 +201,11 @@ if (!\function_exists('mb_trim')) {
      *
      * Trims characters from both ends of a multibyte string.
      * When $characters is null, trims Unicode whitespace and control characters.
-     * Uses regex for correct multibyte character boundary handling.
+     * Uses preg_replace with 'u' flag for correct multibyte character boundary handling.
      *
      * @param string      $string     The string to trim
      * @param null|string $characters Optional characters to trim (default: Unicode whitespace)
-     * @param null|string $encoding   Optional character encoding (default: internal encoding)
+     * @param null|string $encoding   Optional (ignored, for API compatibility only)
      *
      * @return string The trimmed string
      */
@@ -164,35 +215,21 @@ if (!\function_exists('mb_trim')) {
             return '';
         }
 
-        // Set regex encoding for preg_* functions
-        $previous_encoding = null;
-        if (null !== $encoding && \function_exists('mb_regex_encoding')) {
-            $previous_encoding = mb_regex_encoding();
-            mb_regex_encoding($encoding);
+        if (null === $characters) {
+            // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
+            // per PHP 8.4 mb_trim() specification.
+            return preg_replace('/^[\s\p{C}]+|[\s\p{C}]+$/u', '', $string);
         }
 
-        try {
-            if (null === $characters) {
-                // Trim Unicode whitespace (\s) and Unicode control/format characters (\p{C})
-                // per PHP 8.4 mb_trim() specification.
-                return preg_replace('/^[\s\p{C}]+|[\s\p{C}]+$/u', '', $string);
-            }
-
-            if ('' === $characters) {
-                return $string;
-            }
-
-            // For specific character set, build regex pattern with proper escaping
-            // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
-            $escaped = preg_quote($characters, '/');
-
-            return preg_replace('/^[' . $escaped . ']+|[' . $escaped . ']+$/u', '', $string);
-        } finally {
-            // Restore previous regex encoding
-            if (null !== $previous_encoding && \function_exists('mb_regex_encoding')) {
-                mb_regex_encoding($previous_encoding);
-            }
+        if ('' === $characters) {
+            return $string;
         }
+
+        // For specific character set, build regex pattern with proper escaping
+        // The 'u' flag enables UTF-8 mode, ensuring multibyte character handling
+        $escaped = preg_quote($characters, '/');
+
+        return preg_replace('/^[' . $escaped . ']+|[' . $escaped . ']+$/u', '', $string);
     }
 }
 
