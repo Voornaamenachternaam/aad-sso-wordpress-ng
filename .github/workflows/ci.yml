@@ -215,11 +215,15 @@ jobs:
           PLUGIN_DIR="wp-content/plugins/aad-sso-wordpress-ng"
           mkdir -p "$PLUGIN_DIR"
 
-          # Copy files excluding vendor, tests, .git, .github, cache, tmp, and markdown files
+          # Copy files excluding:
+          # - vendor, tests, .git, .github, cache, tmp (development files)
+          # - *.md (markdown files)
+          # - wp-*, wp-config.php (WordPress core files from wp core download)
           for item in *; do
             case "$item" in
               vendor|node_modules|tests|.git|.github|cache|tmp) continue ;;
               *.md) continue ;;
+              wp-content|wp-admin|wp-includes|wp-config.php|index.php|license.txt|readme.html|wp-activate.php|wp-blog-header.php|wp-cron.php|wp-links-opml.php|wp-load.php|wp-login.php|wp-mail.php|wp-settings.php|wp-signup.php|wp-trackback.php|xmlrpc.php) continue ;;
             esac
             if [ -e "$item" ]; then
               cp -r "$item" "$PLUGIN_DIR/"
