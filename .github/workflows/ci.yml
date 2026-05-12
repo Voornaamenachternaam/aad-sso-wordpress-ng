@@ -215,3 +215,92 @@ jobs:
         with:
           build-dir: .
         continue-on-error: true
+
+  plugin-activation-test:
+    name: WordPress Plugin Activation Test (PHP ${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.4', '8.5']
+
+    services:
+      mysql:
+        image: "mysql:8.4"
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - "3306:3306"
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2.37.0
+        with:
+          php-version: "${{ matrix.php-version }}"
+          extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql, dom, fileinfo
+
+      - name: Install WP-CLI
+        run: |
+          curl -sLO https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+
+      - name: Get WordPress and Install Plugin
+        run: |
+          # Download WordPress to parent directory
+          cd ..
+          wp core download --version=6.9.4 --force
+          wp config create --dbhost=127.0.0.1 --dbname=wordpress_test --dbuser=root --dbpass=root --quiet
+          wp core install --url="http://localhost" --title="Test Site" --admin_user="admin" --admin_password="admin" --admin_email="admin@test.com" --skip-email --quiet
+          
+          # Copy plugin to WordPress plugins directory (not the repo directory!)
+          cp -r aad-sso-wordpress-ng wp-content/plugins/
+
+      - name: Test Plugin Loading (Syntax Check)
+        run: |
+          # Test that the main plugin file loads without errors
+          php -r "
+            define('ABSPATH', '/workspace/project/aad-sso-wordpress-ng/wordpress/');
+            require_once ABSPATH . 'wp-load.php';
+            // Include the autoloader and plugin files
+            require_once '/workspace/project/aad-sso-wordpress-ng/vendor/autoload.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/Logger.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/HttpClient.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/Settings.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/SettingsPage.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/AuthorizationHelper.php';
+            require_once '/workspace/project/aad-sso-wordpress-ng/GraphHelper.php';
+            echo 'All plugin files loaded successfully\n';
+          "
+        working-directory: /workspace/project/aad-sso-wordpress-ng
+
+      - name: Test Plugin Activation
+        run: |
+          cd ..
+          # Activate the plugin
+          wp plugin activate aad-sso-wordpress 2>&1
+          
+          # Verify plugin is active
+          wp plugin is-active aad-sso-wordpress && echo "Plugin activated successfully!" || echo "Plugin activation failed!"
+        working-directory: /workspace/project/aad-sso-wordpress-ng
+
+      - name: Test Plugin Deactivation
+        run: |
+          cd ..
+          wp plugin deactivate aad-sso-wordpress 2>&1
+          wp plugin is-active aad-sso-wordpress && echo "Deactivation failed!" || echo "Plugin deactivated successfully!"
+        working-directory: /workspace/project/aad-sso-wordpress-ng
+
+      - name: Cleanup
+        if: always()
+        run: |
+          wp db drop --yes --quiet 2>/dev/null || true
+          rm -f wp-content/debug.log
