@@ -211,17 +211,14 @@ jobs:
 
       - name: Setup plugin directory
         run: |
-          # Move plugin files to proper location (excluding vendor, tests, .git, etc.)
+          # Copy plugin files including vendor dependencies
           PLUGIN_DIR="wp-content/plugins/aad-sso-wordpress-ng"
           mkdir -p "$PLUGIN_DIR"
 
-          # Copy files excluding:
-          # - vendor, tests, .git, .github, cache, tmp (development files)
-          # - *.md (markdown files)
-          # - wp-*, wp-config.php (WordPress core files from wp core download)
+          # Copy files excluding development files and WordPress core
           for item in *; do
             case "$item" in
-              vendor|node_modules|tests|.git|.github|cache|tmp) continue ;;
+              node_modules|tests|.git|.github|cache|tmp) continue ;;
               *.md) continue ;;
               wp-content|wp-admin|wp-includes|wp-config.php|index.php|license.txt|readme.html|wp-activate.php|wp-blog-header.php|wp-cron.php|wp-links-opml.php|wp-load.php|wp-login.php|wp-mail.php|wp-settings.php|wp-signup.php|wp-trackback.php|xmlrpc.php) continue ;;
             esac
@@ -231,6 +228,8 @@ jobs:
           done
 
           ls -la "$PLUGIN_DIR"
+          echo "=== Vendor Directory ==="
+          ls -la "$PLUGIN_DIR/vendor/"
 
       - name: Verify plugin files exist
         run: |
