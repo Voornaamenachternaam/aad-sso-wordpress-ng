@@ -147,7 +147,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Run WordPress Plugin Check
-        uses: WordPress/plugin-check-action@v1.1.5
+        uses: WordPress/plugin-check-action@v1.1.6
         with:
           build-dir: .
           wp-version: latest
