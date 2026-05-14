@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
           extensions: mbstring, json, openssl
@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
           extensions: mbstring, json, openssl
@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
           extensions: mbstring, json, openssl
@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
           extensions: mbstring, json, openssl, xdebug
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
 
@@ -176,7 +176,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@2.37.0
+        uses: shivammathur/setup-php@2.37.1
         with:
           php-version: '8.4'
           extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql, gd, zip
