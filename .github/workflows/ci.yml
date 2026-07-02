@@ -19,7 +19,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -47,7 +47,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -70,7 +70,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
           extensions: mbstring, json, openssl
 
       - name: Install Composer dependencies
@@ -93,7 +93,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
           extensions: mbstring, json, openssl, xdebug
 
       - name: Install Composer dependencies
@@ -120,7 +120,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
 
       - name: Install Composer dependencies
         run: |
@@ -147,10 +147,10 @@ jobs:
         uses: actions/checkout@v7.0.0
 
       - name: Run WordPress Plugin Check
-        uses: WordPress/plugin-check-action@v1.1.5
+        uses: WordPress/plugin-check-action@v1.1.7
         with:
           build-dir: .
-          wp-version: latest
+          wp-version: '8.4.1'
         continue-on-error: true
 
   plugin-activation-php84:
@@ -178,7 +178,7 @@ jobs:
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@2.37.2
         with:
-          php-version: '8.4'
+          php-version: '8.4.1'
           extensions: mbstring, json, openssl, curl, mysql, pdo, pdo_mysql, gd, zip
           coverage: none
 
