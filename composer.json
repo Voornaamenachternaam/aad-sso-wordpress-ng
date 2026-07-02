@@ -5,8 +5,8 @@
   "license": "MIT",
   "require": {
     "php": ">=8.4",
-    "psr/simple-cache": "^3.0",
-    "firebase/php-jwt": "^7.0.5",
+    "psr/simple-cache": "^3.0.0",
+    "firebase/php-jwt": "^7.1.0",
     "symfony/options-resolver": "^8.0.8",
     "monolog/monolog": "^3.10",
     "symfony/cache": "^8.0.9",
