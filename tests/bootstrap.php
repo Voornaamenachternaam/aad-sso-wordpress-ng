@@ -802,7 +802,7 @@ if (!class_exists('AADSSO_HttpClient')) {
         private function createMockResponse(): Psr\Http\Message\ResponseInterface
         {
             // @implements \Psr\Http\Message\ResponseInterface
-            return new class implements Psr\Http\Message\ResponseInterface {
+            return new class() implements Psr\Http\Message\ResponseInterface {
                 /**
                  * @var int
                  */
@@ -820,7 +820,7 @@ if (!class_exists('AADSSO_HttpClient')) {
 
                 public function __construct()
                 {
-                    $this->body = new class {
+                    $this->body = new class() {
                         public function getContents(): string
                         {
                             return '{"access_token":"test","token_type":"Bearer"}';
