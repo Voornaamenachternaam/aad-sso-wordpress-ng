@@ -969,7 +969,7 @@ class AuthorizationHelperTest extends TestCase
      */
     private function createMockSettings(): object
     {
-        return new class() {
+        return new class {
             /**
              * @var string
              */
