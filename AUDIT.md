@@ -1,485 +1,434 @@
-# Security Audit — `aad-sso-wordpress-ng`
+# Enterprise Readiness Audit
 
-**Audit date:** May 8, 2026 (UTC)  
-**Out of scope:** OpenID 1.0 (explicitly excluded)  
+**Audited project:** Single Sign-on with Microsoft Entra ID for WordPress
 
----
+**Audit date:** 24 September 2026 (UTC)
+**Target baseline:** WordPress 7.1.2, supported stable PHP releases, a locked current Composer dependency set, and current Microsoft Entra ID / Microsoft Graph behavior.
 
-## 1) Scope and rigor level
+## Executive conclusion
 
-This review is an **in-depth, untruncated** security and architecture audit of the authentication pipeline, with emphasis on:
+This release **must not be represented as 100% compatible or enterprise-ready**. Static analysis and unit tests are useful, but they do not establish compatibility with WordPress 7.1.2 or a live Entra tenant. The release also has supply-chain reproducibility defects: no committed Composer lock file and a committed `vendor/` tree that does not satisfy several declared dependency constraints.
 
-- OIDC authorization request construction
-- Authorization-code exchange and token handling
-- ID token validation correctness
-- Session and redirect security
-- User discovery/provisioning/linking
-- Entra group → WordPress role mapping via Microsoft Graph
-- Operational hardening and least-privilege posture
+Certification requires the prioritized work below and a repeatable, passing test matrix against the exact target versions. Upstream WordPress, PHP, Composer advisory, and Microsoft documentation endpoints could not be queried from the audit environment because its outbound proxy returned HTTP 403; all “current as of” assertions must therefore be re-verified during release certification.
 
-This report references **primary sources only**, current as of **May 2026**.
+## Scope and audit evidence
 
----
+Reviewed:
 
-## 2) Primary sources (verified current as of May 2026)
+- Plugin runtime, settings, login, user-linking, Graph, HTTP, logging, and uninstall code.
+- Plugin metadata, both README formats, Composer manifest and bundled dependency metadata.
+- Unit-test bootstrap, CI workflow, and release/activation paths.
 
-### Identity protocol and standards
-1. OpenID Connect Core 1.0 (Final):  
-   https://openid.net/specs/openid-connect-core-1_0-final.html
-2. OAuth 2.0 Authorization Framework (RFC 6749):  
-   https://www.rfc-editor.org/rfc/rfc6749
-3. OAuth 2.0 Threat Model and Security Considerations (RFC 6819):  
-   https://www.rfc-editor.org/rfc/rfc6819
-4. Proof Key for Code Exchange (PKCE) (RFC 7636):  
-   https://www.rfc-editor.org/rfc/rfc7636
-5. OAuth 2.0 for Browser-Based Apps (BCP / RFC 8252 + later best practices where applicable):  
-   https://www.rfc-editor.org/rfc/rfc8252
+Checks completed:
 
-### Microsoft Entra / Microsoft identity platform
-6. ID token claims reference:  
-   https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference
-7. Access tokens reference:  
-   https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens
-8. Claims validation guidance:  
-   https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation
-9. OAuth 2.0 authorization code flow (Microsoft identity platform):  
-   https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow
-10. Microsoft identity platform scopes and permissions:  
-    https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc
+- PHP syntax validation for project files: pass.
+- PHPUnit: 78 tests / 149 assertions passed, but with 36 deprecations, 16 notices, and one skipped test.
+- PHPStan: pass.
+- PHP-CS-Fixer dry run: pass, with a warning that the local runtime was PHP 8.5.7-dev rather than the project minimum PHP 8.4.
+- Composer manifest validation: pass.
+- Composer security audit: blocked by the environment proxy.
 
-### Microsoft Graph
-11. `checkMemberGroups` API (v1.0):  
-    https://learn.microsoft.com/en-us/graph/api/directoryobject-checkmembergroups?view=graph-rest-1.0
-12. Microsoft Graph permissions reference:  
-    https://learn.microsoft.com/en-us/graph/permissions-reference
+## Compatibility status
 
-### WordPress
-13. `wp_safe_redirect()` behavior and host allowlist mechanics:  
-    https://developer.wordpress.org/reference/functions/wp_safe_redirect/
-14. WordPress authentication/session related developer refs (core auth hooks/functions):  
-    https://developer.wordpress.org/reference/hooks/authenticate/
+| Target | Status | Reason |
+|---|---|---|
+| WordPress 7.1.2 | **Fail / unverified** | Metadata says tested only through 6.9.4; no pinned 7.1.2 integration test exists. |
+| PHP 8.4 | **Partial** | Declared minimum; no real local WP integration run on PHP 8.4. |
+| Current stable PHP | **Unverified** | Local runtime was a development build, not a stable-release matrix. |
+| Composer dependencies | **Fail** | No lockfile and shipped packages violate declared constraints. |
+| Entra ID / OIDC | **Fail by default configuration** | The default discovery endpoint conflicts with the plugin’s claimed v2 OAuth model. |
+| Graph role mapping | **Conditional** | Requires current permission/consent validation and live Graph contract tests. |
 
----
+# P0 — Release blockers
 
-## 3) Codebase areas reviewed
+## 1. Correct the default Entra OpenID Connect discovery endpoint
 
-- `aad-sso-wordpress.php`
-- `AuthorizationHelper.php`
-- `GraphHelper.php`
-- `HttpClient.php`
-- `Settings.php`
-- Settings page/view and supporting logger code where security-relevant
+**Gap:** `Settings::DEFAULT_OPENID_CONFIGURATION_ENDPOINT` is `https://login.microsoftonline.com/organizations/.well-known/openid-configuration`, but authorization is constructed as a v2 scope-based authorization-code flow. The issuer-validation code also expects v2 issuer forms.
 
----
+**Required resolution**
 
-## 4) Executive summary
+1. Default to the explicit Entra v2.0 discovery endpoint.
+2. Validate discovery-document issuer, authorization endpoint, token endpoint, JWKS URI, response types, and supported signing algorithms before enabling login.
+3. Reject discovery data that is incompatible with the configured tenant mode or v2 requirements.
+4. Add tests for tenant-specific, `organizations`, `common`, and supported sovereign-cloud discovery endpoints.
+5. Migrate existing defaults safely and give administrators a visible action item.
 
-The plugin demonstrates a solid baseline for an Entra ID SSO plugin:
+**Acceptance criteria:** Fresh setup succeeds against a current Entra v2 tenant; invalid/mismatched metadata fails closed; documented test evidence covers all advertised tenant modes.
 
-- It uses the authorization code flow.
-- It validates token signatures via JWKS.
-- It checks anti-forgery state/nonce linkage.
-- It performs issuer validation logic with consideration for templated issuers.
-- It uses `wp_safe_redirect()` and defaults to TLS peer/host verification.
+## 2. Commit a Composer lockfile and make release dependencies reproducible
 
-However, there are **critical correctness gaps in ID token validation** and several **defense-in-depth weaknesses** that materially affect trust decisions for production WordPress authentication.
+**Gap:** Production `vendor/` is committed, but `composer.lock` is absent. The activation workflow copies that vendor tree into the plugin artifact.
 
-### Overall risk rating: **High**
+**Required resolution**
 
-This rating is primarily due to missing `aud` and tenant policy enforcement (`tid`/tenant boundary semantics), which can allow authentication acceptance outside intended relying-party and tenant trust assumptions.
+1. Generate and commit `composer.lock` from a clean supported-PHP build.
+2. Build production `vendor/` only with `composer install --no-dev --prefer-dist --optimize-autoloader` from that lockfile.
+3. Add CI validation that fails when installed packages differ from the lockfile.
+4. Generate an SBOM, license inventory, package provenance, and checksums for every release.
+5. Remove all development tooling from the released plugin artifact.
 
----
+**Acceptance criteria:** The release artifact is reproducible, contains only locked production dependencies, and its installed package metadata exactly matches the lockfile.
 
-## 5) Threat model assumptions
+## 3. Resolve all manifest-to-vendor version violations
 
-Threats considered:
+**Gap:** The bundled vendor tree is older than several direct constraints, including `firebase/php-jwt`, `guzzlehttp/psr7`, `symfony/options-resolver`, `symfony/cache`, and `symfony/http-client`.
 
-- Token substitution/confused deputy conditions across apps/tenants.
-- Code interception and replay risk in authorization-code flow.
-- Session fixation/hijacking in mixed hosting/proxy setups.
-- Account-linking ambiguity where claims can vary by guest/federated contexts.
-- Over-permissioned Graph scopes increasing impact radius.
+**Required resolution**
 
-Not considered:
+1. Reinstall from the new lockfile in a clean workspace.
+2. Verify every direct and transitive package supports each declared PHP version.
+3. Run `composer validate --strict`, `composer check-platform-reqs`, and a locked vulnerability audit in CI.
+4. Track deprecations, abandoned packages, licensing, and advisories.
 
-- Full compromise of WordPress host or database.
-- Upstream compromise of Microsoft identity platform.
-- Browser malware/device compromise.
+**Acceptance criteria:** Every shipped package satisfies `composer.json`, the locked audit passes, and security updates are traceable.
 
----
+## 4. Pin and pass a real WordPress 7.1.2 test matrix
 
-## 6) Detailed findings
+**Gap:** Plugin headers and `readme.txt` say “Tested up to: 6.9.4”.
 
-## F-01 — Missing required ID token `aud` validation (**High**)
+**Required resolution**
 
-### Observation
-ID token processing verifies signature/JWKS and nonce, but does not explicitly reject tokens whose `aud` does not match the configured client/application ID.
+1. Run required CI against exact WordPress 7.1.2.
+2. Test the minimum supported PHP and the current supported stable PHP release.
+3. Test single site, multisite if claimed, default and persistent object cache, Apache/Nginx, and HTTPS/reverse-proxy deployment.
+4. Update both metadata files to 7.1.2 only after the matrix passes.
 
-### Why this is a problem
-OIDC relying parties must validate audience to ensure the token was intended for this client. Without this, a validly signed token for another app can be misaccepted under some trust/misconfiguration conditions.
+**Acceptance criteria:** A pinned 7.1.2 matrix is green and protected by branch rules; release metadata truthfully reflects it.
 
-### Standards / vendor basis
-- OIDC Core ID Token validation requirements include audience checks.
-- Microsoft token guidance requires validating `aud` to your app.
+## 5. Repair the WordPress Plugin Check CI job
 
-### Exploitability context
-Real-world exploitability depends on surrounding misconfigurations and token acquisition context, but this is a **protocol-correctness must-fix**, not optional hardening.
+**Gap:** The job labelled “WordPress Plugin Check (Latest WP)” sets `wp-version: '8.4.1'` and allows failure with `continue-on-error: true`.
 
-### Recommendation
-Implement strict audience validation:
-- Require `aud` claim presence.
-- If string: `aud === client_id`.
-- If array: ensure configured `client_id` is present.
-- Handle `azp` according to OIDC rules for multi-audience/authorized presenter scenarios.
+**Required resolution**
 
----
+1. Set the intended WordPress version to 7.1.2.
+2. Remove `continue-on-error`.
+3. Pin the action version under the organization’s action-supply-chain policy.
+4. Archive results and fail the release for untriaged warnings/errors.
 
-## F-02 — No explicit tenant restriction policy (`tid`) while defaulting to `/organizations/` (**High**)
+**Acceptance criteria:** Plugin Check is a required passing status against WP 7.1.2.
 
-### Observation
-Default metadata endpoint is `.../organizations/...`; issuer handling accepts concrete tenant IDs when metadata contains `{tenantid}` pattern, but there is no explicit expected-tenant allowlist check.
+## 6. Establish and test a PHP support policy
 
-### Why this is a problem
-Organizations often expect tenant-bounded access. If app registration and consent posture permit broader identities, absent `tid` policy may admit users from unintended tenants.
+**Gap:** PHP 8.4 is declared as minimum and 8.5 as tested, yet CI runs only PHP 8.4.1 and local testing used a `-dev` build.
 
-### Standards / vendor basis
-Microsoft claim validation docs emphasize checking claims in context, including tenant/issuer constraints.
+**Required resolution**
 
-### Recommendation
-Add tenant policy controls:
-- `expected_tenant_id` (single-tenant mode), or
-- `allowed_tenant_ids[]` (multi-tenant controlled mode).
+1. Publish minimum, current-stable, and end-of-support PHP policy.
+2. Test each supported PHP release/SAPI in the WP 7.1.2 integration matrix.
+3. Add extension/platform checks and fail CI on PHP warnings/deprecations.
+4. Synchronize PHP version statements in code, Composer, CI, and documentation.
 
-Enforce `tid` validation after signature validation and before user linking.
+**Acceptance criteria:** All advertised PHP versions have passing functional and integration evidence without new warnings/deprecations.
 
----
+## 7. Make tenant restriction secure by default
 
-## F-03 — `azp`/multi-audience handling fully implemented (**RESOLVED**)
+**Gap:** `tenantRestrictionMode` defaults to `none`, causing `tid` policy validation to be bypassed.
 
-### Implementation Status: COMPLETE ✅
+**Required resolution**
 
-The plugin now implements comprehensive `azp` (Authorized Party) validation according to OIDC Core 1.0 Section 3.1.3.7 and Microsoft Entra ID guidance (May 2026).
+1. Default new deployments to single-tenant mode with a required tenant GUID.
+2. Require explicit, reviewed allowlists for multi-tenant operation.
+3. Treat `/organizations` and `/common` without tenant constraints as dangerous configurations.
+4. Block auto-provisioning unless a valid tenant restriction is enforced.
+5. Add Site Health warnings for unsafe tenant configuration.
 
-### What Was Implemented
+**Acceptance criteria:** A token from an unapproved tenant is always rejected; new configurations cannot enable SSO without an approved tenant policy.
 
-The `process_jwks_response()` method in `AuthorizationHelper.php` now includes:
+## 8. Replace automatic mutable-claim account linking with reviewed immutable migration
 
-1. **Multi-audience token detection**: Detects when `aud` claim is an array with multiple values
-2. **azp presence warning**: Logs a warning when multi-audience tokens are missing `azp` (per OIDC "SHOULD" requirement)
-3. **azp/client_id matching**: Validates that if `azp` is present, it must equal the configured `client_id`
-4. **Type safety**: Properly handles non-string `azp` values by ignoring them
+**Gap:** Although immutable `oid`/`tid` linking exists, mutable email/UPN/login heuristics remain available by default and a heuristic match writes the incoming immutable identity to the local account.
 
-### Code Location
-- **Primary implementation**: `AuthorizationHelper.php` lines 410-458
-- **Unit tests**: `tests/Unit/AuthorizationHelperTest.php` (7 new test cases)
+**Required resolution**
 
-### References (Primary Sources, May 2026)
-- [OIDC Core 1.0 Section 3.1.3.7](https://openid.net/specs/openid-connect-core-1_0-final.html) — ID Token Validation
-- [Microsoft Entra ID token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference)
-- [Microsoft Entra claims validation](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation)
+1. Enable forced immutable linking by default for new deployments.
+2. Provide an administrator-reviewed migration workflow with evidence, approver, date, and audit record.
+3. Never automatically link privileged WordPress accounts.
+4. Detect duplicate Entra object/tenant mappings.
+5. Retire mutable fallback after a documented migration window.
 
-### Test Coverage
-The following scenarios are tested:
-- ✅ Token with matching `azp` (equals `client_id`) — ACCEPTED
-- ✅ Token with mismatched `azp` — REJECTED
-- ✅ Token without `azp` (single audience) — ACCEPTED
-- ✅ Multi-audience token with matching `azp` — ACCEPTED
-- ✅ Multi-audience token with mismatched `azp` — REJECTED
-- ✅ Multi-audience token without `azp` (with warning logged) — ACCEPTED
-- ✅ Non-string `azp` values — IGNORED (not rejected)
+**Acceptance criteria:** No new automatic identity binding occurs through email, UPN, or login name; all legacy bindings are auditable and reviewed.
 
----
+## 9. Define a deterministic role-mapping privilege policy
 
-## F-04 — Authorization code flow does not use PKCE (**RESOLVED** ✅)
+**Gap:** Every matching Entra group mapping is added as a WordPress role, creating cumulative effective capabilities.
 
-### Implementation Status: COMPLETE
+**Required resolution**
 
-PKCE (Proof Key for Code Exchange) per RFC 7636 has been fully implemented.
+1. Select one policy: deny conflicting matches, explicit priority, least privilege, or approved multi-role combinations.
+2. Forbid `administrator` mapping by default and require a separate dangerous-action confirmation.
+3. Validate role existence and group GUIDs at save time.
+4. Test role addition/removal, conflicts, Graph errors, and loss of group membership.
+5. Log role transitions without tokens or raw PII.
 
-### What Was Implemented
+**Acceptance criteria:** Each group set has a deterministic, tested authorization result and cannot silently elevate privilege.
 
-1. **PKCE Helper Functions** (`AuthorizationHelper.php`):
-   - `aad_sso_generate_pkce_code_verifier()`: Generates cryptographically secure 43-character code_verifier using `random_bytes(32)` and base64url encoding
-   - `aad_sso_generate_pkce_code_challenge()`: Computes S256 code_challenge as `BASE64URL(SHA256(verifier))`
-   - `aad_sso_validate_pkce_code_verifier()`: Validates verifier format and uses constant-time comparison (`hash_equals`)
+## 10. Replace or rigorously harden native PHP sessions
 
-2. **Authorization Request** (`get_authorization_url()`):
-   - Now accepts `code_verifier` parameter
-   - Includes `code_challenge` and `code_challenge_method=S256` in authorization URL
+**Gap:** The plugin starts a native PHP session during `login_init` and uses it for OAuth state, nonce, PKCE, redirects, and Graph token material.
 
-3. **Token Exchange** (`get_access_token()`):
-   - Now requires and validates `code_verifier` parameter
-   - Sends `code_verifier` in token request body
+**Required resolution**
 
-4. **Session Storage** (`aad-sso-wordpress.php`):
-   - `get_login_url()`: Generates and stores PKCE code_verifier in `$_SESSION['aadsso_pkce_code_verifier']`
-   - `authenticate()`: Retrieves code_verifier from session and passes to token exchange
-   - `regenerate_session()`: Clears code_verifier after successful authentication
+1. Prefer a WordPress-native short-lived server-side state store where feasible.
+2. If sessions remain, document shared session-storage, reverse-proxy TLS, headers-sent, cache, and plugin-conflict requirements.
+3. Enforce session expiry, cleanup after all callbacks, Secure/HttpOnly/SameSite attributes, and safe behavior when sessions cannot start.
+4. Add concurrent-tab, replay, multi-node, and already-started-session tests.
 
-### Code Location
-- **PKCE functions**: `AuthorizationHelper.php` lines 1-81
-- **Auth URL generation**: `AuthorizationHelper.php` lines 165-186
-- **Token exchange**: `AuthorizationHelper.php` lines 203-230
-- **Session integration**: `aad-sso-wordpress.php` lines 751-757, 187-196, 214, 860
+**Acceptance criteria:** The flow is reliable on common managed WordPress and multi-node deployments and fails safely under session errors.
 
-### References (Primary Sources, May 2026)
-- [RFC 7636 - Proof Key for Code Exchange](https://datatracker.ietf.org/doc/html/rfc7636)
-- [Microsoft identity platform OAuth 2.0 authorization code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow)
-- [OAuth 2.1 mandates PKCE for all clients](https://curity.io/blog/oauth-2-1-oauth-made-better/)
-- [oauth.com - PKCE for OAuth 2.0](https://oauth.com/oauth2-servers/pkce/)
+## 11. Do not persist Graph access tokens in the session
 
-### Test Coverage
-- ✅ Code verifier length validation (43-128 chars)
-- ✅ Character set validation (unreserved chars only)
-- ✅ S256 challenge generation (RFC 7636 example vector verified)
-- ✅ Base64url encoding without padding
-- ✅ Roundtrip verification
-- ✅ Invalid format rejection
-- ✅ Constant-time comparison usage
+**Gap:** Token responses write `access_token` and unvalidated `token_type` into `$_SESSION`.
 
----
+**Required resolution**
 
-## F-05 — Session lifecycle hardening is incomplete (**RESOLVED** ✅)
+1. Retain Graph tokens only in process memory until group evaluation completes.
+2. If persistence is essential, encrypt, expire, and explicitly destroy token storage.
+3. Require token type `Bearer`.
+4. Remove `offline_access` unless a secure refresh-token lifecycle is implemented.
 
-### Implementation Status: COMPLETE
+**Acceptance criteria:** Successful login leaves no Graph/refresh token in session storage.
 
-Session security has been hardened with the following implementations:
+## 12. Remove or strictly gate secret-bearing debug output
 
-### What Was Implemented
+**Gap:** `print_debug()` outputs complete session, GET, stored settings, and resolved settings values.
 
-1. **Secure Cookie Parameters** (`register_session()`):
-   - `Secure=true`: Only transmit cookie over HTTPS
-   - `HttpOnly=true`: Prevent JavaScript access to session cookie
-   - `SameSite=Lax`: CSRF protection while allowing top-level navigation
-   - PHP 7.3+ uses array signature; fallback for older versions
+**Required resolution**
 
-2. **Session Mode Hardening** (`register_session()`):
-   - `session.use_strict_mode=1`: Reject uninitialized session IDs
-   - `session.use_only_cookies=1`: Prevent URL-based session IDs
+1. Remove it from production or restrict it to non-production, `WP_DEBUG`, `manage_options`, nonce-protected access, and mandatory redaction.
+2. Never display client secrets, tokens, authorization codes, state, nonce, or PKCE verifiers.
+3. Add automated tests that scan diagnostics/logs for secrets.
 
-3. **Session Regeneration** (`regenerate_session()`):
-   - Called after successful authentication
-   - `session_regenerate_id(true)`: Creates new session ID and deletes old session data
-   - Clears `aadsso_pkce_code_verifier` after use (no longer needed)
+**Acceptance criteria:** No support/debug path can disclose sensitive OAuth or application-secret material.
 
-### Code Location
-- **Cookie params**: `aad-sso-wordpress.php` lines 790-836
-- **Session regeneration**: `aad-sso-wordpress.php` lines 838-864
-- **Call after login**: `aad-sso-wordpress.php` lines 478-484
+# P1 — High-priority security and resilience work
 
-### References (Primary Sources, May 2026)
-- [PHP session_set_cookie_params](https://php.net/manual/en/function.session-set-cookie-params.php)
-- [PHP session_regenerate_id](https://php.net/manual/en/function.session-regenerate-id.php)
-- [Paragonie: Fast Track Safe and Secure PHP Sessions](https://paragonie.com/blog/2015/04/fast-track-safe-and-secure-php-sessions)
-- [PHP Session Security Best Practices](https://php.net/manual/en/features.session.security.ini.php)
+## 13. Add live Entra and Graph end-to-end contract tests
 
-### Security Benefits
-- ✅ Prevents session fixation attacks
-- ✅ Protects against XSS-based session cookie theft
-- ✅ Mitigates CSRF via SameSite attribute
-- ✅ Ensures HTTPS-only cookie transmission
+- Use a dedicated test tenant/app registration and CI secrets vault.
+- Cover authorization code, PKCE, state/nonce replay, issuer/audience/`azp`/`tid`, key rotation, expiry, consent failure, MFA/Conditional Access, Graph failures, and group-role mapping.
+- Test advertised tenant/account modes: single tenant, approved multi-tenant, guest/B2B, and MSA behavior.
 
----
+## 14. Add JWKS cache, key rotation, and outage controls
 
-## F-06 — Redirect handling is mostly safe, but should tighten redirect target policy (**RESOLVED** ✅)
+- Cache by HTTP cache directives with bounded TTL.
+- Refresh once on an unknown key ID.
+- Handle malformed responses, timeout, 429, and 5xx safely.
+- Instrument refresh outcome and cache age.
 
-### Implementation Status: COMPLETE
+## 15. Enforce HTTPS and trusted Microsoft endpoint origins
 
-Redirect security has been enhanced with allowlist and external redirect blocking capabilities.
+- Require HTTPS for discovery, token/JWKS/authorization/Graph, redirect, and logout endpoints in production.
+- Default allowlist official Microsoft cloud domains; make custom/sov-cloud support explicit profiles.
+- Verify discovery-derived endpoint origin consistency and prevent configuration-based SSRF.
 
-### What Was Implemented
+## 16. Restrict authorization decisions to Graph v1.0
 
-1. **New Settings** (`Settings.php`):
-   - `allowed_redirect_domains[]`: List of allowed redirect target domains
-   - `block_external_redirects`: Boolean to block all external redirects
+- Disallow `beta` for production group/role authorization.
+- Permit beta only under explicit non-production guardrails.
+- Validate current `checkMemberGroups` behavior and permissions against the test tenant.
 
-2. **Validation Method** (`validate_redirect_url()`):
-   - Checks `block_external_redirects` - only allows same-site redirects
-   - Checks `allowed_redirect_domains` - validates against configured allowlist
-   - Supports subdomain matching (example.com allows sub.example.com)
-   - Falls back to WordPress `wp_safe_redirect()` for remaining checks
+## 17. Complete Graph permission, consent, and capability governance
 
-3. **Sanitization** (`sanitize_redirect_domains()`):
-   - Accepts array or newline-separated string input
-   - Normalizes domains (strips protocols, trailing slashes)
-   - Validates hostname format
-   - Filters out invalid entries
+- Reconfirm current delegated permission and admin-consent requirements.
+- Add setup preflight that detects missing consent/capability before user login.
+- Document least-privilege alternatives such as claims/app roles where appropriate.
+- Translate consent errors safely without raw Graph internals.
 
-4. **Integration** (`aad-sso-wordpress.php`):
-   - `save_redirect_and_maybe_bypass_login()`: Validates `redirect_to` before storing
-   - `redirect_after_login()`: Re-validates stored redirect URL (defense in depth)
+## 18. Add strict configuration preflight and health diagnostics
 
-### Code Location
-- **Settings properties**: `Settings.php` lines 69-86
-- **Option resolver**: `Settings.php` lines 252-258
-- **Sanitization**: `Settings.php` lines 631-692
-- **Validation**: `Settings.php` lines 694-781
-- **Plugin integration**: `aad-sso-wordpress.php` lines 150-156, 168-176
+- Validate client ID, tenant IDs, group IDs, redirect URIs, logout URI, endpoint HTTPS/origin, and role mappings.
+- Confirm app-registration requirements without storing or printing secrets.
+- Add a “test configuration” action and WordPress Site Health checks.
 
-### References (Primary Sources, May 2026)
-- [WordPress wp_safe_redirect](https://developer.wordpress.org/reference/functions/wp_safe_redirect/)
-- [OWASP Redirect Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)
+## 19. Define a strict Entra token-claim policy
 
-### Test Coverage
-- ✅ Empty input handling
-- ✅ Relative URL passthrough
-- ✅ Protocol stripping
-- ✅ Trailing slash removal
-- ✅ Invalid hostname rejection
-- ✅ Newline-separated input parsing
-- ✅ Invalid entry filtering
+- Document mandatory claims and allowed types for every supported account category.
+- Require `tid` for enterprise flows.
+- Define clock-skew, guest, MSA, federated, service-principal, missing-email, and missing-UPN policy.
+- Add negative test vectors for every validation branch.
 
----
+## 20. Add state expiry and replay defenses
 
-## F-07 — Account linking relies on mutable claims and fallback heuristics (**Medium**)
+- Store issuance time and a short expiry with state/nonce/PKCE.
+- Use constant-time state comparison.
+- Destroy pending values after both success and failure.
+- Support multiple concurrent logins through bounded indexed state entries.
 
-### Observation
-User lookup may use `email`/`preferred_username`/`upn`/`unique_name` and alias fallbacks.
+## 21. Strengthen outbound HTTP reliability and observability
 
-### Why this matters
-Mutable or guest-transformed identifiers can lead to ambiguous matches in edge cases.
+- Define connect/read/total timeouts, safe retries, 429 handling, correlation IDs, User-Agent, and circuit breakers.
+- Decide whether to use WordPress HTTP API for platform proxy/CA compatibility.
+- Add sanitized metrics and health checks.
 
-### Recommendation
-Introduce immutable link strategy:
-- Store first successful Entra `oid` (and optionally `tid`) in user meta.
-- On subsequent login, require exact immutable match.
-- Keep heuristic fallback as opt-in migration mode only.
+## 22. Default to local post-login/logout redirects
 
----
+- Set external redirect blocking by default.
+- Test encoded, Unicode/IDN, backslash, CRLF, port, IPv6, and double-encoding bypass cases.
+- Require `wp_safe_redirect()` as final redirect protection with immediate termination.
 
-## F-08 — Auto-provisioning controls need stronger policy guardrails (**Medium**)
+## 23. Add comprehensive audit logging
 
-### Observation
-Auto-provisioning can create users based on claims when not already present.
+- Audit configuration changes, identity links, login outcomes, tenant decisions, user provisioning, and role changes.
+- Include correlation ID, actor, target, time, old/new roles, and policy decision.
+- Exclude all secret/token/raw-claim content.
+- Support enterprise log forwarding hooks and retention policy.
 
-### Risk
-Inadequate tenant/group policy can combine with auto-provisioning to expand access unexpectedly.
+## 24. Harden log/cache filesystem storage
 
-### Recommendation
-- Gate auto-provisioning behind explicit tenant restriction and role assignment policy.
-- Add admin warnings and safer defaults (off by default already helps).
+- Avoid relying on `.htaccess`, which does not protect all web servers.
+- Prefer storage outside web roots, restrictive permissions, and secure ownership.
+- Test read-only/container/shared-host/multisite behavior.
+- Do not use the plugin directory as a writable fallback in production.
 
----
+## 25. Make test runs clean
 
-## F-09 — Graph least-privilege posture should be made explicit in docs/UI (**Medium**)
+- Eliminate PHPUnit deprecations/notices and resolve skipped-test coverage.
+- Fail CI on newly introduced notices/deprecations.
+- Add security-critical coverage thresholds.
 
-### Observation
-Role mapping path requests Graph scopes including `GroupMember.Read.All` and calls `checkMemberGroups`.
+## 26. Test activation, upgrade, rollback, deactivation, and uninstall
 
-### Risk/tradeoff
-Functionally valid but broader delegated access requires strong justification and admin awareness.
+- Test complete lifecycle on WP 7.1.2.
+- Version migrations, make them idempotent, and define retention/deletion policy for identity metadata.
+- Test network activation and multisite behavior if claimed.
 
-### Recommendation
-- Document exact permissions and consent implications in settings UI.
-- Offer reduced-capability mode where feasible.
+## 27. Define multisite support explicitly
 
----
+- Decide scope of settings, user linking, roles, sessions, redirects, and logs.
+- Test network activation, super admins, site activation, mapped domains, and per-site roles.
+- Reject unsupported multisite paths visibly.
 
-## F-10 — Logging may expose sensitive operational context (**Low/Medium**)
+## 28. Repair localization, accessibility, and admin UX
 
-### Observation
-Debug logs include token/claim/HTTP diagnostic context in some branches.
+- Use one canonical text domain consistently in header, code, POT, tests, and package slug.
+- Regenerate translations and test localized/RTL settings screens.
+- Run WordPress accessibility and coding-standard checks.
 
-### Risk
-Operational logs may leak identity metadata or error internals if debug enabled in production.
+# P2 — Robustness and operational maturity
 
-### Recommendation
-- Redact token-like strings/PII in logs.
-- Add explicit “safe debug mode” with irreversible redaction.
+## 29. Implement or remove refresh-token scope
 
----
+- Remove `offline_access` unless refresh tokens are necessary.
+- If retained, implement encrypted storage, rotation, expiry, revocation, incident response, and least privilege.
 
-## 7) Positive security controls observed
+## 30. Support Entra interaction-required scenarios safely
 
-1. Anti-forgery `state` is checked against session-stored value.
-2. Nonce from token is correlated with anti-forgery value.
-3. JWKS signature validation is implemented.
-4. Issuer validation logic exists and accounts for templated issuer metadata.
-5. HTTP client enables TLS verification.
-6. Graph call failures are surfaced as auth errors rather than silent bypass.
+- Test and provide safe UX for MFA, Conditional Access, consent, password change, disabled accounts, and interaction-required errors.
 
----
+## 31. Define account-type support boundaries
 
-## 8) Prioritized remediation roadmap
+- Explicitly support or reject B2B guests, cross-tenant sync, consumer MSA, federation, and external ID/B2C.
+- Provide claim/linking policy and test coverage for each supported mode.
 
-### Phase 0 — Immediate (blocker/high)
-1. ~~Implement mandatory `aud` validation.~~ ✅ RESOLVED
-2. ~~Implement mandatory tenant policy check (`tid` with single or allowlist mode).~~ ✅ RESOLVED
-3. ~~Add `azp` handling where required by token shape.~~ ✅ RESOLVED
+## 32. Add rate limiting and outage protection
 
-### Phase 1 — Near-term hardening
-4. ~~Add PKCE S256 to authorization code flow.~~ ✅ RESOLVED (F-04)
-5. ~~Regenerate PHP session ID post-auth and tighten session cookie flags.~~ ✅ RESOLVED (F-05)
-   - ~~Redirect target policy tightening.~~ ✅ RESOLVED (F-06)
-6. ⬜ Implement immutable user linking with `oid`(+`tid`) persistence.
+- Rate-limit callback/login failures and upstream calls.
+- Integrate with WordPress/WAF protection.
+- Add bounded circuit breakers and clear incident behavior for Entra/Graph outages.
 
-### Phase 2 — Operational maturity
-7. Improve permission transparency in settings UI.
-8. Add sensitive logging redaction.
-9. Add security-focused integration tests for claim validation edge cases.
+## 33. Add enterprise secret management
 
----
+- Support environment variables or WordPress constants for secrets.
+- Provide secret rotation/expiry guidance and alerts.
+- Ensure exports, migrations, support bundles, and logs never disclose secrets.
 
-## 9) Suggested test cases to add
+## 34. Govern configuration export/import and migration
 
-1. Reject ID token with valid signature but wrong `aud`.
-2. Reject ID token with unexpected `tid`.
-3. Accept only configured tenant(s) in multi-tenant mode.
-4. PKCE verifier mismatch should fail token exchange.
-5. Session ID rotates after successful authentication.
-6. Immutable `oid` mismatch prevents takeover of existing WP account.
-7. Group mapping failure path never yields elevated role assignment.
+- Exclude secrets by default.
+- Integrity-protect imported settings.
+- Require capability/nonce checks and audit reset/import/migration actions.
+- Test malformed and malicious legacy input.
 
----
+## 35. Test concurrency and race conditions
 
-## 10) Commands and checks executed during audit
+- Test parallel first logins, provisioning, identity migration, role changes, and concurrent tabs.
+- Add uniqueness/transactional safeguards where required.
 
-1. `vendor/bin/phpunit --colors=never`  
-   Result: pass (24 tests) with deprecations.
+## 36. Validate all role/group mappings on save
 
-2. `vendor/bin/phpstan analyse --no-progress --memory-limit=512M`  
-   Result: incomplete in this environment due to memory exhaustion.
+- Require valid GUID group IDs and existing role slugs.
+- Deduplicate values and reject empty/ambiguous mappings.
+- Preview risky mapping changes before activation.
 
-3. `composer audit --format=plain`  
-   Result: unable to complete in this environment due to Packagist connectivity/proxy restriction.
+## 37. Make issuer validation cloud-aware and metadata-derived
 
----
+- Derive expected issuer patterns from trusted discovery data.
+- Explicitly support approved Microsoft sovereign clouds.
+- Avoid a single hard-coded public-cloud issuer pattern.
 
-## 11) Final conclusion
+## 38. Maintain a formal threat model
 
-For the stated use case (WordPress login via Entra ID), this plugin is now production-capable after completing Phase 0 security fixes including mandatory `aud` validation, tenant policy enforcement (`tid`), and `azp` handling.
+- Cover token substitution, account takeover, replay, session fixation, SSRF, privilege escalation, logout CSRF, and settings tampering.
+- Map controls to OAuth/OIDC best current practice, Entra claim validation guidance, WordPress security guidance, and OWASP ASVS.
 
-### Progress Summary
+## 39. Add fuzzing and hostile-input tests
 
-- **Phase 0 (blocker/high)**: ✅ ALL RESOLVED
-  - Mandatory `aud` validation
-  - Tenant policy check (`tid` with single/multi-tenant modes)
-  - `azp` handling per OIDC Core 1.0 Section 3.1.3.7
+- Fuzz tokens, claims, JWKS, metadata, Graph responses, redirects, imports, Unicode, oversized inputs, duplicate JSON keys, and unexpected data types.
 
-- **Phase 1 (near-term hardening)**: ✅ ALL RESOLVED
-  - ✅ PKCE S256 to authorization code flow (F-04)
-  - ✅ Session regeneration post-auth (F-05)
-  - ✅ Redirect target policy tightening (F-06)
-  - ✅ Immutable user linking with `oid` (F-07)
+## 40. Establish performance and scale budgets
 
-- **Phase 2 (operational maturity)**: ✅ ALL RESOLVED
-  - ✅ Permission transparency in settings UI (F-09)
-  - ✅ Sensitive logging redaction (F-10)
-  - Auto-provisioning policy guardrails (F-08)
+- Load-test callback throughput, cache behavior, Graph group mapping, large mappings, and Entra/Graph outage response.
+- Measure request volume, worker use, latency, and cache hit rate.
 
-### Security Posture
+## 41. Publish upgrade/rollback policy
 
-The plugin now has robust security hardening including:
-- ✅ PKCE protection against authorization code interception
-- ✅ Session fixation prevention with ID regeneration
-- ✅ Secure cookie attributes (Secure, HttpOnly, SameSite)
-- ✅ Redirect allowlisting and external redirect blocking
-- ✅ All Phase 0 critical security fixes (aud, tid, azp)
-- ✅ Immutable user linking with oid/tid for account security
-- ✅ Auto-provisioning gated behind tenant and role policies
-- ✅ Sensitive data redaction in debug logs
+- Provide idempotent versioned migrations, historical upgrade tests, and rollback safety without destructive data loss.
 
-**May 9, 2026**: All Phase 1 and Phase 2 items from AUDIT.md have been resolved. The plugin implements all recommendations from the security audit.
+## 42. Publish incident response and support policy
 
----
-*Last updated: May 9, 2026 (UTC)*
+- Define support windows, vulnerability disclosure, security SLA, Entra/Graph outage runbooks, secret compromise, role-elevation, and identity-linking incident procedures.
+
+# P3 — Release engineering and external assurance
+
+## 43. Build a clean, attestable release artifact
+
+- Build plugin zip in CI from locked production dependencies.
+- Exclude tests/tooling/caches and scan the artifact.
+- Produce checksums, SBOM, provenance, and install/activate the exact zip on WP 7.1.2.
+
+## 44. Align documentation with behavior
+
+- Keep code comments, headers, README, `readme.txt`, settings UI, PHP support, Entra registration, Graph permission, tenant, session, proxy, and operational documentation in sync.
+
+## 45. Make WordPress quality/security checks release gates
+
+- Require WPCS, Plugin Check, escaping/sanitization/nonce/capability/filesystem/i18n checks.
+- Do not permit non-blocking security checks or unexplained suppressions.
+
+## 46. Automate dependency maintenance
+
+- Configure reviewed automated Composer updates.
+- Require lockfile diff, security audit, license scan, and WP/PHP matrix for each update.
+- Maintain emergency patch/release process.
+
+## 47. Add enterprise health checks and telemetry
+
+- Implement sanitized Site Health checks for autoloader, dependencies, extensions, endpoint reachability, metadata freshness, tenant policy, Graph consent, secret expiry, and secure storage.
+- Record non-PII outcome metrics and alert thresholds.
+
+## 48. Obtain independent security assessment
+
+- Conduct external OIDC/Entra/Graph/WordPress penetration testing and code review.
+- Remediate and retest all high/critical findings before certification.
+
+# Recommended implementation order
+
+1. Complete P0 items 1–6: identity-default correctness, reproducible dependencies, and exact WP/PHP validation.
+2. Complete P0 items 7–12: secure tenancy, immutable identity links, authorization policy, session/token handling, and diagnostics.
+3. Complete P1: live Entra/Graph contract testing and runtime resilience.
+4. Complete P2: scale, governance, migration, and operational maturity.
+5. Complete P3: release provenance, continuous assurance, and independent review.
+
+# Certification definition of done
+
+The addon may be called enterprise-grade and compatible with the stated targets only when:
+
+1. Required integration tests pass on exact WordPress 7.1.2 and all published PHP versions.
+2. A committed Composer lockfile, exact production `vendor/`, locked vulnerability audit, license scan, and SBOM are present.
+3. A dedicated Entra test tenant proves current discovery, authorization-code + PKCE, token validation, tenant restrictions, key rotation, consent, Graph group authorization, and error handling.
+4. Secure defaults require tenant restriction and immutable user identity linking.
+5. Privileged role mapping is deterministic, minimized, audited, and fully tested.
+6. No secret, token, or raw claim is exposed by logs, debug output, caches, exports, or errors.
+7. Plugin Check, security checks, and the test matrix are mandatory passing release gates.
+8. Independent security assessment has no unresolved high or critical finding.
