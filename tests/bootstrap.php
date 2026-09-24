@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
-
 // Allow ABSPATH to be overridden via environment variable (for CI/standalone setups)
 // This is the standard WordPress convention: check env first, then use default
 if (\defined('ABSPATH')) {

@@ -10,7 +10,7 @@ if (!\defined('ABSPATH')) {
 
 class Settings
 {
-    public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/v2.0/.well-known/openid-configuration';
+    public const DEFAULT_OPENID_CONFIGURATION_ENDPOINT = 'https://login.microsoftonline.com/organizations/.well-known/openid-configuration';
 
     public string $client_id = '';
 
@@ -558,167 +558,6 @@ class Settings
     }
 
     /**
-     * Safely migrate a legacy OpenID Connect discovery endpoint URL to Entra v2.0.
-     *
-     * @param string $endpoint The endpoint URL to migrate
-     *
-     * @return string The migrated v2.0 endpoint URL
-     */
-    public static function migrate_openid_endpoint_to_v2(string $endpoint): string
-    {
-        if ('' === $endpoint) {
-            return self::DEFAULT_OPENID_CONFIGURATION_ENDPOINT;
-        }
-
-        if (str_contains($endpoint, '/v2.0/')) {
-            return $endpoint;
-        }
-
-        if (str_contains($endpoint, '/.well-known/openid-configuration')) {
-            return str_replace('/.well-known/openid-configuration', '/v2.0/.well-known/openid-configuration', $endpoint);
-        }
-
-        return $endpoint;
-    }
-
-    /**
-     * Helper to extract tenant component from issuer URL.
-     */
-    public static function extract_tenant_from_issuer(string $issuer): string
-    {
-        $path = (string) parse_url($issuer, \PHP_URL_PATH);
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => '' !== $s));
-
-        $v2_index = array_search('v2.0', $segments, true);
-        if (false !== $v2_index && $v2_index > 0) {
-            return $segments[$v2_index - 1];
-        }
-
-        return $segments[0] ?? '';
-    }
-
-    /**
-     * Validate OpenID Connect discovery document structure, v2 endpoint requirements,
-     * signing algorithms, response types, and tenant mode compatibility.
-     *
-     * @param array<string, mixed> $config
-     * @param null|self            $settings Optional settings instance to validate against configured tenant restrictions
-     *
-     * @return bool True if configuration is valid and compatible; false otherwise
-     */
-    public static function validate_openid_configuration(array $config, ?self $settings = null): bool
-    {
-        $required_keys = [
-            'authorization_endpoint',
-            'token_endpoint',
-            'jwks_uri',
-            'issuer',
-            'response_types_supported',
-            'id_token_signing_alg_values_supported',
-        ];
-
-        foreach ($required_keys as $key) {
-            if (!isset($config[$key])) {
-                AADSSO_Logger::log_error(\sprintf('OpenID discovery document missing required field: %s', $key));
-
-                return false;
-            }
-        }
-
-        $authorization_endpoint = \is_string($config['authorization_endpoint']) ? $config['authorization_endpoint'] : '';
-        $token_endpoint = \is_string($config['token_endpoint']) ? $config['token_endpoint'] : '';
-        $jwks_uri = \is_string($config['jwks_uri']) ? $config['jwks_uri'] : '';
-        $issuer = \is_string($config['issuer']) ? $config['issuer'] : '';
-
-        if ('' === $authorization_endpoint || !str_starts_with($authorization_endpoint, 'https://')) {
-            AADSSO_Logger::log_error('OpenID discovery document authorization_endpoint must be a valid HTTPS URL.');
-
-            return false;
-        }
-
-        if ('' === $token_endpoint || !str_starts_with($token_endpoint, 'https://')) {
-            AADSSO_Logger::log_error('OpenID discovery document token_endpoint must be a valid HTTPS URL.');
-
-            return false;
-        }
-
-        if ('' === $jwks_uri || !str_starts_with($jwks_uri, 'https://')) {
-            AADSSO_Logger::log_error('OpenID discovery document jwks_uri must be a valid HTTPS URL.');
-
-            return false;
-        }
-
-        if ('' === $issuer || !str_starts_with($issuer, 'https://')) {
-            AADSSO_Logger::log_error('OpenID discovery document issuer must be a valid HTTPS URL.');
-
-            return false;
-        }
-
-        if (!str_contains($authorization_endpoint, '/v2.0/') && !str_contains($authorization_endpoint, '/v2.0')) {
-            AADSSO_Logger::log_error(\sprintf('Authorization endpoint "%s" is not an Entra v2.0 endpoint.', $authorization_endpoint));
-
-            return false;
-        }
-
-        if (!str_contains($token_endpoint, '/v2.0/') && !str_contains($token_endpoint, '/v2.0')) {
-            AADSSO_Logger::log_error(\sprintf('Token endpoint "%s" is not an Entra v2.0 endpoint.', $token_endpoint));
-
-            return false;
-        }
-
-        if (!str_ends_with(rtrim($issuer, '/'), '/v2.0')) {
-            AADSSO_Logger::log_error(\sprintf('Issuer "%s" does not match Entra v2.0 issuer pattern (must end in /v2.0).', $issuer));
-
-            return false;
-        }
-
-        $response_types = \is_array($config['response_types_supported']) ? $config['response_types_supported'] : [];
-        if (!\in_array('code', $response_types, true)) {
-            AADSSO_Logger::log_error('OpenID discovery document response_types_supported does not contain "code".');
-
-            return false;
-        }
-
-        $signing_algs = \is_array($config['id_token_signing_alg_values_supported']) ? $config['id_token_signing_alg_values_supported'] : [];
-        if (!\in_array('RS256', $signing_algs, true)) {
-            AADSSO_Logger::log_error('OpenID discovery document id_token_signing_alg_values_supported does not contain "RS256".');
-
-            return false;
-        }
-
-        $settings ??= self::get_instance();
-        $issuer_tenant = self::extract_tenant_from_issuer($issuer);
-
-        if ('' !== $issuer_tenant && '{tenantid}' !== $issuer_tenant && '{tenant-id}' !== $issuer_tenant) {
-            if ('' !== $settings->expected_tenant_id || 'single' === $settings->tenantRestrictionMode) {
-                if ('' !== $settings->expected_tenant_id && 0 !== strcasecmp($issuer_tenant, $settings->expected_tenant_id)) {
-                    AADSSO_Logger::log_error(\sprintf(
-                        'OpenID discovery issuer tenant "%s" does not match expected single tenant ID "%s".',
-                        $issuer_tenant,
-                        $settings->expected_tenant_id
-                    ));
-
-                    return false;
-                }
-            }
-
-            if ('multi' === $settings->tenantRestrictionMode && !empty($settings->allowed_tenant_ids)) {
-                $allowed = array_map('strtolower', $settings->allowed_tenant_ids);
-                if (!\in_array(mb_strtolower($issuer_tenant), $allowed, true)) {
-                    AADSSO_Logger::log_error(\sprintf(
-                        'OpenID discovery issuer tenant "%s" is not in the allowed tenant list.',
-                        $issuer_tenant
-                    ));
-
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Safely get blog name, with fallback for when WordPress is not fully initialized.
      */
     private static function safe_get_bloginfo_name(): string
@@ -839,12 +678,6 @@ class Settings
             }
 
             if (\is_array($openid_configuration) && !empty($openid_configuration)) {
-                if (!self::validate_openid_configuration($openid_configuration, $instance)) {
-                    AADSSO_Logger::log_error('OpenID Connect discovery configuration validation failed.');
-
-                    return false;
-                }
-
                 // @var array<string, mixed>
                 return $openid_configuration;
             }
